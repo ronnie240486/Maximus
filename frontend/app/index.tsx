@@ -1,0 +1,337 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  ImageBackground,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+
+import { colors, spacing } from '@/src/theme';
+import { getDeviceMac } from '@/src/lib/device';
+import { checkMac, MacStatus } from '@/src/api/client';
+import { saveSession, loadSession } from '@/src/state/session';
+
+const POLL_MS = 5000;
+
+export default function MacLoginScreen() {
+  const router = useRouter();
+  const [mac, setMac] = useState<string>('');
+  const [status, setStatus] = useState<MacStatus | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
+  const [checking, setChecking] = useState(false);
+  const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  const runPoll = useCallback(
+    async (deviceMac: string, isManual = false) => {
+      if (!mountedRef.current) return;
+      setChecking(true);
+      const s = await checkMac(deviceMac);
+      if (!mountedRef.current) return;
+      setChecking(false);
+      setStatus(s);
+      setLastCheck(new Date());
+      setPollCount((c) => c + 1);
+      if (s.authorized) {
+        await saveSession(s);
+        router.replace('/profiles');
+        return;
+      }
+      if (!isManual) {
+        pollRef.current = setTimeout(() => runPoll(deviceMac), POLL_MS);
+      }
+    },
+    [router]
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    (async () => {
+      // If we already have a session cached, jump straight to profiles.
+      const cached = await loadSession();
+      if (cached?.authorized) {
+        router.replace('/profiles');
+        return;
+      }
+      const m = await getDeviceMac();
+      if (!mountedRef.current) return;
+      setMac(m);
+      runPoll(m);
+    })();
+    return () => {
+      mountedRef.current = false;
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
+  }, [router, runPoll]);
+
+  const onCopy = async () => {
+    if (!mac) return;
+    await Clipboard.setStringAsync(mac);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  const onCheckNow = async () => {
+    if (!mac || checking) return;
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+    await runPoll(mac);
+    // Restart auto-polling after manual check
+    if (mountedRef.current && !status?.authorized) {
+      pollRef.current = setTimeout(() => runPoll(mac), POLL_MS);
+    }
+  };
+
+  const bg = status?.bg_url;
+  const logo = status?.logo_url;
+  const banner = status?.banner_url;
+  const appName = status?.app_name;
+
+  // Concise summary of the last response for on-screen debug.
+  const debugLine = (() => {
+    if (!lastCheck) return 'Aguardando primeira verificação...';
+    const time = lastCheck.toLocaleTimeString();
+    if (!status) return `${time} • sem resposta`;
+    if (status.message === 'Falha de conexão.') {
+      return `${time} • FALHA DE REDE (verifique internet/CORS)`;
+    }
+    if (status.registered && !status.authorized) {
+      return `${time} • registrado mas sem playlist`;
+    }
+    if (status.registered) {
+      return `${time} • registered=SIM, status=${status.status || '—'}`;
+    }
+    return `${time} • device NÃO encontrado no painel`;
+  })();
+
+  return (
+    <ImageBackground
+      source={bg ? { uri: bg } : undefined}
+      style={styles.bg}
+      imageStyle={{ opacity: 0.25 }}
+    >
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.logoWrap}>
+          {logo ? (
+            <Image source={{ uri: logo }} style={styles.logoImg} contentFit="contain" />
+          ) : (
+            <View style={styles.logoCircle} testID="app-logo">
+              <Ionicons name="play" size={30} color={colors.black} />
+            </View>
+          )}
+        </View>
+
+        {!!banner && (
+          <Image source={{ uri: banner }} style={styles.banner} contentFit="cover" testID="app-banner" />
+        )}
+
+        <Text style={styles.title} testID="mac-login-title">Como entrar</Text>
+
+        <View style={styles.centerBlock}>
+          <Text style={styles.label}>ID DO DISPOSITIVO (MAC)</Text>
+          <Pressable onPress={onCopy} hitSlop={12} testID="mac-value-copy">
+            <Text style={styles.macValue} numberOfLines={1}>
+              {mac || '— — : — — : — — : — — : — — : — —'}
+            </Text>
+          </Pressable>
+          <Text style={styles.tap}>{copied ? 'Copiado!' : 'Toque para copiar'}</Text>
+
+          <View style={styles.statusBox} testID="mac-status-box">
+            {checking ? (
+              <ActivityIndicator color={colors.accentCyan} size="small" />
+            ) : (
+              <Ionicons name="time-outline" size={16} color={colors.accentCyan} />
+            )}
+            <Text style={styles.statusText}>
+              {checking ? 'VERIFICANDO...' : 'AGUARDANDO ATIVACAO...'}
+            </Text>
+          </View>
+
+          <Text style={styles.debugText} testID="mac-debug-line">
+            {debugLine}
+          </Text>
+          <Text style={styles.debugSmall}>
+            Tentativas: {pollCount} • Backend: renciaapp.manus.space
+          </Text>
+
+          <Pressable
+            onPress={onCheckNow}
+            disabled={checking}
+            style={[styles.checkBtn, checking && { opacity: 0.5 }]}
+            testID="mac-check-now"
+          >
+            <Ionicons name="refresh" size={14} color={colors.accentCyan} />
+            <Text style={styles.checkBtnText}>VERIFICAR AGORA</Text>
+          </Pressable>
+
+          <Text style={styles.hint}>
+            Envie o ID acima para seu revendedor.{'\n'}
+            Assim que ativado, o acesso abre automaticamente.
+          </Text>
+
+          {!!status?.reseller_whatsapp && (
+            <View style={styles.resellerBox}>
+              <Ionicons name="logo-whatsapp" size={16} color={colors.accentCyan} />
+              <Text style={styles.resellerText}>
+                {status.reseller_contact || status.reseller_whatsapp}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Pressable
+          onPress={() => router.push('/diagnostic')}
+          style={styles.diagBtn}
+          hitSlop={12}
+          testID="mac-login-diagnostic"
+        >
+          <Ionicons name="pulse" size={12} color={colors.textMuted} />
+          <Text style={styles.diagText}>Diagnosticar backend</Text>
+        </Pressable>
+
+        <Text style={styles.footer}>{appName || 'Interactive Player'}</Text>
+      </SafeAreaView>
+    </ImageBackground>
+  );
+}
+
+const styles = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: colors.black },
+  safe: { flex: 1, paddingHorizontal: spacing.xl },
+  logoWrap: { alignItems: 'center', marginTop: spacing.md },
+  banner: {
+    width: '100%',
+    aspectRatio: 16 / 6,
+    marginTop: spacing.md,
+    borderRadius: 12,
+  },
+  logoCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: colors.accentCyan,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImg: { width: 96, height: 72 },
+  title: {
+    color: colors.white,
+    fontSize: 26,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
+  centerBlock: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  label: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 1.5,
+    marginBottom: spacing.sm,
+  },
+  macValue: {
+    color: colors.accentCyan,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  tap: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
+  statusBox: {
+    marginTop: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.darkSurface,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  statusText: {
+    color: colors.accentCyan,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  debugText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  debugSmall: {
+    color: colors.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  checkBtn: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.accentCyan,
+  },
+  checkBtnText: {
+    color: colors.accentCyan,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  hint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: spacing.lg,
+  },
+  resellerBox: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.darkSurfaceAlt,
+    borderRadius: 20,
+  },
+  resellerText: { color: colors.accentCyan, fontSize: 13, fontWeight: '700' },
+  diagBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  diagText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    letterSpacing: 1,
+    textDecorationLine: 'underline',
+  },
+  footer: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    letterSpacing: 1,
+  },
+});
