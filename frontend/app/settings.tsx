@@ -19,6 +19,7 @@ import { getDeviceMac } from '@/src/lib/device';
 import { clearSession, loadSession, getXtream } from '@/src/state/session';
 import { xtream } from '@/src/lib/xtream';
 import { storage } from '@/src/utils/storage';
+import { isWelcomeAudioEnabled, setWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { MacStatus } from '@/src/api/client';
 import PinModal from '@/src/components/PinModal';
 import {
@@ -70,16 +71,18 @@ export default function SettingsScreen() {
   const [autoplayNext, setAutoplayNext] = useState(true);
   const [pinFlow, setPinFlow] = useState<PinFlow | null>(null);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
+  const [welcomeAudio, setWelcomeAudio] = useState(true);
   const [pinError, setPinError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [m, s, parental, hasPin, autoplay] = await Promise.all([
+      const [m, s, parental, hasPin, autoplay, welcomeAudioOn] = await Promise.all([
         getDeviceMac(),
         loadSession(),
         isParentalLockEnabled(),
         hasParentalPin(),
         storage.getItem<boolean>(AUTOPLAY_KEY, true),
+        isWelcomeAudioEnabled(),
       ]);
       setMac(m);
       setSession(s);
@@ -96,6 +99,7 @@ export default function SettingsScreen() {
           if (msg) setProviderMessage(msg);
         });
       }
+      setWelcomeAudio(welcomeAudioOn);
     })();
   }, []);
 
@@ -103,6 +107,12 @@ export default function SettingsScreen() {
     setAutoplayNext(v);
     await storage.setItem(AUTOPLAY_KEY, v);
   };
+
+  const toggleWelcomeAudio = async (v: boolean) => {
+    setWelcomeAudio(v);
+    await setWelcomeAudioEnabled(v);
+  };
+
 
   // Turning ON with no PIN yet -> create one first. Turning OFF always
   // requires the current PIN, so a kid can't just flip the switch back off.
@@ -354,6 +364,13 @@ export default function SettingsScreen() {
       subtitle: autoplayNext ? 'Próximo episódio automático: ativado' : 'Próximo episódio automático: desativado',
       icon: <Ionicons name="play-circle-outline" size={20} color={colors.accentCyan} />,
       toggle: { value: autoplayNext, onChange: toggleAutoplay },
+    },
+    {
+      id: 'welcome-audio',
+      title: 'Áudio de boas-vindas',
+      subtitle: welcomeAudio ? 'Ativado' : 'Desativado',
+      icon: <Ionicons name="volume-high-outline" size={20} color={colors.accentCyan} />,
+      toggle: { value: welcomeAudio, onChange: toggleWelcomeAudio },
     },
     {
       id: 'diagnostic',
