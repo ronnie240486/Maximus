@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Interactive Player",
-    "slug": "interactive-player",
+    "slug": "interactive-player-v2",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
