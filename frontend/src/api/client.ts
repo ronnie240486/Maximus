@@ -160,27 +160,21 @@ export type TestRegisterResult = {
   raw: string;
 };
 
+const BACKEND_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+
 /**
- * Chama o endpoint de registro de dispositivo de teste. Não temos
- * documentação oficial do formato, então tentamos a variação mais comum
- * (".php", igual aos outros endpoints deste painel) e devolvemos a resposta
- * crua pra podermos ver o resultado direto na tela, sem precisar de log.
+ * Gera um teste automático. Chama o NOSSO backend (não o painel direto) —
+ * o backend é quem sabe a URL real do gerador de teste, guardada numa
+ * variável de ambiente (TEST_REGISTER_URL) que pode mudar sem precisar
+ * gerar um APK novo.
  */
 export async function registerTestDevice(mac: string): Promise<TestRegisterResult> {
-  const candidates = [
-    `${PANEL_BASE}/user_register.php?mac=${encodeURIComponent(mac)}`,
-    `${PANEL_BASE}/user_register?mac=${encodeURIComponent(mac)}`,
-  ];
-  let last: TestRegisterResult = { ok: false, url: candidates[0], raw: '' };
-  for (const upstream of candidates) {
-    try {
-      const res = await fetch(proxied(upstream), { headers: commonHeaders });
-      const text = await res.text();
-      last = { ok: res.ok, http: res.status, url: upstream, raw: text };
-      if (res.ok) return last;
-    } catch (e: any) {
-      last = { ok: false, url: upstream, raw: e?.message || String(e) };
-    }
+  const upstream = `${BACKEND_BASE}/api/generate-test?mac=${encodeURIComponent(mac)}`;
+  try {
+    const res = await fetch(upstream, { headers: commonHeaders });
+    const text = await res.text();
+    return { ok: res.ok, http: res.status, url: upstream, raw: text };
+  } catch (e: any) {
+    return { ok: false, url: upstream, raw: e?.message || String(e) };
   }
-  return last;
 }

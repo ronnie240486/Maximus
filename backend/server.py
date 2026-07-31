@@ -130,6 +130,35 @@ async def iptv_proxy(url: str, request: Request):
     )
 
 
+# ---------------------------------------------------------------------------
+# Teste automático (chatbot de geração de teste)
+# ---------------------------------------------------------------------------
+# A URL real do gerador de teste (sigmab.pro) muda de tempos em tempos, então
+# fica numa variável de ambiente em vez de fixa no código do app — trocar o
+# link não exige gerar um APK novo, só atualizar essa variável e reiniciar o
+# backend.
+TEST_REGISTER_URL = os.environ.get("TEST_REGISTER_URL", "")
+
+
+@api_router.get("/generate-test")
+async def generate_test(mac: str = ""):
+    """Repassa pro gerador de teste automático configurado em TEST_REGISTER_URL."""
+    if not TEST_REGISTER_URL:
+        raise HTTPException(status_code=503, detail="TEST_REGISTER_URL não configurada no backend.")
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as http:
+            upstream = await http.get(TEST_REGISTER_URL, params={"mac": mac} if mac else None)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream error: {e}") from e
+
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type", "application/octet-stream"),
+    )
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
