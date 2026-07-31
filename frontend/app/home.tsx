@@ -104,7 +104,7 @@ export default function HomeScreen() {
   const [featuredFavIds, setFeaturedFavIds] = useState<Set<string>>(new Set());
   const [bg, setBg] = useState<string | undefined>();
   const [logo, setLogo] = useState<string | undefined>();
-  const [appName, setAppName] = useState<string>('Interactive Player');
+  const [appName, setAppName] = useState<string>('Maximus Player');
   // Only show the full-screen spinner when there's nothing to paint yet
   // (no cache, first section still pending). Once anything is on screen —
   // cached or freshly fetched — we never block the UI again.
@@ -169,7 +169,7 @@ export default function HomeScreen() {
     setMac(m);
     setBg(session?.bg_url);
     setLogo(session?.logo_url);
-    setAppName(session?.app_name || 'Interactive Player');
+    setAppName(session?.app_name || 'Maximus Player');
 
     // Stale-while-revalidate: paint whatever we had last time immediately,
     // then keep loading in the background and swap in fresh data per

@@ -79,7 +79,7 @@ export default function WelcomeScreen() {
             ) : logo ? (
               <Image source={{ uri: logo }} style={styles.logoImg} contentFit="contain" testID="welcome-logo" />
             ) : null}
-            <Text style={styles.welcomeText}>Bem-vindo ao Interactive Player</Text>
+            <Text style={styles.welcomeText}>Bem-vindo ao Maximus Player</Text>
           </View>
           <Text style={styles.skipHint}>Toque para pular</Text>
         </Pressable>

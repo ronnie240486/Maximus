@@ -233,7 +233,7 @@ export default function MacLoginScreen() {
           <Text style={styles.diagText}>Diagnosticar backend</Text>
         </Pressable>
 
-        <Text style={styles.footer}>{appName || 'Interactive Player'}</Text>
+        <Text style={styles.footer}>{appName || 'Maximus Player'}</Text>
       </SafeAreaView>
     </ImageBackground>
   );

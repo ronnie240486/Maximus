@@ -262,7 +262,7 @@ export default function SettingsScreen() {
 
   const showVersion = () => {
     Alert.alert(
-      session?.app_name || 'Interactive Player',
+      session?.app_name || 'Maximus Player',
       `Versão ${session?.version || '1.0'}`
     );
   };
