@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
@@ -111,6 +112,44 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<string>('home');
+  const [listening, setListening] = useState(false);
+
+  // Comando de voz: "Space HD", "De volta para o futuro" etc. — reconhece a
+  // fala e manda pra tela de busca já com o termo preenchido, que abre
+  // direto o primeiro resultado quando a origem é voz (ver search.tsx).
+  useSpeechRecognitionEvent('result', (event) => {
+    if (!event.isFinal) return;
+    const transcript = event.results[0]?.transcript?.trim();
+    setListening(false);
+    if (transcript) {
+      router.push({ pathname: '/search', params: { q: transcript, voice: '1' } });
+    }
+  });
+  useSpeechRecognitionEvent('end', () => setListening(false));
+  useSpeechRecognitionEvent('error', (event) => {
+    setListening(false);
+    if (event.error !== 'no-speech' && event.error !== 'aborted') {
+      Alert.alert('Não entendi', 'Tente falar de novo, mais perto do microfone.');
+    }
+  });
+
+  const startVoiceSearch = async () => {
+    if (listening) {
+      ExpoSpeechRecognitionModule.stop();
+      return;
+    }
+    const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permissão necessária', 'Ative o microfone nas permissões do app pra usar o comando de voz.');
+      return;
+    }
+    setListening(true);
+    ExpoSpeechRecognitionModule.start({
+      lang: 'pt-BR',
+      interimResults: false,
+      continuous: false,
+    });
+  };
 
   const sections = React.useMemo(() => {
     const order: Section[] = [];
@@ -489,15 +528,25 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={[styles.appNameSmall, isLandscape && { fontSize: 9 }]}>{appName}</Text>
               </View>
-              <Pressable onPress={() => router.replace('/profiles')} testID="nav-profile">
-                {logo ? (
-                  <Image source={{ uri: logo }} style={{ width: isLandscape ? 28 : 34, height: isLandscape ? 28 : 34, borderRadius: 17 }} contentFit="cover" />
-                ) : (
-                  <View style={styles.profileFallback}>
-                    <Ionicons name="person" size={16} color={colors.black} />
-                  </View>
-                )}
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Pressable
+                  onPress={startVoiceSearch}
+                  style={[styles.micBtn, listening && styles.micBtnActive]}
+                  testID="nav-voice-search"
+                  hitSlop={10}
+                >
+                  <Ionicons name={listening ? 'mic' : 'mic-outline'} size={18} color={listening ? colors.black : colors.accentCyan} />
+                </Pressable>
+                <Pressable onPress={() => router.replace('/profiles')} testID="nav-profile">
+                  {logo ? (
+                    <Image source={{ uri: logo }} style={{ width: isLandscape ? 28 : 34, height: isLandscape ? 28 : 34, borderRadius: 17 }} contentFit="cover" />
+                  ) : (
+                    <View style={styles.profileFallback}>
+                      <Ionicons name="person" size={16} color={colors.black} />
+                    </View>
+                  )}
+                </Pressable>
+              </View>
             </View>
 
             {loading ? (
@@ -806,6 +855,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentCyan,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  micBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.darkSurfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.accentCyan,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBtnActive: {
+    backgroundColor: colors.accentCyan,
   },
   content: { flex: 1, minWidth: 0, paddingTop: spacing.md },
   topBar: {

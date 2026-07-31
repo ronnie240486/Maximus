@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
@@ -31,11 +31,14 @@ type Row =
 
 export default function SearchScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ q?: string; voice?: string }>();
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState<XtreamLive[]>([]);
   const [movies, setMovies] = useState<XtreamMovie[]>([]);
   const [series, setSeries] = useState<XtreamSeries[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(params.q || '');
+  const [voiceNotFound, setVoiceNotFound] = useState(false);
+  const autoOpenedRef = useRef(false);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -54,7 +57,9 @@ export default function SearchScreen() {
       setMovies(m || []);
       setSeries(s || []);
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      if (!params.voice) {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     })();
   }, []);
 
@@ -96,7 +101,13 @@ export default function SearchScreen() {
   }, [query, live, movies, series]);
 
   const openRow = (r: Row) => {
-    if (r.kind === 'series') return;
+    if (r.kind === 'series') {
+      router.push({
+        pathname: '/series-details',
+        params: { id: r.id.replace('s-', ''), name: r.name, cover: r.icon || '' },
+      });
+      return;
+    }
     router.push({
       pathname: '/player',
       params: {
@@ -107,6 +118,20 @@ export default function SearchScreen() {
       },
     });
   };
+
+  // Comando de voz: abre direto o melhor resultado assim que a lista
+  // carregar, sem exigir que a pessoa toque em nada.
+  useEffect(() => {
+    if (!params.voice || autoOpenedRef.current || loading) return;
+    if (results.length === 0) {
+      setVoiceNotFound(true);
+      return;
+    }
+    autoOpenedRef.current = true;
+    const q = (params.q || '').trim().toLowerCase();
+    const exact = results.find((r) => r.name.trim().toLowerCase() === q);
+    openRow(exact || results[0]);
+  }, [params.voice, params.q, loading, results]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -149,6 +174,9 @@ export default function SearchScreen() {
         <View style={styles.center} testID="search-empty">
           <MaterialCommunityIcons name="magnify-close" size={44} color={colors.textMuted} />
           <Text style={styles.hintTitle}>Sem resultados</Text>
+          {voiceNotFound && (
+            <Text style={styles.hintSub}>Não encontrei "{params.q}" no catálogo.</Text>
+          )}
         </View>
       ) : (
         <FlatList
