@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { loadProfiles, Profile } from '@/src/state/profiles';
-import { loadSession } from '@/src/state/session';
+import { loadSession, saveSession } from '@/src/state/session';
+import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import Avatar from '@/src/components/Avatar';
 
@@ -28,13 +29,21 @@ export default function ProfileSelectionScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [m, list, session] = await Promise.all([
+    const [m, list, cachedSession] = await Promise.all([
       getDeviceMac(),
       loadProfiles(),
       loadSession(),
     ]);
     setMac(m);
     setProfiles(list);
+
+    // O fundo (bg_url) é uma URL assinada que expira em ~1h — por isso
+    // buscamos o status de novo aqui em vez de confiar só no que ficou
+    // salvo de uma sessão anterior, que pode estar com o link já vencido.
+    const fresh = await checkMac(m);
+    const session = fresh.authorized ? fresh : cachedSession;
+    if (fresh.authorized) await saveSession(fresh);
+
     setBg(session?.bg_url);
     setLoading(false);
   }, []);

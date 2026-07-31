@@ -18,6 +18,7 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { clearSession, loadSession } from '@/src/state/session';
 import { storage } from '@/src/utils/storage';
+import { isWelcomeAudioEnabled, setWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { MacStatus } from '@/src/api/client';
 import PinModal from '@/src/components/PinModal';
 import {
@@ -67,29 +68,37 @@ export default function SettingsScreen() {
   const [parentalLock, setParentalLock] = useState(false);
   const [pinExists, setPinExists] = useState(false);
   const [autoplayNext, setAutoplayNext] = useState(true);
+  const [welcomeAudio, setWelcomeAudio] = useState(true);
   const [pinFlow, setPinFlow] = useState<PinFlow | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [m, s, parental, hasPin, autoplay] = await Promise.all([
+      const [m, s, parental, hasPin, autoplay, welcomeAudioOn] = await Promise.all([
         getDeviceMac(),
         loadSession(),
         isParentalLockEnabled(),
         hasParentalPin(),
         storage.getItem<boolean>(AUTOPLAY_KEY, true),
+        isWelcomeAudioEnabled(),
       ]);
       setMac(m);
       setSession(s);
       setParentalLock(parental);
       setPinExists(hasPin);
       setAutoplayNext(autoplay !== false);
+      setWelcomeAudio(welcomeAudioOn);
     })();
   }, []);
 
   const toggleAutoplay = async (v: boolean) => {
     setAutoplayNext(v);
     await storage.setItem(AUTOPLAY_KEY, v);
+  };
+
+  const toggleWelcomeAudio = async (v: boolean) => {
+    setWelcomeAudio(v);
+    await setWelcomeAudioEnabled(v);
   };
 
   // Turning ON with no PIN yet -> create one first. Turning OFF always
@@ -342,6 +351,13 @@ export default function SettingsScreen() {
       subtitle: autoplayNext ? 'Próximo episódio automático: ativado' : 'Próximo episódio automático: desativado',
       icon: <Ionicons name="play-circle-outline" size={20} color={colors.accentCyan} />,
       toggle: { value: autoplayNext, onChange: toggleAutoplay },
+    },
+    {
+      id: 'welcome-audio',
+      title: 'Áudio de boas-vindas',
+      subtitle: welcomeAudio ? 'Ativado' : 'Desativado',
+      icon: <Ionicons name="volume-high-outline" size={20} color={colors.accentCyan} />,
+      toggle: { value: welcomeAudio, onChange: toggleWelcomeAudio },
     },
     {
       id: 'diagnostic',

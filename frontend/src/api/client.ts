@@ -152,3 +152,35 @@ export async function checkExpire(mac: string): Promise<{ expired: boolean; expi
     return { expired: true };
   }
 }
+
+export type TestRegisterResult = {
+  ok: boolean;
+  http?: number;
+  url: string;
+  raw: string;
+};
+
+/**
+ * Chama o endpoint de registro de dispositivo de teste. Não temos
+ * documentação oficial do formato, então tentamos a variação mais comum
+ * (".php", igual aos outros endpoints deste painel) e devolvemos a resposta
+ * crua pra podermos ver o resultado direto na tela, sem precisar de log.
+ */
+export async function registerTestDevice(mac: string): Promise<TestRegisterResult> {
+  const candidates = [
+    `${PANEL_BASE}/user_register.php?mac=${encodeURIComponent(mac)}`,
+    `${PANEL_BASE}/user_register?mac=${encodeURIComponent(mac)}`,
+  ];
+  let last: TestRegisterResult = { ok: false, url: candidates[0], raw: '' };
+  for (const upstream of candidates) {
+    try {
+      const res = await fetch(proxied(upstream), { headers: commonHeaders });
+      const text = await res.text();
+      last = { ok: res.ok, http: res.status, url: upstream, raw: text };
+      if (res.ok) return last;
+    } catch (e: any) {
+      last = { ok: false, url: upstream, raw: e?.message || String(e) };
+    }
+  }
+  return last;
+}

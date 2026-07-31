@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   ImageBackground,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { checkMac, MacStatus } from '@/src/api/client';
+import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
 import { saveSession, loadSession } from '@/src/state/session';
 
 const POLL_MS = 5000;
@@ -28,6 +29,7 @@ export default function MacLoginScreen() {
   const [pollCount, setPollCount] = useState(0);
   const [checking, setChecking] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  const [testing, setTesting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
@@ -43,7 +45,7 @@ export default function MacLoginScreen() {
       setPollCount((c) => c + 1);
       if (s.authorized) {
         await saveSession(s);
-        router.replace('/profiles');
+        router.replace('/welcome');
         return;
       }
       if (!isManual) {
@@ -59,7 +61,7 @@ export default function MacLoginScreen() {
       // If we already have a session cached, jump straight to profiles.
       const cached = await loadSession();
       if (cached?.authorized) {
-        router.replace('/profiles');
+        router.replace('/welcome');
         return;
       }
       const m = await getDeviceMac();
@@ -93,6 +95,25 @@ export default function MacLoginScreen() {
     }
   };
 
+  const onTestRegister = async () => {
+    if (!mac || testing) return;
+    setTesting(true);
+    const result = await registerTestDevice(mac);
+    setTesting(false);
+    if (!mountedRef.current) return;
+
+    // Mostra a resposta crua na tela — como não temos documentação desse
+    // endpoint, isso deixa fácil ver e me mandar print se algo não bater.
+    Alert.alert(
+      result.ok ? 'Teste enviado' : 'Falha no teste',
+      `HTTP ${result.http ?? '—'} • ${result.url}\n\n${result.raw.slice(0, 500)}`
+    );
+
+    if (result.ok) {
+      onCheckNow();
+    }
+  };
+
   const bg = status?.bg_url;
   const logo = status?.logo_url;
   const banner = status?.banner_url;
@@ -123,7 +144,9 @@ export default function MacLoginScreen() {
     >
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.logoWrap}>
-          {logo ? (
+          {banner ? (
+            <Image source={{ uri: banner }} style={styles.banner} contentFit="cover" testID="app-banner" />
+          ) : logo ? (
             <Image source={{ uri: logo }} style={styles.logoImg} contentFit="contain" />
           ) : (
             <View style={styles.logoCircle} testID="app-logo">
@@ -131,10 +154,6 @@ export default function MacLoginScreen() {
             </View>
           )}
         </View>
-
-        {!!banner && (
-          <Image source={{ uri: banner }} style={styles.banner} contentFit="cover" testID="app-banner" />
-        )}
 
         <Text style={styles.title} testID="mac-login-title">Como entrar</Text>
 
@@ -146,6 +165,20 @@ export default function MacLoginScreen() {
             </Text>
           </Pressable>
           <Text style={styles.tap}>{copied ? 'Copiado!' : 'Toque para copiar'}</Text>
+
+          <Pressable
+            onPress={onTestRegister}
+            disabled={testing}
+            style={[styles.testBtn, testing && { opacity: 0.5 }]}
+            testID="mac-test-register"
+          >
+            {testing ? (
+              <ActivityIndicator color={colors.black} size="small" />
+            ) : (
+              <Ionicons name="flash" size={14} color={colors.black} />
+            )}
+            <Text style={styles.testBtnText}>TESTE</Text>
+          </Pressable>
 
           <View style={styles.statusBox} testID="mac-status-box">
             {checking ? (
@@ -247,6 +280,22 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   tap: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
+  testBtn: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accentCyan,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  testBtnText: {
+    color: colors.black,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
   statusBox: {
     marginTop: spacing.xl,
     flexDirection: 'row',
