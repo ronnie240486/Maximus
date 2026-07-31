@@ -33,15 +33,6 @@
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#0B0F1A"
-        }
-      ],
-      [
         "expo-video",
         {
           "supportsBackgroundPlayback": true
