@@ -167,36 +167,68 @@ export default function HomeScreen() {
   // of only on first mount like the network-backed sections below.
   useFocusEffect(
     React.useCallback(() => {
-      loadWatchHistory().then((history) => {
-        setContinueWatching(
-          history.length
-            ? {
-                title: 'CONTINUE ASSISTINDO',
-                items: history.slice(0, 15).map((h) => ({
-                  id: `continue-${h.id}`,
-                  name: h.name,
-                  logo: h.logo,
-                  stream: h.stream,
-                })),
-              }
-            : undefined
-        );
-      });
-      popDueReminders().then((due) => {
-        due.forEach((r) => {
-          Alert.alert(
-            'Hora do jogo!',
-            `${r.name} está começando agora. Quer abrir a lista de canais pra encontrar a transmissão?`,
-            [
-              { text: 'Agora não', style: 'cancel' },
-              { text: 'Abrir canais', onPress: () => router.push({ pathname: '/channels', params: { initialQuery: r.league || '' } }) },
-            ]
+      let cancelled = false;
+      (async () => {
+        // Roda em TODA vez que a tela ganha foco (não só quando abre o
+        // app) — por isso a checagem de bloqueio/lista removida precisa
+        // estar aqui também, não só no load() inicial. Sem isso, "Continue
+        // assistindo" continuava tocando vídeo mesmo com o MAC bloqueado
+        // ou a lista removida no painel, porque ele nunca perguntava de
+        // novo pro painel, só usava o link salvo no celular.
+        const creds = getXtream();
+        if (creds) {
+          const m = await getDeviceMac();
+          if (cancelled) return;
+          const fresh = await checkMac(m);
+          if (cancelled) return;
+          const isRealResponse = fresh.message !== 'Falha de conexão.';
+          if (isRealResponse) {
+            const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
+              const parsed = parsePlaylistUrl(p.url);
+              return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
+            });
+            if (!fresh.authorized || !stillHasThisPlaylist) {
+              await clearSession();
+              router.replace('/');
+              return;
+            }
+          }
+        }
+
+        loadWatchHistory().then((history) => {
+          setContinueWatching(
+            history.length
+              ? {
+                  title: 'CONTINUE ASSISTINDO',
+                  items: history.slice(0, 15).map((h) => ({
+                    id: `continue-${h.id}`,
+                    name: h.name,
+                    logo: h.logo,
+                    stream: h.stream,
+                  })),
+                }
+              : undefined
           );
         });
-      });
-      loadFavorites().then((list) => {
-        setFeaturedFavIds(new Set(list.filter((f) => f.kind === 'movie' || f.kind === 'series').map((f) => f.id)));
-      });
+        popDueReminders().then((due) => {
+          due.forEach((r) => {
+            Alert.alert(
+              'Hora do jogo!',
+              `${r.name} está começando agora. Quer abrir a lista de canais pra encontrar a transmissão?`,
+              [
+                { text: 'Agora não', style: 'cancel' },
+                { text: 'Abrir canais', onPress: () => router.push({ pathname: '/channels', params: { initialQuery: r.league || '' } }) },
+              ]
+            );
+          });
+        });
+        loadFavorites().then((list) => {
+          setFeaturedFavIds(new Set(list.filter((f) => f.kind === 'movie' || f.kind === 'series').map((f) => f.id)));
+        });
+      })();
+      return () => {
+        cancelled = true;
+      };
     }, [router])
   );
 
