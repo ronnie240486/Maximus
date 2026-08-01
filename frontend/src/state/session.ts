@@ -23,10 +23,17 @@ export function getActivePlaylistIndex(): number {
   return cachedActiveIndex;
 }
 
-export async function setActivePlaylistIndex(idx: number): Promise<void> {
+// `persist=true` (padrão) é pra quando a pessoa escolhe manualmente uma
+// lista na tela de Playlists — isso deve continuar valendo depois de fechar
+// e abrir o app de novo. `persist=false` é usado pela troca automática (Home,
+// quando uma lista falha) — só vale pra sessão atual; ao reabrir o app,
+// sempre volta a tentar a lista 1 (ou a que a pessoa escolheu manualmente).
+export async function setActivePlaylistIndex(idx: number, persist: boolean = true): Promise<void> {
   cachedActiveIndex = idx;
   cachedCreds = null; // força getXtream() recalcular com a nova playlist
-  await storage.setItem(ACTIVE_PLAYLIST_KEY, idx);
+  if (persist) {
+    await storage.setItem(ACTIVE_PLAYLIST_KEY, idx);
+  }
 }
 
 export function getXtream(): XtreamCreds | null {

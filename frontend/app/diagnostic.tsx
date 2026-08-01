@@ -20,6 +20,15 @@ import { parsePlaylistUrl } from '@/src/lib/xtream';
 
 const BACKEND = 'https://renciaapp.manus.space/api/v5';
 
+// Esconde usuário/senha (do Xtream do cliente) de qualquer texto antes de
+// mostrar ou copiar na tela — tanto em URLs (?username=...&password=...)
+// quanto em corpos de resposta JSON ("username":"...","password":"...").
+function redact(text: string): string {
+  return text
+    .replace(/([?&](?:user(?:name)?|pass(?:word)?)=)[^&\s"'<]+/gi, '$1***')
+    .replace(/("(?:username|user|password|pass)"\s*:\s*")[^"]*(")/gi, '$1***$2');
+}
+
 type Result = {
   url: string;
   status: 'ok' | 'error' | 'pending';
@@ -44,16 +53,16 @@ export default function BackendDiagScreen() {
       const ct = res.headers.get('content-type') || '';
       const text = await res.text();
       return {
-        url,
+        url: redact(url),
         status: res.ok ? 'ok' : 'error',
         ms: Date.now() - t0,
         http: res.status,
         contentType: ct,
-        bodyPreview: text.slice(0, 3000),
+        bodyPreview: redact(text.slice(0, 3000)),
       };
     } catch (e: any) {
       return {
-        url,
+        url: redact(url),
         status: 'error',
         ms: Date.now() - t0,
         error: e?.message || String(e),
@@ -167,14 +176,7 @@ export default function BackendDiagScreen() {
             <Row k="Banner" v={status.banner_url ? 'SIM' : 'não veio'} accent={!!status.banner_url} />
             {!!status.reseller_contact && <Row k="Revendedor" v={status.reseller_contact} />}
             {!!status.playlists?.length && (
-              <Row k="Playlists" v={`${status.playlists.length} lista(s)`} />
-            )}
-            {!!status.playlists?.[0]?.url && (
-              <Pressable onPress={() => copy(status.playlists![0].url)}>
-                <Text style={styles.mono} numberOfLines={2}>
-                  {status.playlists[0].url}
-                </Text>
-              </Pressable>
+              <Row k="Playlists" v={`${status.playlists.length} lista(s) — dados ocultos`} />
             )}
             {!!status.message && <Row k="Msg" v={status.message} />}
           </View>

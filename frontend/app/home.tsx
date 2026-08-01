@@ -363,13 +363,13 @@ export default function HomeScreen() {
       const totalPlaylists = session?.playlists?.length || 0;
       const currentIdx = getActivePlaylistIndex();
       if (totalPlaylists > 1 && currentIdx < totalPlaylists - 1) {
-        await setActivePlaylistIndex(currentIdx + 1);
+        await setActivePlaylistIndex(currentIdx + 1, false);
         return load();
       }
       if (totalPlaylists > 1) {
-        // Já tentamos todas — volta pra primeira pra próxima tentativa
-        // (manual ou automática) recomeçar do início.
-        await setActivePlaylistIndex(0);
+        // Já tentamos todas — volta pra primeira (sem persistir; é só pra
+        // sessão atual) pra próxima tentativa recomeçar do início.
+        await setActivePlaylistIndex(0, false);
       }
     }
 
