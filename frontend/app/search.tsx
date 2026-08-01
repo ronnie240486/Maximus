@@ -119,18 +119,27 @@ export default function SearchScreen() {
     });
   };
 
-  // Comando de voz: abre direto o melhor resultado assim que a lista
-  // carregar, sem exigir que a pessoa toque em nada.
+  // Comando de voz: abre direto quando tem certeza (nome exato ou só achou
+  // uma coisa). Se achou várias parecidas e nenhuma bate exatamente, é
+  // melhor mostrar a lista pra pessoa escolher do que chutar a primeira —
+  // "amor" pode bater em vários filmes/séries diferentes, por exemplo.
   useEffect(() => {
     if (!params.voice || autoOpenedRef.current || loading) return;
     if (results.length === 0) {
       setVoiceNotFound(true);
       return;
     }
-    autoOpenedRef.current = true;
     const q = (params.q || '').trim().toLowerCase();
     const exact = results.find((r) => r.name.trim().toLowerCase() === q);
-    openRow(exact || results[0]);
+    if (exact) {
+      autoOpenedRef.current = true;
+      openRow(exact);
+    } else if (results.length === 1) {
+      autoOpenedRef.current = true;
+      openRow(results[0]);
+    }
+    // Se caiu aqui sem abrir, results.length > 1 e nenhum bateu exato —
+    // deixa a tela normal de resultados aparecer pra pessoa tocar no certo.
   }, [params.voice, params.q, loading, results]);
 
   return (
