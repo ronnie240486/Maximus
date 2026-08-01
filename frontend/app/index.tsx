@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
-import { saveSession, loadSession } from '@/src/state/session';
+import { saveSession, loadSession, clearSession } from '@/src/state/session';
 
 const POLL_MS = 5000;
 
@@ -59,15 +59,28 @@ export default function MacLoginScreen() {
   useEffect(() => {
     mountedRef.current = true;
     (async () => {
-      // If we already have a session cached, jump straight to profiles.
-      const cached = await loadSession();
-      if (cached?.authorized) {
-        router.replace('/welcome');
-        return;
-      }
       const m = await getDeviceMac();
       if (!mountedRef.current) return;
       setMac(m);
+
+      // Mesmo com sessão salva, sempre confirma de novo com o painel antes
+      // de liberar — se o revendedor bloqueou a lista nesse meio tempo, o
+      // app não pode continuar usando dados antigos salvos no celular.
+      const cached = await loadSession();
+      if (cached?.authorized) {
+        const fresh = await checkMac(m);
+        if (!mountedRef.current) return;
+        if (fresh.authorized) {
+          await saveSession(fresh);
+          router.replace('/welcome');
+          return;
+        }
+        // Não está mais autorizado — limpa a sessão velha e segue pro
+        // fluxo normal de verificação abaixo.
+        await clearSession();
+        setStatus(fresh);
+      }
+
       runPoll(m);
     })();
     return () => {

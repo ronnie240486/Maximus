@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { loadProfiles, Profile } from '@/src/state/profiles';
-import { loadSession, saveSession } from '@/src/state/session';
+import { loadSession, saveSession, clearSession } from '@/src/state/session';
 import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import Avatar from '@/src/components/Avatar';
@@ -41,6 +41,17 @@ export default function ProfileSelectionScreen() {
     // buscamos o status de novo aqui em vez de confiar só no que ficou
     // salvo de uma sessão anterior, que pode estar com o link já vencido.
     const fresh = await checkMac(m);
+
+    // O painel respondeu de verdade (não foi falha de rede) e disse que
+    // esse MAC não está mais autorizado — o revendedor bloqueou a lista.
+    // Não dá pra continuar usando os dados antigos salvos no celular.
+    const isRealResponse = fresh.message !== 'Falha de conexão.';
+    if (isRealResponse && !fresh.authorized) {
+      await clearSession();
+      router.replace('/');
+      return;
+    }
+
     const session = fresh.authorized ? fresh : cachedSession;
     if (fresh.authorized) await saveSession(fresh);
 
