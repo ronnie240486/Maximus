@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ImageBackground,
   Alert,
+  Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -95,6 +96,13 @@ export default function MacLoginScreen() {
     }
   };
 
+  const onOpenWhatsapp = () => {
+    const raw = status?.reseller_whatsapp || '';
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return;
+    Linking.openURL(`https://wa.me/${digits}`);
+  };
+
   const onTestRegister = async () => {
     if (!mac || testing) return;
     setTesting(true);
@@ -166,19 +174,28 @@ export default function MacLoginScreen() {
           </Pressable>
           <Text style={styles.tap}>{copied ? 'Copiado!' : 'Toque para copiar'}</Text>
 
-          <Pressable
-            onPress={onTestRegister}
-            disabled={testing}
-            style={[styles.testBtn, testing && { opacity: 0.5 }]}
-            testID="mac-test-register"
-          >
-            {testing ? (
-              <ActivityIndicator color={colors.black} size="small" />
-            ) : (
-              <Ionicons name="flash" size={14} color={colors.black} />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
+            <Pressable
+              onPress={onTestRegister}
+              disabled={testing}
+              style={[styles.testBtn, testing && { opacity: 0.5 }]}
+              testID="mac-test-register"
+            >
+              {testing ? (
+                <ActivityIndicator color={colors.black} size="small" />
+              ) : (
+                <Ionicons name="flash" size={14} color={colors.black} />
+              )}
+              <Text style={styles.testBtnText}>TESTE</Text>
+            </Pressable>
+
+            {!!status?.reseller_whatsapp && (
+              <Pressable onPress={onOpenWhatsapp} style={styles.whatsBtn} testID="mac-whatsapp-btn">
+                <Ionicons name="logo-whatsapp" size={16} color={colors.white} />
+                <Text style={styles.whatsBtnText}>ZAP</Text>
+              </Pressable>
             )}
-            <Text style={styles.testBtnText}>TESTE</Text>
-          </Pressable>
+          </View>
 
           <View style={styles.statusBox} testID="mac-status-box">
             {checking ? (
@@ -212,15 +229,6 @@ export default function MacLoginScreen() {
             Envie o ID acima para seu revendedor.{'\n'}
             Assim que ativado, o acesso abre automaticamente.
           </Text>
-
-          {!!status?.reseller_whatsapp && (
-            <View style={styles.resellerBox}>
-              <Ionicons name="logo-whatsapp" size={16} color={colors.accentCyan} />
-              <Text style={styles.resellerText}>
-                {status.reseller_contact || status.reseller_whatsapp}
-              </Text>
-            </View>
-          )}
         </View>
 
         <Pressable
@@ -292,6 +300,21 @@ const styles = StyleSheet.create({
   },
   testBtnText: {
     color: colors.black,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  whatsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#25D366',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  whatsBtnText: {
+    color: colors.white,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.5,

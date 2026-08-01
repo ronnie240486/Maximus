@@ -20,7 +20,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { loadSession, getXtream } from '@/src/state/session';
+import { loadSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex } from '@/src/state/session';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache } from '@/src/state/home-cache';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
@@ -355,6 +355,24 @@ export default function HomeScreen() {
     const [live, movies, series] = await Promise.all([liveP, moviesP, seriesP]);
 
     const allEmpty = !live?.length && !movies?.length && !series?.length;
+
+    // Se essa lista não trouxe nada e existe outra cadastrada, troca
+    // sozinho pra próxima e tenta de novo — a pessoa não precisa fazer
+    // nada manualmente quando uma lista para de funcionar.
+    if (allEmpty) {
+      const totalPlaylists = session?.playlists?.length || 0;
+      const currentIdx = getActivePlaylistIndex();
+      if (totalPlaylists > 1 && currentIdx < totalPlaylists - 1) {
+        await setActivePlaylistIndex(currentIdx + 1);
+        return load();
+      }
+      if (totalPlaylists > 1) {
+        // Já tentamos todas — volta pra primeira pra próxima tentativa
+        // (manual ou automática) recomeçar do início.
+        await setActivePlaylistIndex(0);
+      }
+    }
+
     setLoadError(allEmpty ? getLastXtreamError() : null);
     setLoading(false);
 
