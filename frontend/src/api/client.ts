@@ -160,18 +160,18 @@ export type TestRegisterResult = {
   raw: string;
 };
 
-const BACKEND_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+// URL do gerador de teste automático (chatbot sigmab.pro), a mesma
+// cadastrada no campo "URL do Servidor (DNS)" do painel. Chamada direto
+// daqui, sem backend no meio — o painel tem um bug que faz esse campo não
+// chegar certo pro app (manda o nome do revendedor em vez do link), então
+// por enquanto não dá pra ler isso dinamicamente. Se esse link mudar de
+// novo, precisa atualizar aqui e gerar um APK novo.
+const TEST_REGISTER_URL = 'https://nuvixtv.sigmab.pro/api/chatbot/Yen129WPEa/XYgD9JWr6V';
 
-/**
- * Gera um teste automático. Chama o NOSSO backend (não o painel direto) —
- * o backend é quem sabe a URL real do gerador de teste, guardada numa
- * variável de ambiente (TEST_REGISTER_URL) que pode mudar sem precisar
- * gerar um APK novo.
- */
 export async function registerTestDevice(mac: string): Promise<TestRegisterResult> {
-  const upstream = `${BACKEND_BASE}/api/generate-test?mac=${encodeURIComponent(mac)}`;
+  const upstream = `${TEST_REGISTER_URL}?mac=${encodeURIComponent(mac)}`;
   try {
-    const res = await fetch(upstream, { headers: commonHeaders });
+    const res = await fetch(proxied(upstream), { headers: commonHeaders });
     const text = await res.text();
     return { ok: res.ok, http: res.status, url: upstream, raw: text };
   } catch (e: any) {
