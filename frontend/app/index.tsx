@@ -46,7 +46,7 @@ export default function MacLoginScreen() {
       setPollCount((c) => c + 1);
       if (s.authorized) {
         await saveSession(s);
-        router.replace('/profiles');
+        router.replace('/welcome');
         return;
       }
       if (!isManual) {
@@ -62,7 +62,7 @@ export default function MacLoginScreen() {
       // If we already have a session cached, jump straight to profiles.
       const cached = await loadSession();
       if (cached?.authorized) {
-        router.replace('/profiles');
+        router.replace('/welcome');
         return;
       }
       const m = await getDeviceMac();
