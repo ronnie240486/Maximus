@@ -46,7 +46,7 @@ const AUTOPLAY_KEY = 'settings_player_autoplay_next_v1';
 // Só pra conferir se um APK é realmente o mais recente — muda esse texto
 // toda vez que uma correção nova é enviada, e compara com o que aparece
 // aqui dentro do app depois de instalar.
-const BUILD_STAMP = 'build 2026-08-01 19h40 — troca automática de lista + imagem de fundo de volta';
+const BUILD_STAMP = 'build 2026-08-01 20h — boas-vindas busca imagem fresca igual tela de perfis';
 
 type PinFlow =
   | { step: 'create-1' }

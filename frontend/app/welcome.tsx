@@ -6,6 +6,8 @@ import { useRouter } from 'expo-router';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import { colors, spacing } from '@/src/theme';
+import { getDeviceMac } from '@/src/lib/device';
+import { checkMac } from '@/src/api/client';
 import { loadSession } from '@/src/state/session';
 import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 
@@ -35,11 +37,23 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     (async () => {
-      const [session, enabled] = await Promise.all([loadSession(), isWelcomeAudioEnabled()]);
-      setBg(session?.bg_url);
-      setBanner(session?.banner_url);
-      setLogo(session?.logo_url);
+      const [enabled, m] = await Promise.all([isWelcomeAudioEnabled(), getDeviceMac()]);
       setAudioEnabled(enabled);
+
+      // As imagens (fundo/banner/logo) são URLs assinadas que expiram em
+      // ~1h — busca fresco aqui em vez de confiar só na sessão salva,
+      // igual a tela de Perfis já faz, pra sempre bater a mesma imagem.
+      const cached = await loadSession();
+      setBg(cached?.bg_url);
+      setBanner(cached?.banner_url);
+      setLogo(cached?.logo_url);
+
+      const fresh = await checkMac(m);
+      if (fresh.authorized) {
+        setBg(fresh.bg_url);
+        setBanner(fresh.banner_url);
+        setLogo(fresh.logo_url);
+      }
       setReady(true);
     })();
   }, []);
