@@ -1,5 +1,4 @@
 import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect } from "react";
 import { LogBox, StatusBar } from "react-native";
@@ -8,16 +7,8 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 
 LogBox.ignoreAllLogs(true);
 
-SplashScreen.preventAutoHideAsync();
-
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
-
-  useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded, error]);
 
   useEffect(() => {
     // Destrava a rotação de forma ativa — o "orientation": "default" no
