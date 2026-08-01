@@ -20,7 +20,8 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { loadSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex } from '@/src/state/session';
+import { loadSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex, clearSession } from '@/src/state/session';
+import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache } from '@/src/state/home-cache';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
@@ -32,6 +33,7 @@ import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import {
   xtream,
+  parsePlaylistUrl,
   liveStreamUrl,
   movieStreamUrl,
   XtreamLive,
@@ -228,6 +230,24 @@ export default function HomeScreen() {
         setLoading(false);
       }
       return;
+    }
+
+    // Confirma com o painel que o MAC continua autorizado e que a lista que
+    // o app está usando (credenciais salvas) ainda existe cadastrada. Se o
+    // revendedor bloqueou o MAC ou removeu essa lista, não pode continuar
+    // assistindo com o que já estava salvo no celular.
+    const fresh = await checkMac(m);
+    const isRealResponse = fresh.message !== 'Falha de conexão.';
+    if (isRealResponse) {
+      const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
+        const parsed = parsePlaylistUrl(p.url);
+        return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
+      });
+      if (!fresh.authorized || !stillHasThisPlaylist) {
+        await clearSession();
+        router.replace('/');
+        return;
+      }
     }
 
     // Fire all three independently — each one paints as soon as it's ready
