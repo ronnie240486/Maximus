@@ -20,7 +20,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { loadSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex, clearSession } from '@/src/state/session';
+import { loadSession, saveSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex, clearSession } from '@/src/state/session';
 import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache } from '@/src/state/home-cache';
@@ -264,21 +264,27 @@ export default function HomeScreen() {
       return;
     }
 
-    // Confirma com o painel que o MAC continua autorizado e que a lista que
-    // o app está usando (credenciais salvas) ainda existe cadastrada. Se o
-    // revendedor bloqueou o MAC ou removeu essa lista, não pode continuar
-    // assistindo com o que já estava salvo no celular.
+    // Confirma com o painel que o MAC continua autorizado. Se o revendedor
+    // bloqueou o MAC de vez, não tem mais o que fazer aqui — desloga.
     const fresh = await checkMac(m);
     const isRealResponse = fresh.message !== 'Falha de conexão.';
+    if (isRealResponse && !fresh.authorized) {
+      await clearSession();
+      router.replace('/');
+      return;
+    }
     if (isRealResponse) {
+      await saveSession(fresh); // mantém sessão local sempre atualizada
       const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
         const parsed = parsePlaylistUrl(p.url);
         return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
       });
-      if (!fresh.authorized || !stillHasThisPlaylist) {
-        await clearSession();
-        router.replace('/');
-        return;
+      if (!stillHasThisPlaylist) {
+        // Essa lista específica não existe mais no painel — não desloga,
+        // só volta pro índice 0 e deixa o mecanismo de troca automática
+        // (mais abaixo) encontrar uma lista que ainda funcione.
+        await setActivePlaylistIndex(0, false);
+        return load();
       }
     }
 

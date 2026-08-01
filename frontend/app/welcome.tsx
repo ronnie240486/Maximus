@@ -14,10 +14,12 @@ const FALLBACK_MS = 6000;
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const [bg, setBg] = useState(undefined);
   const [banner, setBanner] = useState(undefined);
   const [logo, setLogo] = useState(undefined);
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [bgFailed, setBgFailed] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [ready, setReady] = useState(false);
   const doneRef = useRef(false);
@@ -34,6 +36,7 @@ export default function WelcomeScreen() {
   useEffect(() => {
     (async () => {
       const [session, enabled] = await Promise.all([loadSession(), isWelcomeAudioEnabled()]);
+      setBg(session?.bg_url);
       setBanner(session?.banner_url);
       setLogo(session?.logo_url);
       setAudioEnabled(enabled);
@@ -50,6 +53,14 @@ export default function WelcomeScreen() {
     }, 2500);
     return () => clearTimeout(t);
   }, [banner, logo, imageLoaded]);
+
+  // Mesma proteção pra imagem de fundo — se travar, simplesmente não mostra
+  // (fica só o preto sólido), nunca fica presa carregando.
+  useEffect(() => {
+    if (!bg) return;
+    const t = setTimeout(() => setBgFailed(true), 2500);
+    return () => clearTimeout(t);
+  }, [bg]);
 
   useEffect(() => {
     if (!ready) return;
@@ -72,9 +83,19 @@ export default function WelcomeScreen() {
 
   const showBanner = !!banner && !imageFailed;
   const showLogo = !showBanner && !!logo && !imageFailed;
+  const showBg = !!bg && !bgFailed;
 
   return (
     <View style={styles.bg}>
+      {showBg && (
+        <Image
+          source={{ uri: bg }}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="cover"
+          onError={() => setBgFailed(true)}
+        />
+      )}
+      <View style={[StyleSheet.absoluteFillObject, styles.bgOverlay]} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <Pressable style={styles.tapArea} onPress={goNext}>
           <View style={styles.center}>
@@ -111,7 +132,8 @@ export default function WelcomeScreen() {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.black },
-  safe: { flex: 1, backgroundColor: colors.black },
+  bgOverlay: { backgroundColor: 'rgba(11,15,26,0.55)' },
+  safe: { flex: 1 },
   tapArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   center: { alignItems: 'center', paddingHorizontal: spacing.xl, width: '100%' },
   bannerBox: {
