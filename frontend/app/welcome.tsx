@@ -17,6 +17,7 @@ export default function WelcomeScreen() {
   const [banner, setBanner] = useState(undefined);
   const [logo, setLogo] = useState(undefined);
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [ready, setReady] = useState(false);
   const doneRef = useRef(false);
@@ -39,6 +40,16 @@ export default function WelcomeScreen() {
       setReady(true);
     })();
   }, []);
+
+  // Se a imagem (banner/logo) travar carregando — link vencido, rede lenta,
+  // etc. — não deixa o desenho de "carregando" preso na tela pra sempre.
+  useEffect(() => {
+    if (!banner && !logo) return;
+    const t = setTimeout(() => {
+      if (!imageLoaded) setImageFailed(true);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [banner, logo, imageLoaded]);
 
   useEffect(() => {
     if (!ready) return;
@@ -73,6 +84,7 @@ export default function WelcomeScreen() {
                   source={{ uri: banner }}
                   style={styles.banner}
                   contentFit="cover"
+                  onLoad={() => setImageLoaded(true)}
                   onError={() => setImageFailed(true)}
                   testID="welcome-banner"
                 />
@@ -83,6 +95,7 @@ export default function WelcomeScreen() {
                 source={{ uri: logo }}
                 style={styles.logoImg}
                 contentFit="contain"
+                onLoad={() => setImageLoaded(true)}
                 onError={() => setImageFailed(true)}
                 testID="welcome-logo"
               />

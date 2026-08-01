@@ -43,6 +43,10 @@ const CACHE_KEYS = [
 ];
 
 const AUTOPLAY_KEY = 'settings_player_autoplay_next_v1';
+// Só pra conferir se um APK é realmente o mais recente — muda esse texto
+// toda vez que uma correção nova é enviada, e compara com o que aparece
+// aqui dentro do app depois de instalar.
+const BUILD_STAMP = 'build 2026-08-01 18h — correção imagem travada + bloqueio de lista';
 
 type PinFlow =
   | { step: 'create-1' }
@@ -263,7 +267,7 @@ export default function SettingsScreen() {
   const showVersion = () => {
     Alert.alert(
       session?.app_name || 'Maximus Player',
-      `Versão ${session?.version || '1.0'}`
+      `Versão ${session?.version || '1.0'}\n\n${BUILD_STAMP}`
     );
   };
 
@@ -382,7 +386,7 @@ export default function SettingsScreen() {
     {
       id: 'version',
       title: 'Versão',
-      subtitle: `${session?.app_name || 'App'} v${session?.version || '1.0'}`,
+      subtitle: `v${session?.version || '1.0'} • ${BUILD_STAMP}`,
       icon: <Ionicons name="information-circle-outline" size={20} color={colors.accentCyan} />,
       onPress: showVersion,
     },
