@@ -24,6 +24,7 @@ export default function WelcomeScreen() {
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [bgFailed, setBgFailed] = useState(false);
+  const [bgLoaded, setBgLoaded] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [ready, setReady] = useState(false);
   const doneRef = useRef(false);
@@ -81,13 +82,18 @@ export default function WelcomeScreen() {
     return () => clearTimeout(t);
   }, [banner, logo, imageLoaded]);
 
-  // Mesma proteção pra imagem de fundo — se travar, simplesmente não mostra
-  // (fica só o preto sólido), nunca fica presa carregando.
+  // Mesma proteção pra imagem de fundo — se travar carregando, simplesmente
+  // não mostra (fica só o preto sólido). Só dispara se ela REALMENTE não
+  // carregou a tempo — antes isso escondia a imagem de qualquer jeito
+  // depois de 2.5s, mesmo já carregada e exibida, cortando o fundo no
+  // meio do efeito sonoro/voz de boas-vindas (que dura mais que isso).
   useEffect(() => {
     if (!bg) return;
-    const t = setTimeout(() => setBgFailed(true), 2500);
+    const t = setTimeout(() => {
+      if (!bgLoaded) setBgFailed(true);
+    }, 2500);
     return () => clearTimeout(t);
-  }, [bg]);
+  }, [bg, bgLoaded]);
 
   useEffect(() => {
     if (!ready) return;
@@ -136,6 +142,7 @@ export default function WelcomeScreen() {
           source={{ uri: bg }}
           style={StyleSheet.absoluteFillObject}
           contentFit="cover"
+          onLoad={() => setBgLoaded(true)}
           onError={() => setBgFailed(true)}
         />
       )}
