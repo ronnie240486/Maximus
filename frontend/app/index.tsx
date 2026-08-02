@@ -137,17 +137,48 @@ export default function MacLoginScreen() {
     setTesting(false);
     if (!mountedRef.current) return;
 
-    if (result.ok) {
-      // Deu certo — segue direto verificando o MAC, sem popup nenhum. O
-      // próprio indicador "VERIFICANDO..." na tela já avisa que algo está
-      // acontecendo; o cliente não precisa ver HTTP/JSON cru.
-      onCheckNow();
-    } else {
-      // Só em caso de falha mostramos algo, e mesmo assim de forma simples
-      // — nada de detalhes técnicos pro cliente final.
+    if (!result.ok) {
       Alert.alert(
         'Não foi possível gerar o teste',
         'Tente novamente em instantes ou fale com seu revendedor.'
+      );
+      return;
+    }
+
+    // O gerador de teste (chatbot) cria um acesso IPTV próprio, num
+    // servidor separado do painel principal (que só sabe de MACs já
+    // cadastrados manualmente por um revendedor) — então esperar o painel
+    // "reconhecer" isso não funciona. Em vez disso, usamos o usuário/senha
+    // que o teste devolveu pra entrar direto no app com essa conta,
+    // igual a um login normal.
+    try {
+      const parsed = JSON.parse(result.raw);
+      const dns: string = parsed.dns || '';
+      const username: string = parsed.username || '';
+      const password: string = parsed.password || '';
+      if (!dns || !username || !password) throw new Error('missing_fields');
+
+      const server = dns.replace(/\/+$/, '');
+      const playlistUrl = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
+
+      const testStatus: MacStatus = {
+        authorized: true,
+        registered: true,
+        mac,
+        status: 'Teste',
+        expire_date: parsed.expiresAtFormatted || parsed.expiresAt || null,
+        playlists: [{ name: 'Teste', url: playlistUrl, type: 'm3u_plus' }],
+        app_name: 'Maximus Player',
+      };
+
+      await saveSession(testStatus);
+      router.replace('/welcome');
+    } catch {
+      // Resposta do teste veio num formato inesperado — não trava o
+      // cliente numa tela de erro técnico, só avisa e deixa tentar de novo.
+      Alert.alert(
+        'Teste gerado, mas não consegui entrar automaticamente',
+        'Fale com seu revendedor passando o ID do dispositivo acima.'
       );
     }
   };
