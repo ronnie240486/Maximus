@@ -118,7 +118,7 @@ export default function WelcomeScreen() {
                 <Image
                   source={{ uri: banner }}
                   style={styles.banner}
-                  contentFit="cover"
+                  contentFit="contain"
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageFailed(true)}
                   testID="welcome-banner"
@@ -151,12 +151,10 @@ const styles = StyleSheet.create({
   tapArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   center: { alignItems: 'center', paddingHorizontal: spacing.xl, width: '100%' },
   bannerBox: {
-    width: '68%',
-    maxWidth: 340,
-    aspectRatio: 16 / 9,
+    width: '55%',
+    maxWidth: 260,
+    aspectRatio: 1,
     borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.darkSurface,
     alignSelf: 'center',
   },
   banner: { width: '100%', height: '100%' },
