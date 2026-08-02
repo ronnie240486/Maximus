@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
+import { parsePlaylistUrl } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
 import { clearHomeCache } from '@/src/state/home-cache';
 import { useIsTV } from '@/src/hooks/useIsTV';
@@ -79,18 +80,38 @@ export default function MacLoginScreen() {
       // app não pode continuar usando dados antigos salvos no celular.
       const cached = await loadSession();
       if (cached?.authorized) {
-        const fresh = await checkMac(m);
-        if (!mountedRef.current) return;
-        if (fresh.authorized) {
-          await saveSession(fresh);
-          router.replace('/welcome');
-          return;
+        if (cached.status === 'Teste') {
+          // Sessão de teste: não existe no painel principal, então
+          // perguntar pra ele sempre voltaria "não autorizado" mesmo com
+          // o teste ainda válido. Só confere localmente se já venceu.
+          const expiresAt = cached.expire_date ? new Date(cached.expire_date) : null;
+          const stillValid = expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() > Date.now();
+          if (stillValid) {
+            router.replace('/welcome');
+            return;
+          }
+          await clearSession();
+          await clearHomeCache();
+        } else {
+          const fresh = await checkMac(m);
+          if (!mountedRef.current) return;
+          // Não basta "authorized: true" — o painel às vezes marca o MAC
+          // como autorizado mesmo sem nenhuma lista cadastrada de verdade
+          // (bug do lado deles). Confirma que existe pelo menos uma
+          // playlist que dá pra usar antes de liberar a entrada.
+          const hasUsablePlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
+          if (fresh.authorized && hasUsablePlaylist) {
+            await saveSession(fresh);
+            router.replace('/welcome');
+            return;
+          }
+          // Não está mais autorizado (ou não tem lista nenhuma que
+          // funcione) — limpa a sessão velha e segue pro fluxo normal de
+          // verificação abaixo.
+          await clearSession();
+          await clearHomeCache();
+          setStatus(fresh);
         }
-        // Não está mais autorizado — limpa a sessão velha e segue pro
-        // fluxo normal de verificação abaixo.
-        await clearSession();
-        await clearHomeCache();
-        setStatus(fresh);
       }
 
       // Chegou até aqui: ou nunca teve sessão, ou a sessão expirou/foi
