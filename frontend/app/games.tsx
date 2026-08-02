@@ -30,14 +30,30 @@ import TVFocusable from '@/src/components/TVFocusable';
 // results on the free tier, but no account/credentials needed from the person
 // using the app.
 const SPORTSDB_KEY = '123';
-const SPORTS = ['Soccer', 'Basketball', 'American_Football', 'Motorsport', 'Fighting'] as const;
-const SPORT_LABELS: Record<string, string> = {
-  Soccer: 'Futebol',
-  Basketball: 'Basquete',
-  American_Football: 'Futebol Americano',
-  Motorsport: 'Automobilismo',
-  Fighting: 'Lutas',
+
+// ESPN's public (unofficial, but widely used, no API key needed) scoreboard
+// endpoints — cobre esportes que a TheSportsDB não tem boa cobertura no
+// tier gratuito (beisebol, tênis, vôlei, MMA). Formato documentado:
+// https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates=YYYYMMDD
+type SportDef = {
+  key: string;
+  label: string;
+  source: 'sportsdb' | 'espn';
+  sportsdbSport?: string; // valor do parâmetro `s` na TheSportsDB
+  espnPath?: string; // "{sport}/{league}" na URL da ESPN
 };
+
+const SPORTS: SportDef[] = [
+  { key: 'soccer', label: 'Futebol', source: 'sportsdb', sportsdbSport: 'Soccer' },
+  { key: 'basketball', label: 'Basquete', source: 'sportsdb', sportsdbSport: 'Basketball' },
+  { key: 'nfl', label: 'Futebol Americano', source: 'sportsdb', sportsdbSport: 'American_Football' },
+  { key: 'motorsport', label: 'Automobilismo', source: 'sportsdb', sportsdbSport: 'Motorsport' },
+  { key: 'fighting', label: 'Lutas', source: 'sportsdb', sportsdbSport: 'Fighting' },
+  { key: 'baseball', label: 'Beisebol', source: 'espn', espnPath: 'baseball/mlb' },
+  { key: 'tennis', label: 'Tênis', source: 'espn', espnPath: 'tennis/atp' },
+  { key: 'volleyball', label: 'Vôlei', source: 'sportsdb', sportsdbSport: 'Volleyball' },
+  { key: 'mma', label: 'MMA', source: 'espn', espnPath: 'mma/ufc' },
+];
 const DAYS_AHEAD = 4; // today + next 3 days — keeps free-tier calls reasonable
 
 type GameEvent = {
@@ -104,11 +120,43 @@ function findMatchingChannel(e: GameEvent, channels: XtreamLive[]): XtreamLive |
   });
 }
 
+/** Converte um evento cru da ESPN pro mesmo formato que já usamos (o que
+ * veio da TheSportsDB), pra não precisar duplicar toda a UI. */
+function normalizeEspnEvent(raw: any, sportLabel: string): GameEvent | null {
+  const comp = raw?.competitions?.[0];
+  if (!comp) return null;
+  const home = comp.competitors?.find((c: any) => c.homeAway === 'home');
+  const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
+  const iso = raw.date as string | undefined; // ISO 8601, ex: "2026-08-02T23:00Z"
+  const d = iso ? new Date(iso) : null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // A ESPN manda placar "0" x "0" mesmo pra jogos que ainda nem começaram
+  // (diferente da TheSportsDB, que manda null nesse caso) — sem isso, o
+  // filtro de "só jogos futuros" mais abaixo descartaria tudo por engano.
+  const started = comp.status?.type?.state !== 'pre';
+  return {
+    idEvent: `espn-${raw.id}`,
+    strEvent: raw.name || raw.shortName || '',
+    strLeague: comp.league?.name || raw.league?.name || sportLabel,
+    strLeagueBadge: undefined,
+    strHomeTeam: home?.team?.displayName || home?.athlete?.displayName,
+    strAwayTeam: away?.team?.displayName || away?.athlete?.displayName,
+    strHomeTeamBadge: home?.team?.logo,
+    strAwayTeamBadge: away?.team?.logo,
+    strTime: d ? `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00` : undefined,
+    dateEvent: d ? isoDate(d) : undefined,
+    intHomeScore: started ? home?.score ?? null : null,
+    intAwayScore: started ? away?.score ?? null : null,
+    strStatus: comp.status?.type?.description ?? raw.status?.type?.description ?? null,
+    strSport: sportLabel,
+  };
+}
+
 export default function GamesScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [rawEvents, setRawEvents] = useState<GameEvent[]>([]);
-  const [sport, setSport] = useState<string>('Soccer');
+  const [sport, setSport] = useState<string>('soccer');
   const [error, setError] = useState<string | null>(null);
   const [scheduledIds, setScheduledIds] = useState<Set<string>>(new Set());
   // Looked up once from the person's own channel categories — if their panel
@@ -157,20 +205,51 @@ export default function GamesScreen() {
   const load = useCallback(async (s: string) => {
     setLoading(true);
     setError(null);
+    const def = SPORTS.find((sp) => sp.key === s);
+    if (!def) {
+      setRawEvents([]);
+      setLoading(false);
+      return;
+    }
     try {
       const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => isoDate(new Date(Date.now() + i * 86400000)));
-      const results = await Promise.all(
-        dates.map(async (date) => {
-          const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${date}&s=${encodeURIComponent(s)}`;
-          const res = await fetch(url);
-          if (!res.ok) return [];
-          const json = await res.json();
-          const list: GameEvent[] = json?.events || [];
-          return list.map((e) => ({ ...e, dateEvent: e.dateEvent || date }));
-        })
-      );
-      const merged = results
-        .flat()
+      let merged: GameEvent[] = [];
+
+      if (def.source === 'sportsdb') {
+        const results = await Promise.all(
+          dates.map(async (date) => {
+            const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${date}&s=${encodeURIComponent(def.sportsdbSport!)}`;
+            const res = await fetch(url);
+            if (!res.ok) return [];
+            const json = await res.json();
+            const list: GameEvent[] = json?.events || [];
+            return list.map((e) => ({ ...e, dateEvent: e.dateEvent || date }));
+          })
+        );
+        merged = results.flat();
+      } else {
+        // ESPN: um pedido por data, no formato YYYYMMDD.
+        const results = await Promise.all(
+          dates.map(async (date) => {
+            const yyyymmdd = date.replace(/-/g, '');
+            const url = `https://site.api.espn.com/apis/site/v2/sports/${def.espnPath}/scoreboard?dates=${yyyymmdd}`;
+            try {
+              const res = await fetch(url);
+              if (!res.ok) return [];
+              const json = await res.json();
+              const events: any[] = json?.events || [];
+              return events
+                .map((e) => normalizeEspnEvent(e, def.label))
+                .filter((e): e is GameEvent => !!e);
+            } catch {
+              return [];
+            }
+          })
+        );
+        merged = results.flat();
+      }
+
+      merged = merged
         .filter((e) => e.intHomeScore == null && e.intAwayScore == null)
         .sort((a, b) => (eventEpoch(a) || 0) - (eventEpoch(b) || 0));
       setRawEvents(merged);
@@ -254,16 +333,16 @@ export default function GamesScreen() {
       <View style={styles.chipRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowInner}>
           {SPORTS.map((s) => {
-            const active = s === sport;
+            const active = s.key === sport;
             return (
               <TVFocusable
-                key={s}
-                onPress={() => setSport(s)}
+                key={s.key}
+                onPress={() => setSport(s.key)}
                 style={[styles.chip, active && styles.chipActive]}
-                testID={`games-chip-${s}`}
+                testID={`games-chip-${s.key}`}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {SPORT_LABELS[s] || s}
+                  {s.label}
                 </Text>
               </TVFocusable>
             );
