@@ -314,16 +314,6 @@ export default function MacLoginScreen() {
           </Text>
         </View>
 
-        <TVFocusable
-          onPress={() => router.push('/diagnostic')}
-          style={styles.diagBtn}
-          hitSlop={12}
-          testID="mac-login-diagnostic"
-        >
-          <Ionicons name="pulse" size={12} color={colors.textMuted} />
-          <Text style={styles.diagText}>Diagnosticar backend</Text>
-        </TVFocusable>
-
         <Text style={styles.footer}>{appName || 'Maximus Player'}</Text>
       </SafeAreaView>
     </ImageBackground>
