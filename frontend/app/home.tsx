@@ -817,14 +817,14 @@ function FeaturedHero({
         imageStyle={{ opacity: 0.9 }}
       >
         <LinearGradient
-          colors={['rgba(11,15,26,0.55)', 'rgba(11,15,26,0.75)', colors.black]}
-          locations={[0, 0.55, 1]}
+          colors={['rgba(11,15,26,0.10)', 'rgba(11,15,26,0.40)', 'rgba(11,15,26,0.90)']}
+          locations={[0, 0.6, 1]}
           style={StyleSheet.absoluteFill as any}
         />
         <LinearGradient
-          colors={[colors.black, 'transparent']}
+          colors={['rgba(11,15,26,0.45)', 'transparent']}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0.75, y: 0 }}
+          end={{ x: 0.6, y: 0 }}
           style={StyleSheet.absoluteFill as any}
         />
         <View style={styles.heroContent}>
