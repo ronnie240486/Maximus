@@ -209,7 +209,13 @@ export default function MacLoginScreen() {
       const password: string = parsed.password || '';
       if (!dns || !username || !password) throw new Error('missing_fields');
 
-      const server = dns.replace(/\/+$/, '');
+      const dnsTrimmed = dns.trim().replace(/\/+$/, '');
+      // O campo "dns" que o gerador de teste devolve às vezes vem sem
+      // "http://" na frente (só "servidor.com:8080") — nesse caso a URL
+      // final ficava inválida e nenhuma chamada (sinopse, EPG, stream)
+      // funcionava, mesmo com usuário/senha corretos. Sempre garante um
+      // esquema explícito antes de montar a URL da playlist.
+      const server = /^https?:\/\//i.test(dnsTrimmed) ? dnsTrimmed : `http://${dnsTrimmed}`;
       const playlistUrl = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
 
       // O servidor do teste às vezes leva alguns segundos pra terminar de
