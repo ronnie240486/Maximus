@@ -328,7 +328,7 @@ export default function MacLoginScreen() {
               style={[styles.whatsBtn, isTV && styles.whatsBtnTV]}
               testID="mac-whatsapp-btn"
             >
-              <Ionicons name="logo-whatsapp" size={isTV ? 22 : 16} color={colors.white} />
+              <Ionicons name="logo-whatsapp" size={isTV ? 20 : 14} color={colors.white} />
               <Text style={[styles.whatsBtnText, isTV && styles.btnTextTV]}>ZAP</Text>
             </TVFocusable>
           </View>
@@ -348,7 +348,7 @@ export default function MacLoginScreen() {
             {debugLine}
           </Text>
           <Text style={styles.debugSmall}>
-            Tentativas: {pollCount} • Backend: renciaapp.manus.space
+            Tentativas: {pollCount}
           </Text>
 
           <TVFocusable
