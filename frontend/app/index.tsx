@@ -34,6 +34,13 @@ export default function MacLoginScreen() {
   const [checking, setChecking] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
   const [testing, setTesting] = useState(false);
+  // Enquanto isso for true, não mostramos a tela de "Como entrar" — só uma
+  // tela em branco/carregando. Evita o "flash" da tela de login toda vez
+  // que o app abre, mesmo já estando logado: antes, a tela de login sempre
+  // aparecia primeiro e só depois (quando a checagem de rede terminava)
+  // é que redirecionava pra frente. Agora só mostramos o login de fato
+  // depois de confirmar que NÃO existe uma sessão válida.
+  const [checkingSession, setCheckingSession] = useState(true);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
@@ -84,6 +91,9 @@ export default function MacLoginScreen() {
         setStatus(fresh);
       }
 
+      // Chegou até aqui: ou nunca teve sessão, ou a sessão expirou/foi
+      // bloqueada agora — é a hora certa de mostrar a tela de login.
+      setCheckingSession(false);
       runPoll(m);
     })();
     return () => {
@@ -160,6 +170,17 @@ export default function MacLoginScreen() {
     }
     return `${time} • device NÃO encontrado no painel`;
   })();
+
+  if (checkingSession) {
+    // Tela em branco/carregando só por um instante, enquanto confirma se
+    // já existe uma sessão válida — sem isso, a tela de "Como entrar"
+    // aparecia rapidinho toda vez, mesmo pra quem já estava logado.
+    return (
+      <View style={[styles.bg, styles.center]} testID="mac-login-checking-session">
+        <ActivityIndicator color={colors.accentCyan} size="large" />
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -268,6 +289,7 @@ export default function MacLoginScreen() {
 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.black },
+  center: { alignItems: 'center', justifyContent: 'center' },
   safe: { flex: 1, paddingHorizontal: spacing.xl },
   logoWrap: { alignItems: 'center', marginTop: spacing.md },
   banner: {
