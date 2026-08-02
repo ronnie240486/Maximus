@@ -597,6 +597,7 @@ export default function HomeScreen() {
     { key: 'kids', label: 'Kids', testID: 'nav-kids', icon: (active: boolean) => <MaterialCommunityIcons name="drawing" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: openKids },
     { key: 'radios', label: 'Rádios', testID: 'nav-radios', icon: (active: boolean) => <MaterialCommunityIcons name="radio" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/radios') },
     { key: 'search', label: 'Busca', testID: 'nav-search', icon: (active: boolean) => <Ionicons name="search" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/search') },
+    { key: 'diagnostic', label: 'Diagnóstico', testID: 'nav-diagnostic', icon: (active: boolean) => <Ionicons name="pulse" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/diagnostic') },
     { key: 'settings', label: 'Ajustes', testID: 'nav-settings', icon: (active: boolean) => <Ionicons name="settings" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/settings') },
   ];
 

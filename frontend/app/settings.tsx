@@ -378,6 +378,13 @@ export default function SettingsScreen() {
       toggle: { value: welcomeAudio, onChange: toggleWelcomeAudio },
     },
     {
+      id: 'diagnostic',
+      title: 'Diagnóstico',
+      subtitle: 'Testar conexão com o backend',
+      icon: <MaterialCommunityIcons name="stethoscope" size={20} color={colors.accentCyan} />,
+      onPress: () => router.push('/diagnostic'),
+    },
+    {
       id: 'version',
       title: 'Versão',
       subtitle: `v${session?.version || '1.0'} • ${BUILD_STAMP}`,
