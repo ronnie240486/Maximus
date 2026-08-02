@@ -31,6 +31,9 @@ export default function WelcomeScreen() {
   const player = useAudioPlayer(audioEnabled ? welcomeAudioSource : null);
   const status = useAudioPlayerStatus(player);
   const swooshPlayer = useAudioPlayer(audioEnabled ? swooshSource : null);
+  const swooshStatus = useAudioPlayerStatus(swooshPlayer);
+  const [voiceDone, setVoiceDone] = useState(false);
+  const [swooshDone, setSwooshDone] = useState(false);
 
   const goNext = () => {
     if (doneRef.current) return;
@@ -92,19 +95,35 @@ export default function WelcomeScreen() {
       const t = setTimeout(goNext, 1800);
       return () => clearTimeout(t);
     }
-    player.play();
+    // O efeito sonoro (uns 3s) começa primeiro; a voz "Bem-vindo ao
+    // Maximus Player" (uns 1s) entra um pouco depois, com um respiro —
+    // assim o efeito não fica em cima da voz nem cortado por ela.
     swooshPlayer.play();
+    const voiceDelay = setTimeout(() => player.play(), 350);
     const fallback = setTimeout(goNext, FALLBACK_MS);
-    return () => clearTimeout(fallback);
+    return () => {
+      clearTimeout(voiceDelay);
+      clearTimeout(fallback);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, audioEnabled]);
 
   useEffect(() => {
+    if (status.didJustFinish) setVoiceDone(true);
+  }, [status.didJustFinish]);
+
+  useEffect(() => {
+    if (swooshStatus.didJustFinish) setSwooshDone(true);
+  }, [swooshStatus.didJustFinish]);
+
+  useEffect(() => {
     if (!audioEnabled) return;
-    if (status.didJustFinish) {
+    // Só sai da tela quando os DOIS realmente terminarem — o efeito dura
+    // mais que a voz, então esperar só a voz cortava o efeito no meio.
+    if (voiceDone && swooshDone) {
       goNext();
     }
-  }, [status.didJustFinish, audioEnabled]);
+  }, [voiceDone, swooshDone, audioEnabled]);
 
   const showBanner = !!banner && !imageFailed;
   const showLogo = !showBanner && !!logo && !imageFailed;
