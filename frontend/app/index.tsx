@@ -21,6 +21,7 @@ import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
 import { parsePlaylistUrl } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
 import { clearHomeCache } from '@/src/state/home-cache';
+import { clearListCache } from '@/src/state/list-cache';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import TVFocusable from '@/src/components/TVFocusable';
 
@@ -206,6 +207,12 @@ export default function MacLoginScreen() {
         app_name: 'Maximus Player',
       };
 
+      // Limpa qualquer coisa guardada de uma tentativa anterior (outra
+      // conta, outro teste, o MAC cadastrado sem lista) antes de entrar —
+      // sem isso, o app podia misturar capas/dados antigos com o stream
+      // de credenciais novas, e nada tocava direito.
+      await clearHomeCache();
+      await clearListCache(['channels', 'movies', 'series']);
       await saveSession(testStatus);
       router.replace('/welcome');
     } catch {
