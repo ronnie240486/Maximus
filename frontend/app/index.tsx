@@ -216,7 +216,7 @@ export default function MacLoginScreen() {
       // funcionava, mesmo com usuário/senha corretos. Sempre garante um
       // esquema explícito antes de montar a URL da playlist.
       const server = /^https?:\/\//i.test(dnsTrimmed) ? dnsTrimmed : `http://${dnsTrimmed}`;
-      const playlistUrl = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
+      const playlistUrl = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=mpegts`;
 
       // O servidor do teste às vezes leva alguns segundos pra terminar de
       // provisionar a conta recém-criada — se a gente entrar na hora,
