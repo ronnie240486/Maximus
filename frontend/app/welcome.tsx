@@ -10,6 +10,7 @@ import { getDeviceMac } from '@/src/lib/device';
 import { checkMac } from '@/src/api/client';
 import { loadSession } from '@/src/state/session';
 import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
+import { prefetchHomeContent } from '@/src/state/prefetch';
 
 const welcomeAudioSource = require('@/assets/audio/welcome.wav');
 const FALLBACK_MS = 6000;
@@ -34,6 +35,13 @@ export default function WelcomeScreen() {
     doneRef.current = true;
     router.replace('/profiles');
   };
+
+  useEffect(() => {
+    // Começa a buscar canais/filmes/séries agora, em segundo plano — assim,
+    // quando a pessoa chegar na Home (depois de escolher o perfil), os
+    // dados já estão prontos em vez de começar a busca do zero ali.
+    prefetchHomeContent();
+  }, []);
 
   useEffect(() => {
     (async () => {
