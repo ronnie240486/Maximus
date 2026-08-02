@@ -20,7 +20,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { loadSession, saveSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex, clearSession } from '@/src/state/session';
+import { loadSession, saveSession, getSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex, clearSession } from '@/src/state/session';
 import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, clearHomeCache } from '@/src/state/home-cache';
@@ -181,21 +181,36 @@ export default function HomeScreen() {
         // novo pro painel, só usava o link salvo no celular.
         const creds = getXtream();
         if (creds) {
-          const m = await getDeviceMac();
-          if (cancelled) return;
-          const fresh = await checkMac(m);
-          if (cancelled) return;
-          const isRealResponse = fresh.message !== 'Falha de conexão.';
-          if (isRealResponse) {
-            const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
-              const parsed = parsePlaylistUrl(p.url);
-              return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
-            });
-            if (!fresh.authorized || !stillHasThisPlaylist) {
+          const session = getSession();
+          if (session?.status === 'Teste') {
+            // Conta de teste (gerada pelo botão TESTE) não existe no
+            // painel principal — perguntar pra ele sempre diria "não
+            // autorizado" e derrubaria o teste na hora. Em vez disso, só
+            // confere se o prazo do teste já passou, localmente.
+            const expiresAt = session.expire_date ? new Date(session.expire_date) : null;
+            if (expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
               await clearSession();
               await clearHomeCache();
               router.replace('/');
               return;
+            }
+          } else {
+            const m = await getDeviceMac();
+            if (cancelled) return;
+            const fresh = await checkMac(m);
+            if (cancelled) return;
+            const isRealResponse = fresh.message !== 'Falha de conexão.';
+            if (isRealResponse) {
+              const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
+                const parsed = parsePlaylistUrl(p.url);
+                return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
+              });
+              if (!fresh.authorized || !stillHasThisPlaylist) {
+                await clearSession();
+                await clearHomeCache();
+                router.replace('/');
+                return;
+              }
             }
           }
         }
@@ -269,38 +284,51 @@ export default function HomeScreen() {
       return;
     }
 
-    // Confirma com o painel que o MAC continua autorizado. Se o revendedor
-    // bloqueou o MAC de vez, não tem mais o que fazer aqui — desloga.
-    const fresh = await checkMac(m);
-    const isRealResponse = fresh.message !== 'Falha de conexão.';
-    if (isRealResponse && !fresh.authorized) {
-      await clearSession();
-      await clearHomeCache();
-      router.replace('/');
-      return;
-    }
-    if (isRealResponse) {
-      await saveSession(fresh); // mantém sessão local sempre atualizada
-      const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
-        const parsed = parsePlaylistUrl(p.url);
-        return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
-      });
-      if (!stillHasThisPlaylist) {
-        // A lista que o app estava usando não existe mais no painel. Só
-        // vale tentar trocar automaticamente pra outra se o painel ainda
-        // mandou alguma lista de verdade — se a resposta veio vazia (lista
-        // removida por completo, não só trocada), não tem pra onde trocar:
-        // desloga e volta pro login, em vez de ficar preso mostrando o
-        // conteúdo antigo em cache pra sempre.
-        const hasAnyOtherPlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
-        if (!hasAnyOtherPlaylist) {
-          await clearSession();
-          await clearHomeCache();
-          router.replace('/');
-          return;
+    // Sessão de teste: não existe no painel principal, então perguntar pra
+    // ele sempre voltaria "não autorizado". Só confere localmente se o
+    // prazo do teste já venceu.
+    if (session?.status === 'Teste') {
+      const expiresAt = session.expire_date ? new Date(session.expire_date) : null;
+      if (expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+        await clearSession();
+        await clearHomeCache();
+        router.replace('/');
+        return;
+      }
+    } else {
+      // Confirma com o painel que o MAC continua autorizado. Se o revendedor
+      // bloqueou o MAC de vez, não tem mais o que fazer aqui — desloga.
+      const fresh = await checkMac(m);
+      const isRealResponse = fresh.message !== 'Falha de conexão.';
+      if (isRealResponse && !fresh.authorized) {
+        await clearSession();
+        await clearHomeCache();
+        router.replace('/');
+        return;
+      }
+      if (isRealResponse) {
+        await saveSession(fresh); // mantém sessão local sempre atualizada
+        const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
+          const parsed = parsePlaylistUrl(p.url);
+          return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
+        });
+        if (!stillHasThisPlaylist) {
+          // A lista que o app estava usando não existe mais no painel. Só
+          // vale tentar trocar automaticamente pra outra se o painel ainda
+          // mandou alguma lista de verdade — se a resposta veio vazia (lista
+          // removida por completo, não só trocada), não tem pra onde trocar:
+          // desloga e volta pro login, em vez de ficar preso mostrando o
+          // conteúdo antigo em cache pra sempre.
+          const hasAnyOtherPlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
+          if (!hasAnyOtherPlaylist) {
+            await clearSession();
+            await clearHomeCache();
+            router.replace('/');
+            return;
+          }
+          await setActivePlaylistIndex(0, false);
+          return load();
         }
-        await setActivePlaylistIndex(0, false);
-        return load();
       }
     }
 
