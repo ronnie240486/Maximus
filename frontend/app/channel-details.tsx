@@ -119,10 +119,17 @@ export default function ChannelDetailsScreen() {
 
   const creds = getXtream();
   const initialStreamUrl = creds ? liveStreamUrl(creds, current.streamId, 'm3u8') : '';
-  const player = useVideoPlayer(initialStreamUrl, (p) => {
-    p.loop = false;
-    p.play();
-  });
+  // Mesma proteção do player.tsx: alguns servidores exigem User-Agent
+  // reconhecido no pedido do vídeo em si, não só nas chamadas de API.
+  const player = useVideoPlayer(
+    initialStreamUrl
+      ? { uri: initialStreamUrl, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } }
+      : '',
+    (p) => {
+      p.loop = false;
+      p.play();
+    }
+  );
 
   // Avisa o painel periodicamente qual canal está sendo assistido aqui —
   // essa prévia inline toca sozinha assim que a tela abre, então o

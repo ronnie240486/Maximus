@@ -48,7 +48,7 @@ export default function TVChannelPreview({
     if (!channel || !creds) return;
     const url = liveStreamUrl(creds, channel.stream_id);
     try {
-      player.replace(url);
+      player.replace({ uri: url, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } });
       player.play();
     } catch {
       // Fonte inválida ou player ainda não pronto — o preview simplesmente

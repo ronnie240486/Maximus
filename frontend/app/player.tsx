@@ -156,10 +156,17 @@ export default function PlayerScreen() {
 
   const isAdult = params.adult === '1';
 
-  const player = useVideoPlayer(current.stream || '', (p) => {
-    p.loop = false;
-    p.play();
-  });
+  // Alguns servidores de IPTV bloqueiam/travam o stream se o pedido não
+  // vier com um User-Agent reconhecido (proteção comum contra uso fora de
+  // apps de player) — as chamadas de API já mandavam isso, mas o pedido
+  // do vídeo em si (feito pelo player nativo) não mandava nada.
+  const player = useVideoPlayer(
+    current.stream ? { uri: current.stream, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } } : '',
+    (p) => {
+      p.loop = false;
+      p.play();
+    }
+  );
 
   useEffect(() => {
     if (isLive) return;
