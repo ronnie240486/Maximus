@@ -7,11 +7,16 @@
 // backend happens to be deployed and reachable; native never depends on it.
 
 import { Platform } from 'react-native';
+import { decodeB64 } from '@/src/lib/obfuscate';
 
 const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 
-const PANEL_BASE = 'https://renciaapp.manus.space/api/v5';
-const PANEL_BASE_V4 = 'https://renciaapp.manus.space/api/v4';
+// Ofuscados em base64 — ver src/lib/obfuscate.ts pra entender o porquê e
+// os limites disso. Valores decodificados:
+//   PANEL_BASE:    https://renciaapp.manus.space/api/v5
+//   PANEL_BASE_V4: https://renciaapp.manus.space/api/v4
+const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y1');
+const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y0');
 
 const commonHeaders: Record<string, string> = {
   Accept: 'application/json, text/plain, */*',
@@ -186,7 +191,11 @@ export type TestRegisterResult = {
 // chegar certo pro app (manda o nome do revendedor em vez do link), então
 // por enquanto não dá pra ler isso dinamicamente. Se esse link mudar de
 // novo, precisa atualizar aqui e gerar um APK novo.
-const TEST_REGISTER_URL = 'https://nuvixtv.sigmab.pro/api/chatbot/Yen129WPEa/XYgD9JWr6V';
+// Ofuscado em base64 (ver src/lib/obfuscate.ts) — decodificado:
+//   https://nuvixtv.sigmab.pro/api/chatbot/Yen129WPEa/XYgD9JWr6V
+const TEST_REGISTER_URL = decodeB64(
+  'aHR0cHM6Ly9udXZpeHR2LnNpZ21hYi5wcm8vYXBpL2NoYXRib3QvWWVuMTI5V1BFYS9YWWdEOUpXcjZW'
+);
 
 export async function registerTestDevice(mac: string): Promise<TestRegisterResult> {
   const upstream = `${TEST_REGISTER_URL}?mac=${encodeURIComponent(mac)}`;
