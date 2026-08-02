@@ -24,6 +24,12 @@ const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 
 const commonHeaders: Record<string, string> = {
   Accept: 'application/json, text/plain, */*',
+  // Sem isso, só as chamadas de VÍDEO (que já mandam User-Agent em outros
+  // arquivos) passavam por painéis atrás de Cloudflare — as de DADOS
+  // (sinopse, EPG, categorias, etc, todas via player_api.php) não tinham
+  // nenhum User-Agent, o que muitos desses painéis tratam como tráfego
+  // suspeito/bot e bloqueiam, mesmo com o vídeo funcionando normalmente.
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1',
 };
 
 function routeUrl(url: string): string {

@@ -3,7 +3,33 @@
 // Usamos o endpoint "all.api" que faz round-robin entre os servidores
 // espelhados do projeto, então não dependemos de um único servidor no ar.
 
-const BASE = 'https://all.api.radio-browser.info';
+// "all.api" é um DNS round-robin entre os servidores espelhados do
+// projeto — na maioria das redes funciona bem, mas em algumas (mais comum
+// em TV box, com DNS/roteador mais restritivo) a resolução desse domínio
+// específico falha mesmo com internet normal funcionando pra tudo mais.
+// Por isso mantemos espelhos fixos como alternativa.
+const MIRRORS = [
+  'https://all.api.radio-browser.info',
+  'https://de1.api.radio-browser.info',
+  'https://de2.api.radio-browser.info',
+  'https://nl1.api.radio-browser.info',
+];
+
+async function fetchJson(path: string): Promise<any> {
+  for (const mirror of MIRRORS) {
+    try {
+      const res = await fetch(`${mirror}${path}`, {
+        headers: { 'User-Agent': 'MaximusPlayer/1.0' },
+      });
+      if (!res.ok) continue;
+      return await res.json();
+    } catch {
+      // Esse espelho falhou (DNS, timeout, etc.) — tenta o próximo antes
+      // de desistir de vez.
+    }
+  }
+  return null;
+}
 
 export type RadioStation = {
   stationuuid: string;
@@ -43,14 +69,6 @@ export const RADIO_CATEGORIES: RadioCategory[] = [
   { key: 'internacionais', label: 'Internacionais', tags: ['top 40', 'english'] },
 ];
 
-async function fetchJson(url: string): Promise<any> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'MaximusPlayer/1.0' },
-  });
-  if (!res.ok) return null;
-  return res.json();
-}
-
 function dedupeStations(list: RadioStation[]): RadioStation[] {
   const seen = new Set<string>();
   return list.filter((s) => {
@@ -67,13 +85,13 @@ export async function fetchStationsByCategory(cat: RadioCategory, limit = 80): P
   // tag sozinha (perde o filtro de país, mas mantém o gênero certo).
   if (cat.countryCode && cat.tags.length > 0) {
     for (const tag of cat.tags) {
-      const url = `${BASE}/json/stations/search?tag=${encodeURIComponent(tag)}&countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+      const url = `/json/stations/search?tag=${encodeURIComponent(tag)}&countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
       const json = await fetchJson(url);
       const valid = (json || []).filter((s: RadioStation) => s.url_resolved || s.url);
       if (valid.length > 0) return dedupeStations(valid);
     }
     for (const tag of cat.tags) {
-      const url = `${BASE}/json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+      const url = `/json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
       const json = await fetchJson(url);
       const valid = (json || []).filter((s: RadioStation) => s.url_resolved || s.url);
       if (valid.length > 0) return dedupeStations(valid);
@@ -82,18 +100,18 @@ export async function fetchStationsByCategory(cat: RadioCategory, limit = 80): P
   }
   // Só país, sem tag (ex: Nacionais).
   if (cat.countryCode) {
-    const url = `${BASE}/json/stations/search?countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+    const url = `/json/stations/search?countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
     const json = await fetchJson(url);
     return dedupeStations((json || []).filter((s: RadioStation) => s.url_resolved || s.url));
   }
   if (cat.tags.length === 0) {
     // "Populares" — sem tag nem país, só ordena pelas mais clicadas globalmente.
-    const url = `${BASE}/json/stations/search?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+    const url = `/json/stations/search?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
     const json = await fetchJson(url);
     return dedupeStations((json || []).filter((s: RadioStation) => s.url_resolved || s.url));
   }
   for (const tag of cat.tags) {
-    const url = `${BASE}/json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+    const url = `/json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
     const json = await fetchJson(url);
     const valid = (json || []).filter((s: RadioStation) => s.url_resolved || s.url);
     if (valid.length > 0) return dedupeStations(valid);
@@ -103,7 +121,7 @@ export async function fetchStationsByCategory(cat: RadioCategory, limit = 80): P
 
 /** Busca por nome — usada pela lupa de pesquisa da tela de Rádios. */
 export async function searchStationsByName(query: string, limit = 60): Promise<RadioStation[]> {
-  const url = `${BASE}/json/stations/search?name=${encodeURIComponent(query)}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+  const url = `/json/stations/search?name=${encodeURIComponent(query)}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
   const json = await fetchJson(url);
   return dedupeStations((json || []).filter((s: RadioStation) => s.url_resolved || s.url));
 }
