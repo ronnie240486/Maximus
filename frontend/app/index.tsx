@@ -19,7 +19,7 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
 import { hasUsedTest, markTestUsed } from '@/src/state/test-usage';
-import { parsePlaylistUrl } from '@/src/lib/xtream';
+import { parsePlaylistUrl, xtream, XtreamCreds } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
 import { clearHomeCache } from '@/src/state/home-cache';
 import { clearListCache } from '@/src/state/list-cache';
@@ -38,6 +38,10 @@ export default function MacLoginScreen() {
   const [checking, setChecking] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
   const [testing, setTesting] = useState(false);
+  // Mostrado só durante o "aquecimento" do teste recém-criado (ver
+  // onTestRegister) — deixa claro pro usuário que ele não travou, só está
+  // esperando o servidor de teste terminar de provisionar a conta nova.
+  const [testStage, setTestStage] = useState<string | null>(null);
   // Enquanto isso for true, não mostramos a tela de "Como entrar" — só uma
   // tela em branco/carregando. Evita o "flash" da tela de login toda vez
   // que o app abre, mesmo já estando logado: antes, a tela de login sempre
@@ -208,6 +212,40 @@ export default function MacLoginScreen() {
       const server = dns.replace(/\/+$/, '');
       const playlistUrl = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
 
+      // O servidor do teste às vezes leva alguns segundos pra terminar de
+      // provisionar a conta recém-criada — se a gente entrar na hora,
+      // player_api.php ainda responde vazio/erro pra tudo (sinopse, EPG,
+      // o próprio stream), mesmo com usuário/senha corretos. Por isso
+      // "aquecemos" aqui: tenta autenticar algumas vezes antes de navegar,
+      // pra só entrar quando o servidor já está respondendo de verdade.
+      const testCreds: XtreamCreds = { server, username, password };
+      setTestStage('Preparando seu teste...');
+      const MAX_WARMUP_TRIES = 6;
+      const WARMUP_INTERVAL_MS = 2000;
+      let warmed = false;
+      for (let attempt = 1; attempt <= MAX_WARMUP_TRIES; attempt++) {
+        if (!mountedRef.current) return;
+        const auth = await xtream.authenticate(testCreds);
+        if (auth?.user_info) {
+          warmed = true;
+          break;
+        }
+        if (attempt < MAX_WARMUP_TRIES) {
+          await new Promise((resolve) => setTimeout(resolve, WARMUP_INTERVAL_MS));
+        }
+      }
+      if (!mountedRef.current) return;
+      setTestStage(null);
+      if (!warmed) {
+        // Não trava o usuário pra sempre — se depois de ~12s o servidor
+        // ainda não respondeu, deixa entrar mesmo assim (pode ser lentidão
+        // pontual), mas avisa que pode ser preciso tentar de novo.
+        Alert.alert(
+          'O servidor de teste está demorando',
+          'Vamos entrar mesmo assim, mas se os filmes/canais não carregarem, toque em TESTE de novo em instantes.'
+        );
+      }
+
       const testStatus: MacStatus = {
         authorized: true,
         registered: true,
@@ -235,6 +273,7 @@ export default function MacLoginScreen() {
       await saveSession(testStatus);
       router.replace('/welcome');
     } catch {
+      setTestStage(null);
       // Resposta do teste veio num formato inesperado — não trava o
       // cliente numa tela de erro técnico, só avisa e deixa tentar de novo.
       Alert.alert(
@@ -308,19 +347,21 @@ export default function MacLoginScreen() {
           </Pressable>
           <Text style={styles.tap}>{copied ? 'Copiado!' : 'Toque para copiar'}</Text>
 
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md, alignItems: 'center' }}>
             <TVFocusable
               onPress={onTestRegister}
-              disabled={testing}
-              style={[styles.testBtn, isTV && styles.testBtnTV, testing && { opacity: 0.5 }]}
+              disabled={testing || !!testStage}
+              style={[styles.testBtn, isTV && styles.testBtnTV, (testing || testStage) && { opacity: 0.5 }]}
               testID="mac-test-register"
             >
-              {testing ? (
+              {testing || testStage ? (
                 <ActivityIndicator color={colors.black} size="small" />
               ) : (
                 <Ionicons name="flash" size={isTV ? 20 : 14} color={colors.black} />
               )}
-              <Text style={[styles.testBtnText, isTV && styles.btnTextTV]}>TESTE</Text>
+              <Text style={[styles.testBtnText, isTV && styles.btnTextTV]}>
+                {testStage ? 'PREPARANDO...' : 'TESTE'}
+              </Text>
             </TVFocusable>
 
             <TVFocusable
@@ -427,7 +468,6 @@ const styles = StyleSheet.create({
   },
   tap: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
   testBtn: {
-    marginTop: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
