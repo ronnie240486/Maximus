@@ -104,7 +104,7 @@ export default function ClockWeather({ compact = false }: Props) {
 
       {weather && !weatherDenied && (
         <View style={[styles.weatherBlock, compact && styles.weatherBlockCompact]}>
-          <Ionicons name={weatherIcon(weather.code) as any} size={isTV ? 30 : compact ? 18 : 22} color={colors.accentCyan} />
+          <Ionicons name={weatherIcon(weather.code) as any} size={isTV ? 30 : compact ? 14 : 22} color={colors.accentCyan} />
           <View>
             <Text style={[styles.temp, compact && styles.tempCompact, isTV && styles.tempTV]}>{weather.tempC}°</Text>
             {!compact && !!city && (
@@ -130,10 +130,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   wrapTV: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.lg },
-  wrapCompact: { paddingHorizontal: spacing.sm, paddingVertical: 6, gap: spacing.sm },
+  wrapCompact: { paddingHorizontal: 6, paddingVertical: 4, gap: 6 },
   time: { color: colors.white, fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
   timeTV: { fontSize: 32 },
-  timeCompact: { fontSize: 14 },
+  timeCompact: { fontSize: 12 },
   date: { color: colors.textSecondary, fontSize: 11, textTransform: 'capitalize', marginTop: 1 },
   dateTV: { fontSize: 14 },
   weatherBlock: {
@@ -144,10 +144,10 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.darkSurfaceAlt,
     paddingLeft: spacing.md,
   },
-  weatherBlockCompact: { gap: 4, paddingLeft: spacing.sm },
+  weatherBlockCompact: { gap: 2, paddingLeft: 4, borderLeftWidth: 0 },
   temp: { color: colors.accentCyan, fontSize: 18, fontWeight: '800' },
   tempTV: { fontSize: 26 },
-  tempCompact: { fontSize: 13 },
+  tempCompact: { fontSize: 12 },
   city: { color: colors.textMuted, fontSize: 11 },
   cityTV: { fontSize: 13 },
 });
