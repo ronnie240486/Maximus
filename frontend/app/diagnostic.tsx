@@ -24,10 +24,17 @@ const BACKEND = 'https://renciaapp.manus.space/api/v5';
 // Esconde usuário/senha (do Xtream do cliente) de qualquer texto antes de
 // mostrar ou copiar na tela — tanto em URLs (?username=...&password=...)
 // quanto em corpos de resposta JSON ("username":"...","password":"...").
+// Também esconde contato/WhatsApp do revendedor e a URL do gerador de
+// teste, e encurta as URLs assinadas de imagem (logo/fundo/banner) — são
+// bem longas e não ajudam em nada a achar onde está o erro, só poluem a
+// tela. O que importa pra diagnóstico (status HTTP, autorizado/registrado,
+// mensagens de erro) continua visível.
 function redact(text: string): string {
   return text
     .replace(/([?&](?:user(?:name)?|pass(?:word)?)=)[^&\s"'<]+/gi, '$1***')
-    .replace(/("(?:username|user|password|pass)"\s*:\s*")[^"]*(")/gi, '$1***$2');
+    .replace(/("(?:username|user|password|pass)"\s*:\s*")[^"]*(")/gi, '$1***$2')
+    .replace(/("(?:whatsapp_url|reseller_whatsapp|reseller_contact|dns_url|apk_link)"\s*:\s*")[^"]*(")/gi, '$1***$2')
+    .replace(/("(?:logo_url|bg_url|banner_url)"\s*:\s*"[^"]*?)\?[^"]*(")/gi, '$1$2');
 }
 
 type Result = {
