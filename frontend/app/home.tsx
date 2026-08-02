@@ -468,14 +468,18 @@ export default function HomeScreen() {
         await setActivePlaylistIndex(currentIdx + 1, false);
         return load();
       }
-      if (totalPlaylists > 1) {
-        // Já tentamos todas — volta pra primeira (sem persistir; é só pra
-        // sessão atual) pra próxima tentativa recomeçar do início.
-        await setActivePlaylistIndex(0, false);
-      }
+      // Chegou aqui e ainda veio vazio: ou só tem uma lista mesmo (e ela
+      // não funciona), ou já tentamos todas e nenhuma trouxe nada. Nesse
+      // caso não faz sentido deixar a pessoa "presa" na Home vendo erro —
+      // volta pro login, igual quando o painel bloqueia o MAC.
+      await setActivePlaylistIndex(0, false);
+      await clearSession();
+      await clearHomeCache();
+      router.replace('/');
+      return;
     }
 
-    setLoadError(allEmpty ? getLastXtreamError() : null);
+    setLoadError(null);
     setLoading(false);
 
     // Persist whatever we ended up with so the next cold open of Home is instant.

@@ -175,7 +175,12 @@ export default function MacLoginScreen() {
         registered: true,
         mac,
         status: 'Teste',
-        expire_date: parsed.expiresAtFormatted || parsed.expiresAt || null,
+        // IMPORTANTE: prioriza expiresAt (formato "AAAA-MM-DD HH:mm:ss"),
+        // não expiresAtFormatted ("DD/MM/AAAA...") — o JS interpreta datas
+        // com barra como MM/DD/AAAA (padrão americano), então "02/08"
+        // virava fevereiro em vez de agosto, e o teste expirava na hora
+        // errada sem ninguém perceber.
+        expire_date: parsed.expiresAt || null,
         playlists: [{ name: 'Teste', url: playlistUrl, type: 'm3u_plus' }],
         app_name: 'Maximus Player',
       };
