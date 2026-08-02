@@ -63,11 +63,34 @@ export default function WelcomeScreen() {
       setLogo(cached?.logo_url);
 
       const fresh = await checkMac(m);
+      let finalBg = cached?.bg_url;
+      let finalBanner = cached?.banner_url;
+      let finalLogo = cached?.logo_url;
       if (fresh.authorized) {
-        setBg(fresh.bg_url);
-        setBanner(fresh.banner_url);
-        setLogo(fresh.logo_url);
+        finalBg = fresh.bg_url;
+        finalBanner = fresh.banner_url;
+        finalLogo = fresh.logo_url;
+        setBg(finalBg);
+        setBanner(finalBanner);
+        setLogo(finalLogo);
       }
+
+      // Pré-carrega as imagens ANTES de liberar o áudio — sem isso, o
+      // áudio (voz "Bem-vindo..." + efeito) começava assim que a URL da
+      // imagem ficava conhecida, mas a imagem em si (bytes baixados da
+      // rede) só aparecia um pouco depois, dando a impressão de áudio e
+      // imagem fora de sincronia. Tem um teto de 2s pra isso não atrasar
+      // a entrada se a imagem estiver lenta/fora do ar.
+      const toPrefetch = [finalBanner, finalLogo, finalBg].filter(
+        (u): u is string => !!u
+      );
+      if (toPrefetch.length) {
+        await Promise.race([
+          Image.prefetch(toPrefetch).catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
+      }
+
       setReady(true);
     })();
   }, []);

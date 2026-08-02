@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -52,6 +52,10 @@ export default function ChannelsScreen() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [showCategoryDrawer, setShowCategoryDrawer] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<XtreamLive | null>(null);
+  // Destaque visual da linha (instantâneo) — separado do preview de vídeo
+  // em si, que é mais pesado e usa debounce (ver onFocusChannel abaixo).
+  const [focusedChannel, setFocusedChannel] = useState<XtreamLive | null>(null);
+  const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { modal: parentalModal, guard } = useParentalGate();
 
   useFocusEffect(
@@ -119,6 +123,27 @@ export default function ChannelsScreen() {
     return [FAVORITES, ALL, ...categories.map((c) => c.category_name)];
   }, [categories]);
 
+  // Contagem por categoria (mostrada ao lado do nome na coluna da TV).
+  // Precisa ser memoizada: sem isso, esse cálculo (um filter() por
+  // categoria) rodava de novo em TODA renderização — inclusive a cada
+  // movimento do D-pad na lista de canais (que atualiza `previewChannel`
+  // e força o componente inteiro a re-renderizar) — pesado o bastante
+  // pra contribuir com o travamento ao navegar em listas grandes.
+  const categoryCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const cat of catNames) {
+      if (cat === ALL) {
+        map[cat] = streams.length;
+      } else if (cat === FAVORITES) {
+        map[cat] = favoriteIds.size;
+      } else {
+        const catId = categories.find((c) => c.category_name === cat)?.category_id;
+        map[cat] = catId ? streams.filter((s) => s.category_id === catId).length : 0;
+      }
+    }
+    return map;
+  }, [catNames, streams, categories, favoriteIds]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (selectedCat === FAVORITES) {
@@ -142,13 +167,36 @@ export default function ChannelsScreen() {
     if (!isTV) return;
     if (!filtered.length) {
       setPreviewChannel(null);
+      setFocusedChannel(null);
       return;
     }
     setPreviewChannel((prev) => {
       if (prev && filtered.some((s) => s.stream_id === prev.stream_id)) return prev;
-      return filtered[0];
+      const next = filtered[0];
+      setFocusedChannel(next);
+      return next;
     });
   }, [isTV, filtered]);
+
+  // Chamado a cada movimento do D-pad na lista (TV). Antes, cada um desses
+  // eventos trocava o stream do preview NA HORA — como o D-pad dispara
+  // vários focos por segundo ao segurar pra baixo/cima, isso derrubava uma
+  // nova conexão de vídeo a cada linha percorrida, travando a navegação.
+  // Agora só troca o vídeo de verdade depois que o usuário PARA de se
+  // mexer por um instante; o destaque da linha continua instantâneo.
+  const onFocusChannel = useCallback((item: XtreamLive) => {
+    setFocusedChannel(item);
+    if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+    previewDebounceRef.current = setTimeout(() => {
+      setPreviewChannel(item);
+    }, 350);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+    };
+  }, []);
 
   const openPlayer = (s: XtreamLive) => {
     const categoryName = categories.find((c) => c.category_id === s.category_id)?.category_name;
@@ -245,13 +293,7 @@ export default function ChannelsScreen() {
           >
             {catNames.map((cat) => {
               const active = cat === selectedCat;
-              const catId = categories.find((c) => c.category_name === cat)?.category_id;
-              const count =
-                cat === ALL
-                  ? streams.length
-                  : cat === FAVORITES
-                  ? favoriteIds.size
-                  : streams.filter((s) => s.category_id === catId).length;
+              const count = categoryCounts[cat] ?? 0;
               return (
                 <TVFocusable
                   key={cat}
@@ -289,10 +331,13 @@ export default function ChannelsScreen() {
                 windowSize={7}
                 removeClippedSubviews
                 renderItem={({ item, index }) => {
-                  const rowActive = previewChannel?.stream_id === item.stream_id;
+                  // Destaque da linha usa o canal em FOCO agora mesmo (sem
+                  // atraso) — só o preview de vídeo em si (mais pesado) é
+                  // que espera o usuário parar de se mexer, ver mais abaixo.
+                  const rowActive = focusedChannel?.stream_id === item.stream_id;
                   return (
                     <TVFocusable
-                      onFocus={() => setPreviewChannel(item)}
+                      onFocus={() => onFocusChannel(item)}
                       onPress={() => openPlayer(item)}
                       style={[styles.tvRow, rowActive && styles.tvRowActive]}
                       focusStyle={styles.tvRowFocus}
@@ -302,7 +347,7 @@ export default function ChannelsScreen() {
                       {item.stream_icon ? (
                         <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" />
                       ) : (
-                        <MaterialCommunityIcons name="television-classic" size={18} color={colors.textMuted} />
+                        <MaterialCommunityIcons name="television-classic" size={22} color={colors.textMuted} />
                       )}
                       <Text style={styles.tvRowName} numberOfLines={1}>
                         {item.name}
@@ -557,12 +602,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   tvCatItemActive: { backgroundColor: 'rgba(76,232,240,0.14)' },
-  tvCatText: { color: colors.textSecondary, fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  tvCatText: { color: colors.textSecondary, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   tvCatTextActive: { color: colors.accentCyan },
-  tvCatCount: { color: colors.textMuted, fontSize: 12, marginLeft: 6 },
+  tvCatCount: { color: colors.textMuted, fontSize: 13, marginLeft: 6 },
   tvListCol: {
     width: 340,
     maxWidth: 340,
@@ -577,7 +622,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   tvRowActive: { backgroundColor: 'rgba(76,232,240,0.10)' },
   tvRowFocus: {
@@ -586,9 +631,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     transform: [{ scale: 1 }],
   },
-  tvRowNum: { color: colors.textMuted, fontSize: 13, width: 34, fontVariant: ['tabular-nums'] },
-  tvRowIcon: { width: 24, height: 24 },
-  tvRowName: { color: colors.white, fontSize: 14, fontWeight: '600', flex: 1 },
+  tvRowNum: { color: colors.textMuted, fontSize: 14, width: 34, fontVariant: ['tabular-nums'] },
+  tvRowIcon: { width: 32, height: 32 },
+  tvRowName: { color: colors.white, fontSize: 16, fontWeight: '600', flex: 1 },
   tvPreviewCol: { flex: 1, padding: spacing.sm },
   sideChipTextActive: { color: colors.accentCyan },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },

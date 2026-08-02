@@ -38,10 +38,13 @@ export default function TVChannelPreview({
 
   const player = useVideoPlayer('', (p) => {
     p.loop = true;
-    // Muted por padrão: como o preview troca de canal a cada movimento do
-    // controle remoto, deixar o som ligado criaria uma sucessão caótica de
-    // áudios sobrepostos enquanto a pessoa navega pela lista.
-    p.muted = true;
+    // Antes ficava sempre mudo: como o preview trocava de stream a cada
+    // movimento do D-pad, deixar o som ligado criava uma sucessão caótica
+    // de áudios sobrepostos. Agora a troca de canal (ver onFocusChannel em
+    // channels.tsx) só acontece de fato depois que o usuário PARA de se
+    // mexer por um instante, então só toca o som de um canal por vez — dá
+    // pra deixar audível.
+    p.muted = false;
   });
 
   useEffect(() => {
