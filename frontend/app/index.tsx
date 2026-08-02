@@ -137,15 +137,18 @@ export default function MacLoginScreen() {
     setTesting(false);
     if (!mountedRef.current) return;
 
-    // Mostra a resposta crua na tela — como não temos documentação desse
-    // endpoint, isso deixa fácil ver e me mandar print se algo não bater.
-    Alert.alert(
-      result.ok ? 'Teste enviado' : 'Falha no teste',
-      `HTTP ${result.http ?? '—'} • ${result.url}\n\n${result.raw.slice(0, 500)}`
-    );
-
     if (result.ok) {
+      // Deu certo — segue direto verificando o MAC, sem popup nenhum. O
+      // próprio indicador "VERIFICANDO..." na tela já avisa que algo está
+      // acontecendo; o cliente não precisa ver HTTP/JSON cru.
       onCheckNow();
+    } else {
+      // Só em caso de falha mostramos algo, e mesmo assim de forma simples
+      // — nada de detalhes técnicos pro cliente final.
+      Alert.alert(
+        'Não foi possível gerar o teste',
+        'Tente novamente em instantes ou fale com seu revendedor.'
+      );
     }
   };
 
