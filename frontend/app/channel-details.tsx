@@ -19,6 +19,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
+import { getDeviceMac } from '@/src/lib/device';
+import { sendHeartbeat } from '@/src/api/client';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import TVFocusable from '@/src/components/TVFocusable';
@@ -121,6 +123,26 @@ export default function ChannelDetailsScreen() {
     p.loop = false;
     p.play();
   });
+
+  // Avisa o painel periodicamente qual canal está sendo assistido aqui —
+  // essa prévia inline toca sozinha assim que a tela abre, então o
+  // heartbeat também roda enquanto ela estiver na tela.
+  useEffect(() => {
+    if (!current.name) return;
+    let cancelled = false;
+    const tick = async () => {
+      const mac = await getDeviceMac();
+      if (cancelled) return;
+      sendHeartbeat(mac, current.name);
+    };
+    tick();
+    const interval = setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [current.name]);
+
   // Sempre aponta pro player mais atual — trocar de canal faz o hook acima
   // recriar (e liberar) o player automaticamente, então uma referência
   // "presa" por closure viraria inválida. A ref evita isso.

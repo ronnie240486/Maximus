@@ -21,6 +21,8 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { colors, spacing } from '@/src/theme';
 import { recordWatch } from '@/src/state/watch-history';
 import { getXtream } from '@/src/state/session';
+import { getDeviceMac } from '@/src/lib/device';
+import { sendHeartbeat } from '@/src/api/client';
 import { xtream, liveStreamUrl, XtreamLive, XtreamCategory, XtreamEpgListing, decodeEpgText } from '@/src/lib/xtream';
 import TVFocusable from '@/src/components/TVFocusable';
 
@@ -247,6 +249,26 @@ export default function PlayerScreen() {
   const channelName = current.name || 'Reprodução';
   const logo = current.logo;
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+
+  // Avisa o painel periodicamente o que está sendo assistido nesse MAC —
+  // é isso que faz "Dispositivos Conectados" mostrar o nome do conteúdo,
+  // não só "online". Só manda enquanto está tocando de verdade (não
+  // pausado), e para completamente quando sai dessa tela.
+  useEffect(() => {
+    if (!playing || !channelName) return;
+    let cancelled = false;
+    const tick = async () => {
+      const mac = await getDeviceMac();
+      if (cancelled) return;
+      sendHeartbeat(mac, channelName);
+    };
+    tick();
+    const interval = setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [playing, channelName]);
 
   return (
     <View style={styles.root} testID="player-root">

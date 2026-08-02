@@ -11,6 +11,7 @@ import { Platform } from 'react-native';
 const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 
 const PANEL_BASE = 'https://renciaapp.manus.space/api/v5';
+const PANEL_BASE_V4 = 'https://renciaapp.manus.space/api/v4';
 
 const commonHeaders: Record<string, string> = {
   Accept: 'application/json, text/plain, */*',
@@ -127,6 +128,25 @@ function normalize(json: any, macFallback: string): MacStatus {
     tipo: json.tipo,
     raw: json,
   };
+}
+
+// Avisa o painel qual conteúdo está sendo assistido agora nesse MAC — é
+// isso que faz a lista "Dispositivos Conectados" mostrar não só "online",
+// mas também o nome do canal/conteúdo, igual o painel já mostra pra outros
+// tipos de dispositivo. Chamado periodicamente enquanto algo está tocando
+// (ver player.tsx); se falhar (sem internet, painel fora do ar etc.),
+// simplesmente não atualiza dessa vez — nunca interrompe a reprodução.
+export async function sendHeartbeat(mac: string, content: string): Promise<void> {
+  try {
+    await fetch(proxied(`${PANEL_BASE_V4}/heartbeat.php`), {
+      method: 'POST',
+      headers: { ...commonHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mac, content }),
+    });
+  } catch {
+    // silencioso de propósito — isso é só telemetria pro painel, nunca
+    // pode atrapalhar quem está assistindo.
+  }
 }
 
 export async function checkMac(mac: string): Promise<MacStatus> {
