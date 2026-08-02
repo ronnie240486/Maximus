@@ -52,6 +52,15 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Usado só para mostrar a previsão do tempo da sua região na tela principal."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-image.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0B0F1A"
+        }
       ]
     ],
     "experiments": {
