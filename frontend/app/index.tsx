@@ -218,19 +218,30 @@ export default function MacLoginScreen() {
       const server = /^https?:\/\//i.test(dnsTrimmed) ? dnsTrimmed : `http://${dnsTrimmed}`;
       const playlistUrl = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=mpegts`;
 
-      // O servidor do teste às vezes leva alguns segundos pra terminar de
-      // provisionar a conta recém-criada — se a gente entrar na hora,
-      // player_api.php ainda responde vazio/erro pra tudo (sinopse, EPG,
-      // o próprio stream), mesmo com usuário/senha corretos. Por isso
-      // "aquecemos" aqui: tenta autenticar algumas vezes antes de navegar,
-      // pra só entrar quando o servidor já está respondendo de verdade.
+      // O servidor do teste às vezes leva um tempo bom (mais de 1 minuto,
+      // confirmado na prática) pra terminar de provisionar a conta
+      // recém-criada — se a gente entrar antes disso, player_api.php ainda
+      // responde vazio/erro pra tudo (sinopse, EPG, o próprio stream),
+      // mesmo com usuário/senha corretos. Por isso "aquecemos" aqui: tenta
+      // autenticar repetidamente antes de navegar, pra só entrar quando o
+      // servidor já está respondendo de verdade. A janela é generosa de
+      // propósito (~75s) porque colar a mesma lista manualmente no painel
+      // — que sabidamente funciona — já leva mais tempo que isso só pelo
+      // processo manual (abrir painel, colar, salvar, voltar pro app).
       const testCreds: XtreamCreds = { server, username, password };
-      setTestStage('Preparando seu teste...');
-      const MAX_WARMUP_TRIES = 6;
-      const WARMUP_INTERVAL_MS = 2000;
+      const MAX_WARMUP_TRIES = 25;
+      const WARMUP_INTERVAL_MS = 3000;
       let warmed = false;
       for (let attempt = 1; attempt <= MAX_WARMUP_TRIES; attempt++) {
         if (!mountedRef.current) return;
+        const elapsedSec = Math.round(((attempt - 1) * WARMUP_INTERVAL_MS) / 1000);
+        setTestStage(
+          elapsedSec < 20
+            ? 'Preparando seu teste...'
+            : elapsedSec < 45
+            ? 'Ainda preparando, quase lá...'
+            : 'O servidor está demorando, aguarde mais um pouco...'
+        );
         const auth = await xtream.authenticate(testCreds);
         if (auth?.user_info) {
           warmed = true;
@@ -243,7 +254,7 @@ export default function MacLoginScreen() {
       if (!mountedRef.current) return;
       setTestStage(null);
       if (!warmed) {
-        // Não trava o usuário pra sempre — se depois de ~12s o servidor
+        // Não trava o usuário pra sempre — se depois de ~75s o servidor
         // ainda não respondeu, deixa entrar mesmo assim (pode ser lentidão
         // pontual), mas avisa que pode ser preciso tentar de novo.
         Alert.alert(
@@ -352,6 +363,13 @@ export default function MacLoginScreen() {
             </Text>
           </Pressable>
           <Text style={styles.tap}>{copied ? 'Copiado!' : 'Toque para copiar'}</Text>
+
+          {!!testStage && (
+            <View style={styles.testStageBox} testID="mac-test-stage">
+              <ActivityIndicator color={colors.accentCyan} size="small" />
+              <Text style={styles.testStageText}>{testStage}</Text>
+            </View>
+          )}
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md, alignItems: 'center' }}>
             <TVFocusable
@@ -473,6 +491,13 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   tap: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
+  testStageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.sm,
+  },
+  testStageText: { color: colors.accentCyan, fontSize: 12, fontWeight: '700' },
   testBtn: {
     flexDirection: 'row',
     alignItems: 'center',
