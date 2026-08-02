@@ -33,6 +33,7 @@ import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import ClockWeather from '@/src/components/ClockWeather';
 import TVFocusable from '@/src/components/TVFocusable';
+import { useIsTV } from '@/src/hooks/useIsTV';
 import {
   xtream,
   parsePlaylistUrl,
@@ -75,6 +76,7 @@ type FeaturedEntry = {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const { modal: parentalModal, guard } = useParentalGate();
   const params = useLocalSearchParams<{ profileId?: string; profileName?: string }>();
   const { width, height } = useWindowDimensions();
@@ -600,14 +602,14 @@ export default function HomeScreen() {
           {/* Content */}
           <View style={[styles.content, isLandscape && { paddingTop: 3 }]}>
             <View style={[styles.topBar, isLandscape && { paddingBottom: 4 }]}>
-              <View>
-                <Text style={[styles.hello, isLandscape && { fontSize: 14 }]} testID="home-hello">
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.hello, isLandscape && { fontSize: 14 }]} testID="home-hello" numberOfLines={1}>
                   Olá, {params.profileName || 'usuário'}
                 </Text>
-                <Text style={[styles.appNameSmall, isLandscape && { fontSize: 9 }]}>{appName}</Text>
+                <Text style={[styles.appNameSmall, isLandscape && { fontSize: 9 }]} numberOfLines={1}>{appName}</Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <ClockWeather />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <ClockWeather compact={!isTV} />
                 <TVFocusable
                   onPress={startVoiceSearch}
                   style={[styles.micBtn, listening && styles.micBtnActive]}

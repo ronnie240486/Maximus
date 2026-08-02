@@ -15,7 +15,14 @@ const WEATHER_REFRESH_MS = 20 * 60 * 1000; // clima muda devagar — 20 min est�
  * ou o aparelho não tiver localização (comum em TV box sem GPS), o relógio
  * continua aparecendo normalmente, só sem o clima.
  */
-export default function ClockWeather() {
+type Props = {
+  /** Versão enxuta pra caber em barras estreitas (ex: topo da Home no
+   * celular): esconde a data e o nome da cidade, mostra só hora + ícone +
+   * temperatura. */
+  compact?: boolean;
+};
+
+export default function ClockWeather({ compact = false }: Props) {
   const isTV = useIsTV();
   const [now, setNow] = useState(new Date());
   const [weather, setWeather] = useState<WeatherNow | null>(null);
@@ -89,18 +96,18 @@ export default function ClockWeather() {
     .replace('.', '');
 
   return (
-    <View style={[styles.wrap, isTV && styles.wrapTV]} testID="clock-weather">
+    <View style={[styles.wrap, compact && styles.wrapCompact, isTV && styles.wrapTV]} testID="clock-weather">
       <View>
-        <Text style={[styles.time, isTV && styles.timeTV]}>{time}</Text>
-        <Text style={[styles.date, isTV && styles.dateTV]}>{date}</Text>
+        <Text style={[styles.time, compact && styles.timeCompact, isTV && styles.timeTV]}>{time}</Text>
+        {!compact && <Text style={[styles.date, isTV && styles.dateTV]}>{date}</Text>}
       </View>
 
       {weather && !weatherDenied && (
-        <View style={styles.weatherBlock}>
-          <Ionicons name={weatherIcon(weather.code) as any} size={isTV ? 30 : 22} color={colors.accentCyan} />
+        <View style={[styles.weatherBlock, compact && styles.weatherBlockCompact]}>
+          <Ionicons name={weatherIcon(weather.code) as any} size={isTV ? 30 : compact ? 18 : 22} color={colors.accentCyan} />
           <View>
-            <Text style={[styles.temp, isTV && styles.tempTV]}>{weather.tempC}°</Text>
-            {!!city && (
+            <Text style={[styles.temp, compact && styles.tempCompact, isTV && styles.tempTV]}>{weather.tempC}°</Text>
+            {!compact && !!city && (
               <Text style={[styles.city, isTV && styles.cityTV]} numberOfLines={1}>
                 {city}
               </Text>
@@ -123,8 +130,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   wrapTV: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.lg },
+  wrapCompact: { paddingHorizontal: spacing.sm, paddingVertical: 6, gap: spacing.sm },
   time: { color: colors.white, fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
   timeTV: { fontSize: 32 },
+  timeCompact: { fontSize: 14 },
   date: { color: colors.textSecondary, fontSize: 11, textTransform: 'capitalize', marginTop: 1 },
   dateTV: { fontSize: 14 },
   weatherBlock: {
@@ -135,8 +144,10 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.darkSurfaceAlt,
     paddingLeft: spacing.md,
   },
+  weatherBlockCompact: { gap: 4, paddingLeft: spacing.sm },
   temp: { color: colors.accentCyan, fontSize: 18, fontWeight: '800' },
   tempTV: { fontSize: 26 },
+  tempCompact: { fontSize: 13 },
   city: { color: colors.textMuted, fontSize: 11 },
   cityTV: { fontSize: 13 },
 });

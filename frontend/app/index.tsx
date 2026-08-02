@@ -123,6 +123,13 @@ export default function MacLoginScreen() {
   };
 
   const onOpenWhatsapp = () => {
+    // Mesma fonte que a tela de Configurações usa (Suporte/Revendedor) —
+    // whatsapp_url já vem pronto do painel, com número certo. Só cai pro
+    // reseller_whatsapp (só dígitos) se aquele campo não vier preenchido.
+    if (status?.whatsapp_url) {
+      Linking.openURL(status.whatsapp_url).catch(() => {});
+      return;
+    }
     const raw = status?.reseller_whatsapp || '';
     const digits = raw.replace(/\D/g, '');
     // Sem número cadastrado no painel, abre o WhatsApp mesmo assim (sem
@@ -225,7 +232,7 @@ export default function MacLoginScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.logoWrap}>
           {banner ? (
-            <Image source={{ uri: banner }} style={styles.banner} contentFit="cover" testID="app-banner" />
+            <Image source={{ uri: banner }} style={styles.banner} contentFit="contain" testID="app-banner" />
           ) : logo ? (
             <Image source={{ uri: logo }} style={styles.logoImg} contentFit="contain" />
           ) : (
@@ -325,10 +332,11 @@ const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.black },
   center: { alignItems: 'center', justifyContent: 'center' },
   safe: { flex: 1, paddingHorizontal: spacing.xl },
-  logoWrap: { alignItems: 'center', marginTop: spacing.md },
+  logoWrap: { alignItems: 'center', marginTop: spacing.xl + spacing.sm },
   banner: {
-    width: '100%',
-    aspectRatio: 16 / 6,
+    width: '72%',
+    maxWidth: 320,
+    aspectRatio: 1,
     marginTop: spacing.md,
     borderRadius: 12,
   },
