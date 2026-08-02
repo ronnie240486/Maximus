@@ -56,7 +56,7 @@ export default function MacLoginScreen() {
       setStatus(s);
       setLastCheck(new Date());
       setPollCount((c) => c + 1);
-      if (s.authorized) {
+      if (s.authorized && (s.playlists || []).some((p) => !!parsePlaylistUrl(p.url))) {
         await saveSession(s);
         router.replace('/welcome');
         return;
@@ -231,7 +231,8 @@ export default function MacLoginScreen() {
     if (status.message === 'Falha de conexão.') {
       return `${time} • FALHA DE REDE (verifique internet/CORS)`;
     }
-    if (status.registered && !status.authorized) {
+    const hasUsablePlaylist = (status.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
+    if (status.registered && (!status.authorized || !hasUsablePlaylist)) {
       return `${time} • registrado mas sem playlist`;
     }
     if (status.registered) {
