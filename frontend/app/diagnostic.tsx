@@ -1,136 +1,82 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
+import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { checkMac, MacStatus, proxied } from '@/src/api/client';
-import { parsePlaylistUrl } from '@/src/lib/xtream';
+import { checkMac } from '@/src/api/client';
+import { parsePlaylistUrl, xtream } from '@/src/lib/xtream';
 import TVFocusable from '@/src/components/TVFocusable';
 
-const BACKEND = 'https://renciaapp.manus.space/api/v5';
+type CheckState = 'checking' | 'ok' | 'off';
 
-// Esconde usuário/senha (do Xtream do cliente) de qualquer texto antes de
-// mostrar ou copiar na tela — tanto em URLs (?username=...&password=...)
-// quanto em corpos de resposta JSON ("username":"...","password":"...").
-// Também esconde contato/WhatsApp do revendedor e a URL do gerador de
-// teste, e encurta as URLs assinadas de imagem (logo/fundo/banner) — são
-// bem longas e não ajudam em nada a achar onde está o erro, só poluem a
-// tela. O que importa pra diagnóstico (status HTTP, autorizado/registrado,
-// mensagens de erro) continua visível.
-function redact(text: string): string {
-  return text
-    .replace(/([?&](?:user(?:name)?|pass(?:word)?)=)[^&\s"'<]+/gi, '$1***')
-    .replace(/("(?:username|user|password|pass)"\s*:\s*")[^"]*(")/gi, '$1***$2')
-    .replace(/("(?:whatsapp_url|reseller_whatsapp|reseller_contact|dns_url|apk_link)"\s*:\s*")[^"]*(")/gi, '$1***$2')
-    .replace(/("(?:logo_url|bg_url|banner_url)"\s*:\s*"[^"]*?)\?[^"]*(")/gi, '$1$2');
-}
-
-type Result = {
-  url: string;
-  status: 'ok' | 'error' | 'pending';
-  ms: number;
-  http?: number;
-  contentType?: string;
-  bodyPreview?: string;
-  error?: string;
-};
-
+/**
+ * Diagnóstico simplificado — de propósito, NÃO mostra nada técnico
+ * (URLs do painel, usuário/senha, contato do revendedor, JSON cru). É só
+ * um resumo de duas linhas ("Internet: OK/OFF", "Lista: OK/OFF") pra
+ * qualquer cliente entender rapidamente onde está o problema, sem expor
+ * dado nenhum sensível nem informação que só confunde quem não é técnico.
+ */
 export default function BackendDiagScreen() {
   const router = useRouter();
-  const [mac, setMac] = useState('');
-  const [status, setStatus] = useState<MacStatus | null>(null);
-  const [results, setResults] = useState<Result[]>([]);
-  const [running, setRunning] = useState(false);
-
-  const timedFetch = async (url: string): Promise<Result> => {
-    const t0 = Date.now();
-    try {
-      const res = await fetch(url);
-      const ct = res.headers.get('content-type') || '';
-      const text = await res.text();
-      return {
-        url: redact(url),
-        status: res.ok ? 'ok' : 'error',
-        ms: Date.now() - t0,
-        http: res.status,
-        contentType: ct,
-        bodyPreview: redact(text.slice(0, 3000)),
-      };
-    } catch (e: any) {
-      return {
-        url: redact(url),
-        status: 'error',
-        ms: Date.now() - t0,
-        error: e?.message || String(e),
-      };
-    }
-  };
+  const [internetState, setInternetState] = useState<CheckState>('checking');
+  const [listState, setListState] = useState<CheckState>('checking');
+  const [checking, setChecking] = useState(true);
 
   const run = useCallback(async () => {
-    setRunning(true);
-    setResults([]);
-    const m = await getDeviceMac();
-    setMac(m);
-    const checkMacUpstream = `${BACKEND}/check_mac.php?mac=${encodeURIComponent(m)}`;
-    const r1 = await timedFetch(proxied(checkMacUpstream));
-    setResults((prev) => [...prev, r1]);
+    setChecking(true);
+    setInternetState('checking');
+    setListState('checking');
 
-    const s = await checkMac(m);
-    setStatus(s);
+    // 1) Internet: tenta alcançar um endereço simples e sempre no ar,
+    // sem relação nenhuma com o painel — se isso falhar, o problema é a
+    // conexão do aparelho, não a lista.
+    let internetOk = false;
+    try {
+      const res = await fetch('https://www.gstatic.com/generate_204');
+      internetOk = res.ok || res.status === 204;
+    } catch {
+      internetOk = false;
+    }
+    setInternetState(internetOk ? 'ok' : 'off');
 
-    // If we got playlists, ping the Xtream server too.
-    const playlistUrl = s.playlists?.[0]?.url;
-    if (playlistUrl) {
-      const creds = parsePlaylistUrl(playlistUrl);
-      if (creds) {
-        const xtreamUpstream = `${creds.server}/player_api.php?username=${creds.username}&password=${creds.password}`;
-        const r2 = await timedFetch(proxied(xtreamUpstream));
-        setResults((prev) => [...prev, r2]);
-
-        const catsUpstream = `${creds.server}/player_api.php?username=${creds.username}&password=${creds.password}&action=get_live_categories`;
-        const r3 = await timedFetch(proxied(catsUpstream));
-        setResults((prev) => [...prev, r3]);
+    // 2) Lista: confirma que o MAC está autorizado E que o servidor da
+    // lista realmente responde com conteúdo — sem internet, nem tenta.
+    let listOk = false;
+    if (internetOk) {
+      try {
+        const mac = await getDeviceMac();
+        const status = await checkMac(mac);
+        if (status.authorized && status.playlists?.length) {
+          for (const p of status.playlists) {
+            const creds = parsePlaylistUrl(p.url);
+            if (!creds) continue;
+            try {
+              const cats = await xtream.liveCategories(creds);
+              if (cats && cats.length > 0) {
+                listOk = true;
+                break;
+              }
+            } catch {
+              // essa lista específica não respondeu — tenta a próxima
+            }
+          }
+        }
+      } catch {
+        listOk = false;
       }
     }
-
-    setRunning(false);
+    setListState(listOk ? 'ok' : 'off');
+    setChecking(false);
   }, []);
 
   useEffect(() => {
     run();
   }, [run]);
 
-  const copy = async (s: string) => {
-    await Clipboard.setStringAsync(s);
-    Alert.alert('Copiado', 'Agora é só colar (segurar e escolher "Colar") onde você quiser enviar.');
-  };
-
-  // Overall summary: green only if every request succeeded AND the panel
-  // authorized this device. Anything else surfaces as a clear error message
-  // instead of making the person read the raw request list to figure it out.
-  const failed = results.filter((r) => r.status === 'error');
-  const allOk = !running && results.length > 0 && failed.length === 0 && !!status?.authorized;
-  const summaryError = running
-    ? null
-    : failed.length > 0
-    ? failed[0].error || `Falha ao conectar (HTTP ${failed[0].http ?? '—'}).`
-    : status && !status.authorized
-    ? status.message || 'MAC não autorizado no painel.'
-    : results.length === 0
-    ? 'Nenhum teste rodou ainda.'
-    : null;
+  const allOk = internetState === 'ok' && listState === 'ok';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -139,124 +85,61 @@ export default function BackendDiagScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </TVFocusable>
         <Text style={styles.headerTitle}>Diagnóstico</Text>
-        <TVFocusable onPress={run} hitSlop={16} disabled={running} testID="diag-refresh">
-          <Ionicons name="refresh" size={22} color={running ? colors.textMuted : colors.accentCyan} />
+        <TVFocusable onPress={run} hitSlop={16} disabled={checking} testID="diag-refresh">
+          <Ionicons name="refresh" size={22} color={checking ? colors.textMuted : colors.accentCyan} />
         </TVFocusable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
-        {running ? (
-          <View style={[styles.summary, styles.summaryPending]}>
-            <ActivityIndicator color={colors.textSecondary} size="small" />
-            <Text style={styles.summaryText}>Testando conexão...</Text>
-          </View>
-        ) : (
-          <View style={[styles.summary, allOk ? styles.summaryOk : styles.summaryError]}>
-            <Ionicons
-              name={allOk ? 'checkmark-circle' : 'alert-circle'}
-              size={20}
-              color={allOk ? colors.accentCyan : colors.danger}
-            />
-            <Text style={[styles.summaryText, { color: allOk ? colors.accentCyan : colors.danger }]}>
-              {allOk ? 'Tudo funcionando' : summaryError}
-            </Text>
-          </View>
-        )}
+      <View style={styles.body}>
+        <StatusRow label="Internet" state={internetState} />
+        <StatusRow label="Lista" state={listState} />
 
-        <View style={styles.card}>
-          <Text style={styles.label}>MAC ENVIADO</Text>
-          <Pressable onPress={() => copy(mac)}>
-            <Text style={styles.value}>{mac || '—'}</Text>
-          </Pressable>
+        <View style={styles.summaryBox}>
+          {checking ? (
+            <>
+              <ActivityIndicator color={colors.accentCyan} />
+              <Text style={styles.summaryText}>Verificando...</Text>
+            </>
+          ) : allOk ? (
+            <>
+              <Ionicons name="checkmark-circle" size={22} color={colors.accentCyan} />
+              <Text style={styles.summaryText}>Tudo certo! É só aproveitar.</Text>
+            </>
+          ) : internetState === 'off' ? (
+            <>
+              <Ionicons name="wifi-outline" size={22} color={colors.danger} />
+              <Text style={styles.summaryText}>Sem internet. Verifique seu Wi-Fi ou dados móveis.</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="alert-circle" size={22} color={colors.danger} />
+              <Text style={styles.summaryText}>Sua lista parece fora do ar. Fale com seu revendedor.</Text>
+            </>
+          )}
         </View>
-
-        {status && (
-          <View style={styles.card}>
-            <Text style={styles.label}>RESPOSTA DO CHECK_MAC</Text>
-            <Row k="Autorizado" v={status.authorized ? 'SIM' : 'NÃO'} accent={status.authorized} />
-            <Row k="Registrado" v={status.registered ? 'SIM' : 'NÃO'} accent={status.registered} />
-            {!!status.status && <Row k="Status" v={status.status} />}
-            {!!status.expire_date && <Row k="Expira" v={status.expire_date} />}
-            {!!status.app_name && <Row k="App" v={status.app_name} />}
-            {!!status.version && <Row k="Versão" v={status.version} />}
-            <Row k="Logo" v={status.logo_url ? 'SIM' : 'não veio'} accent={!!status.logo_url} />
-            <Row k="Fundo" v={status.bg_url ? 'SIM' : 'não veio'} accent={!!status.bg_url} />
-            <Row k="Banner" v={status.banner_url ? 'SIM' : 'não veio'} accent={!!status.banner_url} />
-            {!!status.reseller_contact && <Row k="Revendedor" v={status.reseller_contact} />}
-            {!!status.playlists?.length && (
-              <Row k="Playlists" v={`${status.playlists.length} lista(s) — dados ocultos`} />
-            )}
-            {!!status.message && <Row k="Msg" v={status.message} />}
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>REQUISIÇÕES</Text>
-        {running && (
-          <View style={styles.pending}>
-            <ActivityIndicator color={colors.accentCyan} size="small" />
-            <Text style={styles.pendingText}>Testando endpoints...</Text>
-          </View>
-        )}
-        {results.map((r, i) => (
-          <View key={i} style={styles.reqCard}>
-            <View style={styles.reqTop}>
-              <Ionicons
-                name={r.status === 'ok' ? 'checkmark-circle' : 'close-circle'}
-                size={16}
-                color={r.status === 'ok' ? colors.accentCyan : colors.danger}
-              />
-              <Text
-                style={[
-                  styles.reqStatus,
-                  { color: r.status === 'ok' ? colors.accentCyan : colors.danger },
-                ]}
-              >
-                {r.http ? `${r.http}` : 'ERR'} • {r.ms}ms
-              </Text>
-              {!!r.contentType && (
-                <Text style={styles.reqType} numberOfLines={1}>
-                  {r.contentType.split(';')[0]}
-                </Text>
-              )}
-            </View>
-            <Pressable onPress={() => copy(r.url)}>
-              <Text style={styles.reqUrl} numberOfLines={2}>{r.url}</Text>
-            </Pressable>
-            {!!r.error && <Text style={styles.reqError}>{r.error}</Text>}
-            {!!r.bodyPreview && (
-              <>
-                <Pressable onPress={() => copy(r.bodyPreview!)} style={styles.copyBodyBtn} testID={`diag-copy-body-${i}`}>
-                  <Ionicons name="copy-outline" size={13} color={colors.accentCyan} />
-                  <Text style={styles.copyBodyText}>Copiar resposta completa</Text>
-                </Pressable>
-                <Text style={styles.reqBody} selectable>
-                  {r.bodyPreview}
-                </Text>
-              </>
-            )}
-          </View>
-        ))}
-
-        <View style={styles.hint}>
-          <MaterialCommunityIcons name="information-outline" size={16} color={colors.textSecondary} />
-          <Text style={styles.hintText}>
-            No navegador (preview), o próprio site pode bloquear essas respostas mesmo com o
-            servidor funcionando normalmente. Isso NÃO acontece no APK/Expo Go — teste no
-            celular pra ver o resultado real.
-          </Text>
-        </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
-function Row({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
+function StatusRow({ label, state }: { label: string; state: CheckState }) {
   return (
     <View style={styles.row}>
-      <Text style={styles.rowK}>{k}</Text>
-      <Text style={[styles.rowV, accent && { color: colors.accentCyan }]} numberOfLines={1}>
-        {v}
-      </Text>
+      <Text style={styles.rowLabel}>{label}</Text>
+      {state === 'checking' ? (
+        <ActivityIndicator color={colors.textMuted} size="small" />
+      ) : (
+        <View style={styles.rowBadge}>
+          <Ionicons
+            name={state === 'ok' ? 'checkmark-circle' : 'close-circle'}
+            size={16}
+            color={state === 'ok' ? colors.accentCyan : colors.danger}
+          />
+          <Text style={[styles.rowBadgeText, { color: state === 'ok' ? colors.accentCyan : colors.danger }]}>
+            {state === 'ok' ? 'OK' : 'OFF'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -271,93 +154,28 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   backBtn: { padding: 4 },
-  headerTitle: { color: colors.white, fontSize: 20, fontWeight: '800' },
-  summary: {
+  headerTitle: { color: colors.white, fontSize: 18, fontWeight: '800' },
+  body: { padding: spacing.md, gap: spacing.sm },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: spacing.md,
-    borderRadius: 12,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-  },
-  summaryPending: { backgroundColor: colors.darkSurface, borderColor: colors.darkSurfaceAlt },
-  summaryOk: { backgroundColor: 'rgba(76,232,240,0.10)', borderColor: colors.accentCyan },
-  summaryError: { backgroundColor: 'rgba(240,76,76,0.10)', borderColor: colors.danger },
-  summaryText: { flex: 1, color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
-  card: {
+    justifyContent: 'space-between',
     backgroundColor: colors.darkSurface,
-    padding: spacing.md,
     borderRadius: 12,
-    marginBottom: spacing.sm,
-    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
-  label: { color: colors.textMuted, fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
-  value: { color: colors.accentCyan, fontSize: 13, fontWeight: '700' },
-  mono: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  rowK: { color: colors.textMuted, fontSize: 12 },
-  rowV: { color: colors.white, fontSize: 12, fontWeight: '700', maxWidth: '60%' },
-  sectionTitle: {
-    color: colors.textMuted,
-    fontSize: 11,
-    letterSpacing: 1.5,
-    fontWeight: '800',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  pending: {
+  rowLabel: { color: colors.white, fontSize: 15, fontWeight: '700' },
+  rowBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rowBadgeText: { fontSize: 14, fontWeight: '800' },
+  summaryBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: spacing.md,
+    gap: spacing.sm,
     backgroundColor: colors.darkSurfaceAlt,
-    borderRadius: 10,
-    marginBottom: spacing.sm,
-  },
-  pendingText: { color: colors.textSecondary, fontSize: 12 },
-  reqCard: {
-    backgroundColor: colors.darkSurface,
-    padding: spacing.sm,
-    borderRadius: 10,
-    marginBottom: spacing.sm,
-    gap: 4,
-  },
-  reqTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  reqStatus: { fontSize: 11, fontWeight: '800' },
-  reqType: { color: colors.textMuted, fontSize: 10, flex: 1 },
-  reqUrl: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  reqError: { color: colors.danger, fontSize: 11, marginTop: 4 },
-  copyBodyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(76,232,240,0.10)',
-  },
-  copyBodyText: { color: colors.accentCyan, fontSize: 10, fontWeight: '700' },
-  reqBody: {
-    color: colors.textMuted,
-    fontSize: 10,
-    marginTop: 4,
-    fontFamily: 'monospace',
-  },
-  hint: {
-    flexDirection: 'row',
-    gap: 8,
+    borderRadius: 12,
     padding: spacing.md,
-    backgroundColor: colors.darkSurfaceAlt,
-    borderRadius: 10,
     marginTop: spacing.sm,
   },
-  hintText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
+  summaryText: { color: colors.white, fontSize: 14, flex: 1 },
 });

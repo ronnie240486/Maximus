@@ -15,6 +15,17 @@ export type CachedList<TCategory, TItem> = {
 
 const memory: Record<string, CachedList<any, any>> = {};
 
+// Limpa tanto o que está salvo no celular quanto a cópia guardada em
+// memória enquanto o app está aberto — sem isso, "Limpar cache" parecia
+// não fazer nada, porque a tela voltava a usar a cópia em memória (que
+// continuava com os dados antigos) antes mesmo de checar o armazenamento.
+export async function clearListCache(keys: string[]): Promise<void> {
+  for (const key of keys) {
+    delete memory[key];
+    await storage.removeItem(PREFIX + key);
+  }
+}
+
 export async function saveListCache<TCategory, TItem>(
   key: string,
   categories: TCategory[],

@@ -19,6 +19,8 @@ import { getDeviceMac } from '@/src/lib/device';
 import { clearSession, loadSession, getXtream } from '@/src/state/session';
 import { xtream } from '@/src/lib/xtream';
 import { storage } from '@/src/utils/storage';
+import { clearHomeCache } from '@/src/state/home-cache';
+import { clearListCache } from '@/src/state/list-cache';
 import { isWelcomeAudioEnabled, setWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { MacStatus } from '@/src/api/client';
 import PinModal from '@/src/components/PinModal';
@@ -36,12 +38,6 @@ import {
 // log the person out), profiles_v1 (their saved profiles), or the device MAC
 // (device_mac_id_v1 — no longer even used as the source of truth, but left
 // alone regardless so nothing about device identity changes here).
-const CACHE_KEYS = [
-  'home_sections_cache_v1',
-  'list_cache_v1_channels',
-  'list_cache_v1_movies',
-  'list_cache_v1_series',
-];
 
 const AUTOPLAY_KEY = 'settings_player_autoplay_next_v1';
 // Só pra conferir se um APK é realmente o mais recente — muda esse texto
@@ -224,6 +220,11 @@ export default function SettingsScreen() {
     );
   };
 
+  const clearAllCaches = async () => {
+    await clearHomeCache();
+    await clearListCache(['channels', 'movies', 'series']);
+  };
+
   const clearCache = () => {
     Alert.alert(
       'Limpar cache',
@@ -234,7 +235,7 @@ export default function SettingsScreen() {
           text: 'Limpar',
           style: 'destructive',
           onPress: async () => {
-            await Promise.all(CACHE_KEYS.map((k) => storage.removeItem(k)));
+            await clearAllCaches();
             Alert.alert('Pronto', 'Cache limpo. As listas vão recarregar na próxima vez que você abrir cada tela.');
           },
         },
@@ -251,7 +252,7 @@ export default function SettingsScreen() {
         {
           text: 'Atualizar',
           onPress: async () => {
-            await Promise.all(CACHE_KEYS.map((k) => storage.removeItem(k)));
+            await clearAllCaches();
             Alert.alert('Pronto', 'Conteúdo será atualizado. Voltando pra tela inicial...', [
               { text: 'OK', onPress: () => router.replace('/home') },
             ]);
