@@ -8,6 +8,7 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac } from '@/src/api/client';
 import { parsePlaylistUrl, xtream } from '@/src/lib/xtream';
+import { getSession, loadSession } from '@/src/state/session';
 import TVFocusable from '@/src/components/TVFocusable';
 
 type CheckState = 'checking' | 'ok' | 'off';
@@ -42,15 +43,34 @@ export default function BackendDiagScreen() {
     }
     setInternetState(internetOk ? 'ok' : 'off');
 
-    // 2) Lista: confirma que o MAC está autorizado E que o servidor da
-    // lista realmente responde com conteúdo — sem internet, nem tenta.
+    // 2) Lista: confirma que a conta ATUALMENTE ativa no app (sessão
+    // local) tem uma playlist que realmente responde com conteúdo — sem
+    // internet, nem tenta. IMPORTANTE: usa a sessão salva, não
+    // `checkMac` de novo — contas de teste geradas direto no app (ver
+    // tela de MAC) não existem no painel do revendedor, então
+    // reconsultar o painel aqui sempre voltava "não autorizado"/sem
+    // playlist pra elas, mesmo com o teste funcionando normalmente no
+    // resto do app.
     let listOk = false;
     if (internetOk) {
       try {
-        const mac = await getDeviceMac();
-        const status = await checkMac(mac);
-        if (status.authorized && status.playlists?.length) {
-          for (const p of status.playlists) {
+        const session = getSession() || (await loadSession());
+        let playlists = session?.playlists;
+
+        // Sessão normal (não-teste): revalida com o painel, já que o
+        // revendedor pode ter bloqueado/trocado a lista nesse meio tempo.
+        // Sessão de teste: não existe no painel, então isso é pulado —
+        // usa direto o que já está salvo localmente.
+        if (session?.status !== 'Teste') {
+          const mac = await getDeviceMac();
+          const fresh = await checkMac(mac);
+          if (fresh.authorized && fresh.playlists?.length) {
+            playlists = fresh.playlists;
+          }
+        }
+
+        if (playlists?.length) {
+          for (const p of playlists) {
             const creds = parsePlaylistUrl(p.url);
             if (!creds) continue;
             try {
