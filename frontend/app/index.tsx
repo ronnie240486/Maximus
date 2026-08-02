@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
+import { hasUsedTest, markTestUsed } from '@/src/state/test-usage';
 import { parsePlaylistUrl } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
 import { clearHomeCache } from '@/src/state/home-cache';
@@ -163,6 +164,21 @@ export default function MacLoginScreen() {
 
   const onTestRegister = async () => {
     if (!mac || testing) return;
+
+    // MAC já cadastrado no painel do revendedor? Sempre pode testar de
+    // novo. MAC desconhecido? Só uma vez, pra não virar gerador de teste
+    // infinito só de reabrir o app.
+    if (!status?.registered) {
+      const alreadyUsed = await hasUsedTest(mac);
+      if (alreadyUsed) {
+        Alert.alert(
+          'Teste já utilizado',
+          'Esse dispositivo já usou o teste gratuito. Fale com seu revendedor pra liberar o acesso completo.'
+        );
+        return;
+      }
+    }
+
     setTesting(true);
     const result = await registerTestDevice(mac);
     setTesting(false);
@@ -213,6 +229,9 @@ export default function MacLoginScreen() {
       // de credenciais novas, e nada tocava direito.
       await clearHomeCache();
       await clearListCache(['channels', 'movies', 'series']);
+      if (!status?.registered) {
+        await markTestUsed(mac);
+      }
       await saveSession(testStatus);
       router.replace('/welcome');
     } catch {

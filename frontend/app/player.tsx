@@ -9,6 +9,8 @@ import {
   FlatList,
   TextInput,
   ScrollView,
+  Linking,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -257,6 +259,34 @@ export default function PlayerScreen() {
   const logo = current.logo;
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
 
+  // Abre o mesmo stream num player externo (VLC ou MX Player), pra quem
+  // prefere usar um desses em vez do player de dentro do app — útil
+  // também como alternativa se algum vídeo específico não tocar bem aqui.
+  const openInExternalPlayer = () => {
+    const url = current.stream;
+    if (!url) return;
+    Alert.alert('Abrir com', 'Escolha o player pra continuar assistindo', [
+      {
+        text: 'VLC',
+        onPress: () => {
+          Linking.openURL(`vlc://${url}`).catch(() =>
+            Alert.alert('VLC não encontrado', 'Instale o app VLC pra usar essa opção.')
+          );
+        },
+      },
+      {
+        text: 'MX Player',
+        onPress: () => {
+          const intent = `intent:${url}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(channelName)};end`;
+          Linking.openURL(intent).catch(() =>
+            Alert.alert('MX Player não encontrado', 'Instale o app MX Player pra usar essa opção.')
+          );
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  };
+
   // Avisa o painel periodicamente o que está sendo assistido nesse MAC —
   // é isso que faz "Dispositivos Conectados" mostrar o nome do conteúdo,
   // não só "online". Só manda enquanto está tocando de verdade (não
@@ -343,6 +373,9 @@ export default function PlayerScreen() {
                     size={18}
                     color={colors.white}
                   />
+                </TVFocusable>
+                <TVFocusable onPress={openInExternalPlayer} style={styles.topBtn} testID="player-external">
+                  <MaterialCommunityIcons name="open-in-new" size={18} color={colors.white} />
                 </TVFocusable>
               </View>
             </View>
