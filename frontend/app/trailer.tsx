@@ -7,6 +7,7 @@ import { WebView } from 'react-native-webview';
 import YoutubeIframe, { PLAYER_ERRORS } from 'react-native-youtube-iframe';
 
 import { colors, spacing } from '@/src/theme';
+import TVFocusable from '@/src/components/TVFocusable';
 
 // Uses the same battle-tested player MaxPlayer (and most IPTV apps) rely on:
 // react-native-youtube-iframe. Instead of us hand-rolling an <iframe> HTML
@@ -60,9 +61,9 @@ export default function TrailerScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {params.title ? `Trailer • ${params.title}` : 'Trailer'}
         </Text>
-        <Pressable onPress={() => Linking.openURL(externalUrl)} hitSlop={12} testID="trailer-open-external">
+        <TVFocusable onPress={() => Linking.openURL(externalUrl)} hitSlop={12} testID="trailer-open-external">
           <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
-        </Pressable>
+        </TVFocusable>
       </View>
 
       {videoId ? (
@@ -91,10 +92,10 @@ export default function TrailerScreen() {
             <View style={styles.errorBox} testID="trailer-error">
               <Ionicons name="alert-circle-outline" size={22} color={colors.textMuted} />
               <Text style={styles.errorText}>{error}</Text>
-              <Pressable onPress={() => Linking.openURL(externalUrl)} style={styles.fallbackBtn} testID="trailer-fallback-btn">
+              <TVFocusable onPress={() => Linking.openURL(externalUrl)} style={styles.fallbackBtn} testID="trailer-fallback-btn">
                 <Ionicons name="logo-youtube" size={16} color={colors.white} />
                 <Text style={styles.fallbackText}>Abrir no app do YouTube</Text>
-              </Pressable>
+              </TVFocusable>
             </View>
           )}
         </View>

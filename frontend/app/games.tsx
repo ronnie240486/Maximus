@@ -23,6 +23,7 @@ import {
   popDueReminders,
   GameReminder,
 } from '@/src/state/game-reminders';
+import TVFocusable from '@/src/components/TVFocusable';
 
 // TheSportsDB's shared free demo key — documented as the public, no-signup
 // key for the free tier (https://www.thesportsdb.com/documentation). Limited
@@ -255,7 +256,7 @@ export default function GamesScreen() {
           {SPORTS.map((s) => {
             const active = s === sport;
             return (
-              <Pressable
+              <TVFocusable
                 key={s}
                 onPress={() => setSport(s)}
                 style={[styles.chip, active && styles.chipActive]}
@@ -264,7 +265,7 @@ export default function GamesScreen() {
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
                   {SPORT_LABELS[s] || s}
                 </Text>
-              </Pressable>
+              </TVFocusable>
             );
           })}
         </ScrollView>
@@ -364,16 +365,16 @@ function GameRow({
         <TeamBlock name={event.strAwayTeam} badge={event.strAwayTeamBadge} align="right" />
       </View>
       <View style={styles.actionsRow}>
-        <Pressable onPress={onWatch} style={styles.watchBtn} testID={`game-watch-${event.idEvent}`}>
+        <TVFocusable onPress={onWatch} style={styles.watchBtn} testID={`game-watch-${event.idEvent}`}>
           <Ionicons name="play" size={13} color={colors.black} />
           <Text style={styles.watchText}>ASSISTIR</Text>
-        </Pressable>
-        <Pressable onPress={onToggleReminder} style={styles.scheduleBtn} testID={`game-schedule-${event.idEvent}`}>
+        </TVFocusable>
+        <TVFocusable onPress={onToggleReminder} style={styles.scheduleBtn} testID={`game-schedule-${event.idEvent}`}>
           <Ionicons name={scheduled ? 'notifications' : 'notifications-outline'} size={15} color={scheduled ? colors.accentCyan : colors.textSecondary} />
           <Text style={[styles.scheduleText, scheduled && { color: colors.accentCyan }]}>
             {scheduled ? 'AGENDADO' : 'AGENDAR'}
           </Text>
-        </Pressable>
+        </TVFocusable>
       </View>
     </View>
   );

@@ -21,6 +21,7 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
+import TVFocusable from '@/src/components/TVFocusable';
 import {
   loadProgramReminders,
   toggleProgramReminder,
@@ -273,16 +274,16 @@ export default function ChannelDetailsScreen() {
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
         {/* Tocar na área do vídeo já abre direto o player em tela cheia. */}
         <Pressable style={StyleSheet.absoluteFill} onPress={openFullscreenPlayer} testID="cd-video-tap" />
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.videoBackBtn} testID="cd-back">
+        <TVFocusable onPress={() => router.back()} hitSlop={12} style={styles.videoBackBtn} testID="cd-back">
           <Ionicons name="chevron-back" size={22} color={colors.white} />
-        </Pressable>
+        </TVFocusable>
         <View style={styles.videoTopActions}>
-          <Pressable onPress={openChannelGrid} hitSlop={12} style={styles.videoActionBtn} testID="cd-channel-grid">
+          <TVFocusable onPress={openChannelGrid} hitSlop={12} style={styles.videoActionBtn} testID="cd-channel-grid">
             <Ionicons name="grid" size={19} color={colors.white} />
-          </Pressable>
-          <Pressable onPress={openFullscreenPlayer} hitSlop={12} style={styles.videoActionBtn} testID="cd-fullscreen">
+          </TVFocusable>
+          <TVFocusable onPress={openFullscreenPlayer} hitSlop={12} style={styles.videoActionBtn} testID="cd-fullscreen">
             <MaterialCommunityIcons name="fullscreen" size={22} color={colors.white} />
-          </Pressable>
+          </TVFocusable>
         </View>
       </View>
 
@@ -290,13 +291,13 @@ export default function ChannelDetailsScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={styles.headerRow}>
             <Text style={styles.channelName} numberOfLines={1}>{current.name}</Text>
-            <Pressable onPress={onToggleFavorite} hitSlop={10} testID="cd-favorite">
+            <TVFocusable onPress={onToggleFavorite} hitSlop={10} testID="cd-favorite">
               <Ionicons
                 name={favorited ? 'heart' : 'heart-outline'}
                 size={22}
                 color={favorited ? colors.accentMagenta : colors.textSecondary}
               />
-            </Pressable>
+            </TVFocusable>
           </View>
           {!!resolvedCategoryName && (
           <Text style={styles.categoryLine}>
@@ -347,7 +348,7 @@ export default function ChannelDetailsScreen() {
                       </View>
                     )}
                     {!isNow && (
-                      <Pressable
+                      <TVFocusable
                         onPress={() => onToggleReminder(item)}
                         style={styles.epgAlarmBtn}
                         hitSlop={8}
@@ -358,7 +359,7 @@ export default function ChannelDetailsScreen() {
                           size={16}
                           color={isScheduled ? '#F0A94C' : colors.white}
                         />
-                      </Pressable>
+                      </TVFocusable>
                     )}
                   </View>
                   <Text style={styles.epgCardTitle} numberOfLines={2}>{decodeEpgText(item.title)}</Text>
@@ -375,16 +376,16 @@ export default function ChannelDetailsScreen() {
           <>
             <View style={styles.epgHeaderRow}>
               <Text style={styles.sectionTitle}>CANAIS MAIS ASSISTIDOS</Text>
-              <Pressable
+              <TVFocusable
                 onPress={() => router.push({ pathname: '/channels', params: { initialCategory: resolvedCategoryName } })}
                 testID="cd-see-all"
               >
                 <Text style={styles.seeAllText}>Ver todos ›</Text>
-              </Pressable>
+              </TVFocusable>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedRow}>
               {related.slice(0, 15).map((c) => (
-                <Pressable
+                <TVFocusable
                   key={c.stream_id}
                   style={styles.relatedItem}
                   onPress={() => switchToChannel(c)}
@@ -398,7 +399,7 @@ export default function ChannelDetailsScreen() {
                     )}
                   </View>
                   <Text style={styles.relatedName} numberOfLines={1}>{c.name}</Text>
-                </Pressable>
+                </TVFocusable>
               ))}
             </ScrollView>
           </>
@@ -417,9 +418,9 @@ export default function ChannelDetailsScreen() {
           <View style={styles.gridPanel}>
             <View style={styles.gridHeader}>
               <Text style={styles.gridTitle}>Canais</Text>
-              <Pressable onPress={() => setShowChannelGrid(false)} hitSlop={12} testID="cd-grid-close">
+              <TVFocusable onPress={() => setShowChannelGrid(false)} hitSlop={12} testID="cd-grid-close">
                 <Ionicons name="close" size={22} color={colors.white} />
-              </Pressable>
+              </TVFocusable>
             </View>
             <View style={styles.gridSearchBox}>
               <Ionicons name="search" size={15} color={colors.textMuted} />
@@ -437,7 +438,7 @@ export default function ChannelDetailsScreen() {
                 {['Todos', ...categories.map((c) => c.category_name)].map((cat) => {
                   const active = cat === selectedCat;
                   return (
-                    <Pressable
+                    <TVFocusable
                       key={cat}
                       onPress={() => setSelectedCat(cat)}
                       style={[styles.gridCatChip, active && styles.gridCatChipActive]}
@@ -446,7 +447,7 @@ export default function ChannelDetailsScreen() {
                       <Text style={[styles.gridCatChipText, active && styles.gridCatChipTextActive]} numberOfLines={1}>
                         {cat}
                       </Text>
-                    </Pressable>
+                    </TVFocusable>
                   );
                 })}
               </ScrollView>
@@ -467,7 +468,7 @@ export default function ChannelDetailsScreen() {
                 keyExtractor={(c) => String(c.stream_id)}
                 contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 32, gap: 6 }}
                 renderItem={({ item }) => (
-                  <Pressable onPress={() => switchToChannel(item)} style={styles.gridRow} testID={`cd-grid-channel-${item.stream_id}`}>
+                  <TVFocusable onPress={() => switchToChannel(item)} style={styles.gridRow} testID={`cd-grid-channel-${item.stream_id}`}>
                     <View style={styles.gridLogoBox}>
                       {item.stream_icon ? (
                         <Image source={{ uri: item.stream_icon }} style={styles.gridLogoImg} contentFit="contain" />
@@ -476,7 +477,7 @@ export default function ChannelDetailsScreen() {
                       )}
                     </View>
                     <Text style={styles.gridRowText} numberOfLines={1}>{item.name}</Text>
-                  </Pressable>
+                  </TVFocusable>
                 )}
               />
             )}

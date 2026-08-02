@@ -19,11 +19,14 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
+import { useIsTV } from '@/src/hooks/useIsTV';
+import TVFocusable from '@/src/components/TVFocusable';
 
 const POLL_MS = 5000;
 
 export default function MacLoginScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const [mac, setMac] = useState<string>('');
   const [status, setStatus] = useState<MacStatus | null>(null);
   const [copied, setCopied] = useState(false);
@@ -112,8 +115,9 @@ export default function MacLoginScreen() {
   const onOpenWhatsapp = () => {
     const raw = status?.reseller_whatsapp || '';
     const digits = raw.replace(/\D/g, '');
-    if (!digits) return;
-    Linking.openURL(`https://wa.me/${digits}`);
+    // Sem número cadastrado no painel, abre o WhatsApp mesmo assim (sem
+    // destinatário) em vez de não fazer nada — o botão nunca fica "morto".
+    Linking.openURL(digits ? `https://wa.me/${digits}` : 'https://wa.me/');
   };
 
   const onTestRegister = async () => {
@@ -188,26 +192,28 @@ export default function MacLoginScreen() {
           <Text style={styles.tap}>{copied ? 'Copiado!' : 'Toque para copiar'}</Text>
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
-            <Pressable
+            <TVFocusable
               onPress={onTestRegister}
               disabled={testing}
-              style={[styles.testBtn, testing && { opacity: 0.5 }]}
+              style={[styles.testBtn, isTV && styles.testBtnTV, testing && { opacity: 0.5 }]}
               testID="mac-test-register"
             >
               {testing ? (
                 <ActivityIndicator color={colors.black} size="small" />
               ) : (
-                <Ionicons name="flash" size={14} color={colors.black} />
+                <Ionicons name="flash" size={isTV ? 20 : 14} color={colors.black} />
               )}
-              <Text style={styles.testBtnText}>TESTE</Text>
-            </Pressable>
+              <Text style={[styles.testBtnText, isTV && styles.btnTextTV]}>TESTE</Text>
+            </TVFocusable>
 
-            {!!status?.reseller_whatsapp && (
-              <Pressable onPress={onOpenWhatsapp} style={styles.whatsBtn} testID="mac-whatsapp-btn">
-                <Ionicons name="logo-whatsapp" size={16} color={colors.white} />
-                <Text style={styles.whatsBtnText}>ZAP</Text>
-              </Pressable>
-            )}
+            <TVFocusable
+              onPress={onOpenWhatsapp}
+              style={[styles.whatsBtn, isTV && styles.whatsBtnTV]}
+              testID="mac-whatsapp-btn"
+            >
+              <Ionicons name="logo-whatsapp" size={isTV ? 22 : 16} color={colors.white} />
+              <Text style={[styles.whatsBtnText, isTV && styles.btnTextTV]}>ZAP</Text>
+            </TVFocusable>
           </View>
 
           <View style={styles.statusBox} testID="mac-status-box">
@@ -228,15 +234,15 @@ export default function MacLoginScreen() {
             Tentativas: {pollCount} • Backend: renciaapp.manus.space
           </Text>
 
-          <Pressable
+          <TVFocusable
             onPress={onCheckNow}
             disabled={checking}
-            style={[styles.checkBtn, checking && { opacity: 0.5 }]}
+            style={[styles.checkBtn, isTV && styles.checkBtnTV, checking && { opacity: 0.5 }]}
             testID="mac-check-now"
           >
-            <Ionicons name="refresh" size={14} color={colors.accentCyan} />
-            <Text style={styles.checkBtnText}>VERIFICAR AGORA</Text>
-          </Pressable>
+            <Ionicons name="refresh" size={isTV ? 20 : 14} color={colors.accentCyan} />
+            <Text style={[styles.checkBtnText, isTV && styles.btnTextTV]}>VERIFICAR AGORA</Text>
+          </TVFocusable>
 
           <Text style={styles.hint}>
             Envie o ID acima para seu revendedor.{'\n'}
@@ -244,7 +250,7 @@ export default function MacLoginScreen() {
           </Text>
         </View>
 
-        <Pressable
+        <TVFocusable
           onPress={() => router.push('/diagnostic')}
           style={styles.diagBtn}
           hitSlop={12}
@@ -252,7 +258,7 @@ export default function MacLoginScreen() {
         >
           <Ionicons name="pulse" size={12} color={colors.textMuted} />
           <Text style={styles.diagText}>Diagnosticar backend</Text>
-        </Pressable>
+        </TVFocusable>
 
         <Text style={styles.footer}>{appName || 'Maximus Player'}</Text>
       </SafeAreaView>
@@ -317,6 +323,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.5,
   },
+  testBtnTV: {
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 26,
+  },
+  btnTextTV: {
+    fontSize: 16,
+  },
   whatsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -331,6 +345,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.5,
+  },
+  whatsBtnTV: {
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 26,
   },
   statusBox: {
     marginTop: spacing.xl,
@@ -379,6 +398,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
+  },
+  checkBtnTV: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 26,
   },
   hint: {
     color: colors.textMuted,

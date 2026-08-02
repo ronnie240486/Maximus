@@ -8,6 +8,7 @@ import { useVideoPlayer } from 'expo-video';
 
 import { colors, spacing } from '@/src/theme';
 import { loadFavorites, toggleFavorite, FavoriteItem, FavoriteKind } from '@/src/state/favorites';
+import TVFocusable from '@/src/components/TVFocusable';
 
 const TABS: { key: FavoriteKind | 'all'; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -122,14 +123,14 @@ export default function FavoritesScreen() {
           {TABS.map((t) => {
             const active = t.key === tab;
             return (
-              <Pressable
+              <TVFocusable
                 key={t.key}
                 onPress={() => setTab(t.key)}
                 style={[styles.chip, active && styles.chipActive]}
                 testID={`favorites-tab-${t.key}`}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>{t.label}</Text>
-              </Pressable>
+              </TVFocusable>
             );
           })}
         </ScrollView>
@@ -153,7 +154,7 @@ export default function FavoritesScreen() {
           renderItem={({ item }) => {
             const isPlayingRadio = item.kind === 'radio' && currentRadio?.id === item.id;
             return (
-              <Pressable onPress={() => openItem(item)} style={styles.poster} testID={`favorite-${item.id}`}>
+              <TVFocusable onPress={() => openItem(item)} style={styles.poster} focusStyle={styles.posterFocusTV} testID={`favorite-${item.id}`}>
                 <View style={[styles.posterCard, item.kind === 'radio' && styles.posterCardRadio]}>
                   {item.cover ? (
                     <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit={item.kind === 'radio' ? 'contain' : 'cover'} />
@@ -181,7 +182,7 @@ export default function FavoritesScreen() {
                   </Pressable>
                 </View>
                 <Text style={styles.posterName} numberOfLines={2}>{item.name}</Text>
-              </Pressable>
+              </TVFocusable>
             );
           }}
         />
@@ -200,16 +201,16 @@ export default function FavoritesScreen() {
             <Text style={styles.miniName} numberOfLines={1}>{currentRadio.name}</Text>
             <Text style={styles.miniSub}>{buffering ? 'Carregando...' : playing ? 'Ao vivo' : 'Pausado'}</Text>
           </View>
-          <Pressable onPress={togglePlay} style={styles.miniBtn} testID="favorites-radio-play-pause">
+          <TVFocusable onPress={togglePlay} style={styles.miniBtn} testID="favorites-radio-play-pause">
             {buffering ? (
               <ActivityIndicator color={colors.white} size="small" />
             ) : (
               <Ionicons name={playing ? 'pause' : 'play'} size={22} color={colors.white} />
             )}
-          </Pressable>
-          <Pressable onPress={closeRadioPlayer} style={styles.miniBtn} testID="favorites-radio-close">
+          </TVFocusable>
+          <TVFocusable onPress={closeRadioPlayer} style={styles.miniBtn} testID="favorites-radio-close">
             <Ionicons name="close" size={22} color={colors.white} />
-          </Pressable>
+          </TVFocusable>
         </View>
       )}
     </SafeAreaView>
@@ -247,6 +248,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: 8 },
   emptySub: { color: colors.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18 },
   poster: { flex: 1 / 3, maxWidth: '32%' },
+  posterFocusTV: { transform: [{ scale: 1.08 }], borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 10 },
   posterCard: {
     aspectRatio: 2 / 3,
     borderRadius: 8,

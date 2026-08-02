@@ -15,6 +15,7 @@ import {
   radioStreamUrl,
 } from '@/src/lib/radio';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
+import TVFocusable from '@/src/components/TVFocusable';
 
 const FAVORITES_KEY = '__favorites__';
 const SIDE_COL_WIDTH = 160;
@@ -165,7 +166,7 @@ export default function RadiosScreen() {
       {ALL_CATS.map((cat) => {
         const active = cat.key === selectedCat.key;
         return (
-          <Pressable
+          <TVFocusable
             key={cat.key}
             onPress={() => setSelectedCat(cat as typeof selectedCat)}
             style={[isLandscape ? styles.sideChip : styles.chip, active && (isLandscape ? styles.sideChipActive : styles.chipActive)]}
@@ -177,7 +178,7 @@ export default function RadiosScreen() {
             <Text style={[isLandscape ? styles.sideChipText : styles.chipText, active && (isLandscape ? styles.sideChipTextActive : styles.chipTextActive)]} numberOfLines={isLandscape ? 2 : 1}>
               {cat.label}
             </Text>
-          </Pressable>
+          </TVFocusable>
         );
       })}
     </>
@@ -216,7 +217,7 @@ export default function RadiosScreen() {
         const favId = `radio-${item.stationuuid}`;
         const isFav = favoriteIds.has(favId);
         return (
-          <Pressable style={[styles.station, { width: itemWidth }]} onPress={() => play(item)} testID={`radio-${item.stationuuid}`}>
+          <TVFocusable style={[styles.station, { width: itemWidth }]} focusStyle={styles.stationFocusTV} onPress={() => play(item)} testID={`radio-${item.stationuuid}`}>
             <View style={[styles.stationCard, active && styles.stationCardActive]}>
               {item.favicon ? (
                 <Image source={{ uri: item.favicon }} style={styles.stationImg} contentFit="contain" />
@@ -244,7 +245,7 @@ export default function RadiosScreen() {
               )}
             </View>
             <Text style={styles.stationName} numberOfLines={2}>{item.name.trim()}</Text>
-          </Pressable>
+          </TVFocusable>
         );
       }}
     />
@@ -257,9 +258,9 @@ export default function RadiosScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </Pressable>
         <Text style={[styles.headerTitle, isLandscape && { fontSize: 15 }]}>Rádios</Text>
-        <Pressable onPress={() => setShowSearch((v) => !v)} hitSlop={12} testID="radios-search-toggle">
+        <TVFocusable onPress={() => setShowSearch((v) => !v)} hitSlop={12} testID="radios-search-toggle">
           <Ionicons name={showSearch ? 'close' : 'search'} size={22} color={colors.white} />
-        </Pressable>
+        </TVFocusable>
       </View>
 
       {showSearch && (
@@ -312,16 +313,16 @@ export default function RadiosScreen() {
             <Text style={styles.miniName} numberOfLines={1}>{current.name.trim()}</Text>
             <Text style={styles.miniSub}>{buffering ? 'Carregando...' : playing ? 'Ao vivo' : 'Pausado'}</Text>
           </View>
-          <Pressable onPress={togglePlay} style={styles.miniBtn} testID="radio-play-pause">
+          <TVFocusable onPress={togglePlay} style={styles.miniBtn} testID="radio-play-pause">
             {buffering ? (
               <ActivityIndicator color={colors.white} size="small" />
             ) : (
               <Ionicons name={playing ? 'pause' : 'play'} size={22} color={colors.white} />
             )}
-          </Pressable>
-          <Pressable onPress={closePlayer} style={styles.miniBtn} testID="radio-close">
+          </TVFocusable>
+          <TVFocusable onPress={closePlayer} style={styles.miniBtn} testID="radio-close">
             <Ionicons name="close" size={22} color={colors.white} />
-          </Pressable>
+          </TVFocusable>
         </View>
       )}
     </SafeAreaView>
@@ -385,6 +386,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: 8, textAlign: 'center' },
   emptySub: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
   station: {},
+  stationFocusTV: { transform: [{ scale: 1.08 }], borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 10 },
   stationCard: {
     aspectRatio: 1,
     borderRadius: 10,

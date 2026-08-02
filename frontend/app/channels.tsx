@@ -24,6 +24,9 @@ import { isAdultCategoryName } from '@/src/lib/adult-content';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
+import { useIsTV } from '@/src/hooks/useIsTV';
+import TVFocusable from '@/src/components/TVFocusable';
+import TVChannelPreview from '@/src/components/TVChannelPreview';
 
 const ALL = 'Todos';
 const FAVORITES = 'Favoritos';
@@ -32,6 +35,7 @@ const SIDE_COL_WIDTH = 160;
 
 export default function ChannelsScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const params = useLocalSearchParams<{ initialQuery?: string; initialCategory?: string }>();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -47,6 +51,7 @@ export default function ChannelsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [showCategoryDrawer, setShowCategoryDrawer] = useState(false);
+  const [previewChannel, setPreviewChannel] = useState<XtreamLive | null>(null);
   const { modal: parentalModal, guard } = useParentalGate();
 
   useFocusEffect(
@@ -130,6 +135,21 @@ export default function ChannelsScreen() {
     return dedupeByName(matches);
   }, [streams, categories, selectedCat, query, favoriteIds]);
 
+  // Mantém sempre algum canal em preview na TV: escolhe o primeiro da lista
+  // filtrada se ainda não tem nenhum, ou se o que estava em foco sumiu do
+  // filtro atual (ex: trocou de categoria).
+  useEffect(() => {
+    if (!isTV) return;
+    if (!filtered.length) {
+      setPreviewChannel(null);
+      return;
+    }
+    setPreviewChannel((prev) => {
+      if (prev && filtered.some((s) => s.stream_id === prev.stream_id)) return prev;
+      return filtered[0];
+    });
+  }, [isTV, filtered]);
+
   const openPlayer = (s: XtreamLive) => {
     const categoryName = categories.find((c) => c.category_id === s.category_id)?.category_name;
     guard(categoryName, () => {
@@ -185,7 +205,7 @@ export default function ChannelsScreen() {
       )}
 
       {/* Category chips — horizontal chrome (retrato apenas; em paisagem vira coluna lateral abaixo) */}
-      {!isLandscape && (
+      {!isLandscape && !isTV && (
         <View style={styles.chipRow} testID="channels-chip-row">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowInner}>
             {catNames.map((cat) => {
@@ -215,6 +235,100 @@ export default function ChannelsScreen() {
         </View>
       )}
 
+      {isTV ? (
+        <View style={{ flex: 1, flexDirection: 'row' }} testID="channels-tv-layout">
+          <ScrollView
+            style={styles.tvCatCol}
+            contentContainerStyle={styles.tvCatColInner}
+            showsVerticalScrollIndicator={false}
+            testID="channels-tv-categories"
+          >
+            {catNames.map((cat) => {
+              const active = cat === selectedCat;
+              const catId = categories.find((c) => c.category_name === cat)?.category_id;
+              const count =
+                cat === ALL
+                  ? streams.length
+                  : cat === FAVORITES
+                  ? favoriteIds.size
+                  : streams.filter((s) => s.category_id === catId).length;
+              return (
+                <TVFocusable
+                  key={cat}
+                  onPress={() => setSelectedCat(cat)}
+                  style={[styles.tvCatItem, active && styles.tvCatItemActive]}
+                  testID={`tv-cat-${cat.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 6 }}>
+                    {cat === FAVORITES && (
+                      <Ionicons name="heart" size={12} color={active ? colors.accentCyan : colors.textSecondary} />
+                    )}
+                    <Text style={[styles.tvCatText, active && styles.tvCatTextActive]} numberOfLines={1}>
+                      {cat}
+                    </Text>
+                  </View>
+                  <Text style={styles.tvCatCount}>{count}</Text>
+                </TVFocusable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.tvListCol}>
+            {loading ? (
+              <View style={styles.center}>
+                <ActivityIndicator color={colors.accentCyan} />
+              </View>
+            ) : filtered.length === 0 ? (
+              <Empty errorCode={loadError} onRetry={load} />
+            ) : (
+              <FlatList
+                data={filtered}
+                keyExtractor={(c) => String(c.stream_id)}
+                initialNumToRender={20}
+                maxToRenderPerBatch={20}
+                windowSize={7}
+                removeClippedSubviews
+                renderItem={({ item, index }) => {
+                  const rowActive = previewChannel?.stream_id === item.stream_id;
+                  return (
+                    <TVFocusable
+                      onFocus={() => setPreviewChannel(item)}
+                      onPress={() => openPlayer(item)}
+                      style={[styles.tvRow, rowActive && styles.tvRowActive]}
+                      focusStyle={styles.tvRowFocus}
+                      testID={`tv-channel-${item.stream_id}`}
+                    >
+                      <Text style={styles.tvRowNum}>{item.num ?? index + 1}</Text>
+                      {item.stream_icon ? (
+                        <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" />
+                      ) : (
+                        <MaterialCommunityIcons name="television-classic" size={18} color={colors.textMuted} />
+                      )}
+                      <Text style={styles.tvRowName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {favoriteIds.has(`channel-${item.stream_id}`) && (
+                        <Ionicons name="heart" size={14} color={colors.accentMagenta} />
+                      )}
+                    </TVFocusable>
+                  );
+                }}
+              />
+            )}
+          </View>
+
+          <View style={styles.tvPreviewCol}>
+            <TVChannelPreview
+              channel={previewChannel}
+              creds={getXtream()}
+              isFavorite={!!previewChannel && favoriteIds.has(`channel-${previewChannel.stream_id}`)}
+              onToggleFavorite={() => previewChannel && onToggleFavorite(previewChannel)}
+              onOpenFull={() => previewChannel && openPlayer(previewChannel)}
+              onSearch={() => router.push('/search')}
+            />
+          </View>
+        </View>
+      ) : (
       <View style={{ flex: 1, flexDirection: isLandscape ? 'row' : 'column' }}>
         {isLandscape && (
           <ScrollView style={styles.sideCatCol} contentContainerStyle={styles.sideCatColInner} showsVerticalScrollIndicator={false} testID="channels-side-categories">
@@ -297,6 +411,7 @@ export default function ChannelsScreen() {
           )}
         </View>
       </View>
+      )}
       {parentalModal}
 
       {/* Categories drawer — opened via the header menu button. Picking a
@@ -425,6 +540,56 @@ const styles = StyleSheet.create({
   },
   sideChipActive: { backgroundColor: 'rgba(76,232,240,0.14)' },
   sideChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+
+  // --- Layout de TV (categorias | lista numerada | preview ao vivo) ---
+  tvCatCol: {
+    width: 200,
+    maxWidth: 200,
+    minWidth: 200,
+    flexGrow: 0,
+    flexShrink: 0,
+    borderRightWidth: 1,
+    borderRightColor: colors.darkSurfaceAlt,
+  },
+  tvCatColInner: { paddingVertical: spacing.sm },
+  tvCatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  tvCatItemActive: { backgroundColor: 'rgba(76,232,240,0.14)' },
+  tvCatText: { color: colors.textSecondary, fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  tvCatTextActive: { color: colors.accentCyan },
+  tvCatCount: { color: colors.textMuted, fontSize: 12, marginLeft: 6 },
+  tvListCol: {
+    width: 340,
+    maxWidth: 340,
+    minWidth: 340,
+    flexGrow: 0,
+    flexShrink: 0,
+    borderRightWidth: 1,
+    borderRightColor: colors.darkSurfaceAlt,
+  },
+  tvRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  tvRowActive: { backgroundColor: 'rgba(76,232,240,0.10)' },
+  tvRowFocus: {
+    borderWidth: 2,
+    borderColor: colors.accentCyan,
+    borderRadius: 8,
+    transform: [{ scale: 1 }],
+  },
+  tvRowNum: { color: colors.textMuted, fontSize: 13, width: 34, fontVariant: ['tabular-nums'] },
+  tvRowIcon: { width: 24, height: 24 },
+  tvRowName: { color: colors.white, fontSize: 14, fontWeight: '600', flex: 1 },
+  tvPreviewCol: { flex: 1, padding: spacing.sm },
   sideChipTextActive: { color: colors.accentCyan },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   card: {

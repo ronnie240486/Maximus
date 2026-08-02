@@ -16,6 +16,7 @@ import { colors, spacing } from '@/src/theme';
 import { AVATARS } from '@/src/lib/avatars';
 import Avatar from '@/src/components/Avatar';
 import { deleteProfile, loadProfiles, Profile, upsertProfile } from '@/src/state/profiles';
+import TVFocusable from '@/src/components/TVFocusable';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -101,7 +102,7 @@ export default function EditProfileScreen() {
             <Text style={styles.smallLabel}>SEUS PERFIS</Text>
             <View style={styles.profilesRow}>
               {profiles.map((p) => (
-                <Pressable
+                <TVFocusable
                   key={p.id}
                   onPress={() => pickProfile(p)}
                   style={styles.profileMini}
@@ -116,14 +117,14 @@ export default function EditProfileScreen() {
                     <Avatar id={p.avatar_id} size={54} radius={11} />
                   </View>
                   <Text style={styles.miniName} numberOfLines={1}>{p.name}</Text>
-                </Pressable>
+                </TVFocusable>
               ))}
-              <Pressable onPress={startNew} style={styles.profileMini} testID="manage-add-new">
+              <TVFocusable onPress={startNew} style={styles.profileMini} testID="manage-add-new">
                 <View style={styles.addPlus}>
                   <Ionicons name="add" size={28} color={colors.textSecondary} />
                 </View>
                 <Text style={styles.miniName}>Novo</Text>
-              </Pressable>
+              </TVFocusable>
             </View>
           </>
         )}
@@ -137,14 +138,14 @@ export default function EditProfileScreen() {
 
         <View style={styles.avatarGrid}>
           {AVATARS.map((a) => (
-            <Pressable
+            <TVFocusable
               key={a.id}
               onPress={() => setAvatarId(a.id)}
               style={[styles.avatarChoice, avatarId === a.id && styles.avatarChoiceActive]}
               testID={`avatar-choice-${a.id}`}
             >
               <Avatar id={a.id} size={54} radius={12} />
-            </Pressable>
+            </TVFocusable>
           ))}
         </View>
 
@@ -160,7 +161,7 @@ export default function EditProfileScreen() {
         />
 
         <View style={styles.btnRow}>
-          <Pressable
+          <TVFocusable
             onPress={onSave}
             style={[styles.saveBtn, saving && { opacity: 0.6 }]}
             disabled={saving}
@@ -171,16 +172,16 @@ export default function EditProfileScreen() {
             ) : (
               <Text style={styles.saveText}>SALVAR</Text>
             )}
-          </Pressable>
-          <Pressable onPress={() => router.back()} style={styles.cancelBtn} testID="edit-cancel-btn">
+          </TVFocusable>
+          <TVFocusable onPress={() => router.back()} style={styles.cancelBtn} testID="edit-cancel-btn">
             <Text style={styles.cancelText}>CANCELAR</Text>
-          </Pressable>
+          </TVFocusable>
         </View>
 
         {selectedId && (
-          <Pressable onPress={onDelete} style={styles.deleteBtn} testID="edit-delete-btn">
+          <TVFocusable onPress={onDelete} style={styles.deleteBtn} testID="edit-delete-btn">
             <Text style={styles.deleteText}>EXCLUIR PERFIL</Text>
-          </Pressable>
+          </TVFocusable>
         )}
       </ScrollView>
     </SafeAreaView>

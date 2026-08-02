@@ -17,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { toggleFavorite, isFavorite } from '@/src/state/favorites';
+import TVFocusable from '@/src/components/TVFocusable';
 import {
   xtream,
   movieStreamUrl,
@@ -148,22 +149,22 @@ export default function MovieDetailsScreen() {
 
         {/* Action row */}
         <View style={styles.actionRow}>
-          <Pressable onPress={play} style={styles.playBtn} testID="md-play">
+          <TVFocusable onPress={play} style={styles.playBtn} testID="md-play">
             <Ionicons name="play" size={18} color={colors.black} />
             <Text style={styles.playText}>ASSISTIR</Text>
-          </Pressable>
-          <Pressable onPress={openTrailer} style={styles.iconBtn} testID="md-trailer">
+          </TVFocusable>
+          <TVFocusable onPress={openTrailer} style={styles.iconBtn} testID="md-trailer">
             <Ionicons name="logo-youtube" size={20} color={colors.white} />
             <Text style={styles.iconBtnText}>Trailer</Text>
-          </Pressable>
-          <Pressable onPress={onToggleFavorite} style={styles.iconBtn} testID="md-favorite">
+          </TVFocusable>
+          <TVFocusable onPress={onToggleFavorite} style={styles.iconBtn} testID="md-favorite">
             <Ionicons
               name={favorited ? 'heart' : 'heart-outline'}
               size={20}
               color={favorited ? colors.accentMagenta : colors.white}
             />
             <Text style={styles.iconBtnText}>{favorited ? 'Favoritado' : 'Favoritar'}</Text>
-          </Pressable>
+          </TVFocusable>
         </View>
 
         {/* Synopsis/cast — the only part that actually depends on the

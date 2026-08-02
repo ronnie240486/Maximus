@@ -24,6 +24,8 @@ import { isAdultCategoryName } from '@/src/lib/adult-content';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
+import { useIsTV } from '@/src/hooks/useIsTV';
+import TVFocusable from '@/src/components/TVFocusable';
 
 const ALL = 'Todos';
 const FAVORITES = 'Favoritos';
@@ -32,6 +34,7 @@ const SIDE_COL_WIDTH = 160;
 
 export default function MoviesScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const numColumns = isLandscape ? 6 : 3;
@@ -153,7 +156,7 @@ export default function MoviesScreen() {
       {catNames.map((cat) => {
         const active = cat === selectedCat;
         return (
-          <Pressable
+          <TVFocusable
             key={cat}
             onPress={() => setSelectedCat(cat)}
             style={[isLandscape ? styles.sideChip : styles.chip, active && (isLandscape ? styles.sideChipActive : styles.chipActive)]}
@@ -165,7 +168,7 @@ export default function MoviesScreen() {
             <Text style={[isLandscape ? styles.sideChipText : styles.chipText, active && (isLandscape ? styles.sideChipTextActive : styles.chipTextActive)]} numberOfLines={isLandscape ? 2 : 1}>
               {cat}
             </Text>
-          </Pressable>
+          </TVFocusable>
         );
       })}
     </>
@@ -195,9 +198,10 @@ export default function MoviesScreen() {
         windowSize={7}
         removeClippedSubviews
         renderItem={({ item }) => (
-          <Pressable
+          <TVFocusable
             onPress={() => openMovie(item)}
             style={[styles.poster, { width: itemWidth }]}
+            focusStyle={styles.posterFocusTV}
             testID={`movie-${item.stream_id}`}
           >
             <View style={styles.posterCard}>
@@ -220,7 +224,7 @@ export default function MoviesScreen() {
               </Pressable>
             </View>
             <Text style={styles.posterName} numberOfLines={2}>{item.name}</Text>
-          </Pressable>
+          </TVFocusable>
         )}
       />
     );
@@ -391,6 +395,12 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 8 },
   emptyTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: 8 },
   poster: {},
+  posterFocusTV: {
+    transform: [{ scale: 1.08 }],
+    borderWidth: 2,
+    borderColor: colors.accentCyan,
+    borderRadius: 10,
+  },
   posterCard: {
     aspectRatio: 2 / 3,
     borderRadius: 8,

@@ -31,6 +31,8 @@ import { isAdultCategoryName } from '@/src/lib/adult-content';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
+import ClockWeather from '@/src/components/ClockWeather';
+import TVFocusable from '@/src/components/TVFocusable';
 import {
   xtream,
   parsePlaylistUrl,
@@ -576,7 +578,7 @@ export default function HomeScreen() {
               {allNavItems.map((it) => {
                 const active = activeNav === it.key;
                 return (
-                  <Pressable
+                  <TVFocusable
                     key={it.key}
                     onPress={() => {
                       setActiveNav(it.key);
@@ -589,7 +591,7 @@ export default function HomeScreen() {
                     <Text style={[styles.sideNavLabel, active && styles.bottomNavLabelActive]} numberOfLines={1}>
                       {it.label}
                     </Text>
-                  </Pressable>
+                  </TVFocusable>
                 );
               })}
             </ScrollView>
@@ -605,15 +607,16 @@ export default function HomeScreen() {
                 <Text style={[styles.appNameSmall, isLandscape && { fontSize: 9 }]}>{appName}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Pressable
+                <ClockWeather />
+                <TVFocusable
                   onPress={startVoiceSearch}
                   style={[styles.micBtn, listening && styles.micBtnActive]}
                   testID="nav-voice-search"
                   hitSlop={10}
                 >
                   <Ionicons name={listening ? 'mic' : 'mic-outline'} size={18} color={listening ? colors.black : colors.accentCyan} />
-                </Pressable>
-                <Pressable onPress={() => router.replace('/profiles')} testID="nav-profile">
+                </TVFocusable>
+                <TVFocusable onPress={() => router.replace('/profiles')} testID="nav-profile">
                   {logo ? (
                     <Image source={{ uri: logo }} style={{ width: isLandscape ? 28 : 34, height: isLandscape ? 28 : 34, borderRadius: 17 }} contentFit="cover" />
                   ) : (
@@ -621,7 +624,7 @@ export default function HomeScreen() {
                       <Ionicons name="person" size={16} color={colors.black} />
                     </View>
                   )}
-                </Pressable>
+                </TVFocusable>
               </View>
             </View>
 

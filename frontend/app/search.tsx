@@ -23,6 +23,7 @@ import {
   XtreamMovie,
   XtreamSeries,
 } from '@/src/lib/xtream';
+import TVFocusable from '@/src/components/TVFocusable';
 
 type Row =
   | { kind: 'live'; id: string; name: string; icon?: string; stream: string }
@@ -193,7 +194,7 @@ export default function SearchScreen() {
           keyExtractor={(r) => r.id}
           contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 32, gap: spacing.sm }}
           renderItem={({ item }) => (
-            <Pressable
+            <TVFocusable
               onPress={() => openRow(item)}
               style={styles.row}
               testID={`search-result-${item.id}`}
@@ -218,7 +219,7 @@ export default function SearchScreen() {
               {item.kind !== 'series' && (
                 <Ionicons name="play-circle" size={22} color={colors.accentCyan} />
               )}
-            </Pressable>
+            </TVFocusable>
           )}
         />
       )}

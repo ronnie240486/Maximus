@@ -171,7 +171,11 @@ const TEST_REGISTER_URL = 'https://nuvixtv.sigmab.pro/api/chatbot/Yen129WPEa/XYg
 export async function registerTestDevice(mac: string): Promise<TestRegisterResult> {
   const upstream = `${TEST_REGISTER_URL}?mac=${encodeURIComponent(mac)}`;
   try {
-    const res = await fetch(proxied(upstream), { headers: commonHeaders });
+    const res = await fetch(proxied(upstream), {
+      method: 'POST',
+      headers: { ...commonHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mac }),
+    });
     const text = await res.text();
     return { ok: res.ok, http: res.status, url: upstream, raw: text };
   } catch (e: any) {

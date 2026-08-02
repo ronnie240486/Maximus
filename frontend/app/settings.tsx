@@ -22,6 +22,7 @@ import { storage } from '@/src/utils/storage';
 import { isWelcomeAudioEnabled, setWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { MacStatus } from '@/src/api/client';
 import PinModal from '@/src/components/PinModal';
+import TVFocusable from '@/src/components/TVFocusable';
 import {
   isParentalLockEnabled,
   setParentalLockEnabled,
@@ -46,7 +47,7 @@ const AUTOPLAY_KEY = 'settings_player_autoplay_next_v1';
 // Só pra conferir se um APK é realmente o mais recente — muda esse texto
 // toda vez que uma correção nova é enviada, e compara com o que aparece
 // aqui dentro do app depois de instalar.
-const BUILD_STAMP = 'build 2026-08-01 20h — boas-vindas busca imagem fresca igual tela de perfis';
+const BUILD_STAMP = 'build 2026-08-02 — navegacao por controle remoto (TV box) + relogio/clima na tela principal';
 
 type PinFlow =
   | { step: 'create-1' }
@@ -434,7 +435,7 @@ export default function SettingsScreen() {
           </View>
         )}
         {rows.map((r) => (
-          <Pressable
+          <TVFocusable
             key={r.id}
             onPress={r.toggle ? () => r.toggle!.onChange(!r.toggle!.value) : r.onPress}
             style={styles.row}
@@ -455,7 +456,7 @@ export default function SettingsScreen() {
             ) : (
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             )}
-          </Pressable>
+          </TVFocusable>
         ))}
       </ScrollView>
 

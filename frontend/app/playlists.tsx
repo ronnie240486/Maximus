@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getSession, getActivePlaylistIndex, setActivePlaylistIndex } from '@/src/state/session';
 import { storage } from '@/src/utils/storage';
+import TVFocusable from '@/src/components/TVFocusable';
 
 // Mesma lista de chaves que "Limpar cache" em Configurações — trocar de
 // playlist muda canais/filmes/séries por completo, então precisa recarregar
@@ -62,7 +63,7 @@ export default function PlaylistsScreen() {
           {playlists.map((p, idx) => {
             const active = idx === activeIdx;
             return (
-              <Pressable
+              <TVFocusable
                 key={`${p.name}-${idx}`}
                 onPress={() => selectPlaylist(idx)}
                 style={[styles.row, active && styles.rowActive]}
@@ -77,7 +78,7 @@ export default function PlaylistsScreen() {
                   {!!p.type && <Text style={styles.rowSub}>{p.type}</Text>}
                 </View>
                 {active && <Ionicons name="checkmark-circle" size={22} color={colors.accentCyan} />}
-              </Pressable>
+              </TVFocusable>
             );
           })}
         </ScrollView>

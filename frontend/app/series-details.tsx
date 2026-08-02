@@ -17,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { toggleFavorite, isFavorite } from '@/src/state/favorites';
+import TVFocusable from '@/src/components/TVFocusable';
 import {
   xtream,
   seriesEpisodeUrl,
@@ -155,18 +156,18 @@ export default function SeriesDetailsScreen() {
         </ImageBackground>
 
         <View style={styles.actionRow}>
-          <Pressable onPress={openTrailer} style={styles.iconBtn} testID="sd-trailer">
+          <TVFocusable onPress={openTrailer} style={styles.iconBtn} testID="sd-trailer">
             <Ionicons name="logo-youtube" size={20} color={colors.white} />
             <Text style={styles.iconBtnText}>Trailer</Text>
-          </Pressable>
-          <Pressable onPress={onToggleFavorite} style={styles.iconBtn} testID="sd-favorite">
+          </TVFocusable>
+          <TVFocusable onPress={onToggleFavorite} style={styles.iconBtn} testID="sd-favorite">
             <Ionicons
               name={favorited ? 'heart' : 'heart-outline'}
               size={20}
               color={favorited ? colors.accentMagenta : colors.white}
             />
             <Text style={styles.iconBtnText}>{favorited ? 'Favoritado' : 'Favoritar'}</Text>
-          </Pressable>
+          </TVFocusable>
         </View>
 
         {!!info?.info.plot && (
@@ -211,7 +212,7 @@ export default function SeriesDetailsScreen() {
                   {seasonKeys.map((k) => {
                     const active = k === seasonKey;
                     return (
-                      <Pressable
+                      <TVFocusable
                         key={k}
                         onPress={() => setSeasonKey(k)}
                         style={[styles.chip, active && styles.chipActive]}
@@ -220,7 +221,7 @@ export default function SeriesDetailsScreen() {
                         <Text style={[styles.chipText, active && styles.chipTextActive]}>
                           T{k}
                         </Text>
-                      </Pressable>
+                      </TVFocusable>
                     );
                   })}
                 </ScrollView>
@@ -233,7 +234,7 @@ export default function SeriesDetailsScreen() {
             </Text>
             <View style={styles.epList}>
               {currentEpisodes.map((ep) => (
-                <Pressable
+                <TVFocusable
                   key={String(ep.id)}
                   onPress={() => playEpisode(ep)}
                   style={styles.epRow}
@@ -264,7 +265,7 @@ export default function SeriesDetailsScreen() {
                       <Text style={styles.epMeta}>{ep.info.duration}</Text>
                     )}
                   </View>
-              </Pressable>
+              </TVFocusable>
             ))}
             {currentEpisodes.length === 0 && (
               <Text style={styles.emptyEp}>Nenhum episódio nesta temporada.</Text>

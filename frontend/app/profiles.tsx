@@ -19,6 +19,7 @@ import { loadSession, saveSession, clearSession } from '@/src/state/session';
 import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import Avatar from '@/src/components/Avatar';
+import TVFocusable from '@/src/components/TVFocusable';
 
 export default function ProfileSelectionScreen() {
   const router = useRouter();
@@ -104,22 +105,22 @@ export default function ProfileSelectionScreen() {
               renderItem={({ item }) => {
                 if ('addSlot' in item) {
                   return (
-                    <Pressable onPress={addProfile} style={styles.profileItem} testID="profile-add-slot">
+                    <TVFocusable onPress={addProfile} style={styles.profileItem} focusStyle={styles.profileFocusTV} testID="profile-add-slot">
                       <View style={[styles.avatarCard, styles.addCard]}>
                         <Ionicons name="add" size={38} color={colors.textSecondary} />
                       </View>
                       <Text style={styles.profileName}>Adicionar</Text>
-                    </Pressable>
+                    </TVFocusable>
                   );
                 }
                 const p = item as Profile;
                 return (
-                  <Pressable onPress={() => openHome(p)} style={styles.profileItem} testID={`profile-${p.id}`}>
+                  <TVFocusable onPress={() => openHome(p)} style={styles.profileItem} focusStyle={styles.profileFocusTV} testID={`profile-${p.id}`}>
                     <View style={styles.avatarCard}>
                       <Avatar id={p.avatar_id} size={92} radius={14} />
                     </View>
                     <Text style={styles.profileName} numberOfLines={1}>{p.name}</Text>
-                  </Pressable>
+                  </TVFocusable>
                 );
               }}
             />
@@ -127,9 +128,9 @@ export default function ProfileSelectionScreen() {
         </View>
 
         {profiles.length > 0 && (
-          <Pressable style={styles.manageBtn} onPress={goManage} testID="profile-manage-btn">
+          <TVFocusable style={styles.manageBtn} onPress={goManage} testID="profile-manage-btn">
             <Text style={styles.manageText}>PERFIS</Text>
-          </Pressable>
+          </TVFocusable>
         )}
         <Text style={styles.macTag} testID="profile-mac-tag">{mac}</Text>
       </SafeAreaView>
@@ -157,6 +158,7 @@ const styles = StyleSheet.create({
   },
   centerBlock: { flex: 1, justifyContent: 'center' },
   profileItem: { alignItems: 'center', width: 110 },
+  profileFocusTV: { transform: [{ scale: 1.08 }] },
   avatarCard: {
     width: 100,
     height: 100,

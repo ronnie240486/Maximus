@@ -22,6 +22,7 @@ import { colors, spacing } from '@/src/theme';
 import { recordWatch } from '@/src/state/watch-history';
 import { getXtream } from '@/src/state/session';
 import { xtream, liveStreamUrl, XtreamLive, XtreamCategory, XtreamEpgListing, decodeEpgText } from '@/src/lib/xtream';
+import TVFocusable from '@/src/components/TVFocusable';
 
 const HIDE_AFTER_MS = 3500;
 
@@ -273,9 +274,9 @@ export default function PlayerScreen() {
         <View style={styles.errorOverlay}>
           <MaterialCommunityIcons name="alert-circle" size={40} color={colors.danger} />
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={() => router.back()} style={styles.errorBtn}>
+          <TVFocusable onPress={() => router.back()} style={styles.errorBtn}>
             <Text style={styles.errorBtnText}>VOLTAR</Text>
-          </Pressable>
+          </TVFocusable>
         </View>
       )}
 
@@ -294,39 +295,39 @@ export default function PlayerScreen() {
 
           <SafeAreaView style={styles.safe} edges={['top', 'bottom']} pointerEvents="box-none">
             <View style={styles.topBar} pointerEvents="box-none">
-              <Pressable onPress={() => router.back()} hitSlop={12} style={styles.topBtn} testID="player-back">
+              <TVFocusable onPress={() => router.back()} hitSlop={12} style={styles.topBtn} testID="player-back">
                 <Ionicons name="chevron-back" size={22} color={colors.white} />
-              </Pressable>
+              </TVFocusable>
               <Text style={styles.topTitle} numberOfLines={1}>{channelName}</Text>
               <View style={styles.topActions}>
                 {isLive && (
-                  <Pressable onPress={openChannelGrid} style={styles.topBtn} testID="player-channel-grid">
+                  <TVFocusable onPress={openChannelGrid} style={styles.topBtn} testID="player-channel-grid">
                     <Ionicons name="grid" size={18} color={colors.white} />
-                  </Pressable>
+                  </TVFocusable>
                 )}
-                <Pressable onPress={cycleResizeMode} style={styles.topBtn} testID="player-resize-mode">
+                <TVFocusable onPress={cycleResizeMode} style={styles.topBtn} testID="player-resize-mode">
                   <MaterialIcons name={resizeModeIcon as any} size={18} color={colors.white} />
-                </Pressable>
-                <Pressable onPress={toggleFullscreen} style={styles.topBtn} testID="player-fullscreen">
+                </TVFocusable>
+                <TVFocusable onPress={toggleFullscreen} style={styles.topBtn} testID="player-fullscreen">
                   <MaterialCommunityIcons
                     name={isLandscape ? 'fullscreen-exit' : 'fullscreen'}
                     size={18}
                     color={colors.white}
                   />
-                </Pressable>
+                </TVFocusable>
               </View>
             </View>
 
             <View style={styles.centerControls} pointerEvents="box-none">
-              <Pressable
+              <TVFocusable
                 onPress={() => seekBy(-10)}
                 style={[styles.sideBtn, isLive && { opacity: 0.4 }]}
                 disabled={isLive}
                 testID="player-seek-back"
               >
                 <MaterialCommunityIcons name="rewind-10" size={32} color={colors.white} />
-              </Pressable>
-              <Pressable
+              </TVFocusable>
+              <TVFocusable
                 onPress={togglePlay}
                 style={styles.playBtn}
                 testID="player-play-pause"
@@ -336,15 +337,15 @@ export default function PlayerScreen() {
                   size={40}
                   color={colors.white}
                 />
-              </Pressable>
-              <Pressable
+              </TVFocusable>
+              <TVFocusable
                 onPress={() => seekBy(10)}
                 style={[styles.sideBtn, isLive && { opacity: 0.4 }]}
                 disabled={isLive}
                 testID="player-seek-fwd"
               >
                 <MaterialCommunityIcons name="fast-forward-10" size={32} color={colors.white} />
-              </Pressable>
+              </TVFocusable>
             </View>
 
             <View style={styles.bottomWrap} pointerEvents="box-none">
@@ -407,9 +408,9 @@ export default function PlayerScreen() {
             <View style={[styles.gridPanel, isLandscape && styles.gridPanelFullscreen]}>
               <View style={styles.gridHeader}>
                 <Text style={styles.gridTitle}>Canais</Text>
-                <Pressable onPress={() => setShowChannelGrid(false)} hitSlop={12} testID="player-grid-close">
+                <TVFocusable onPress={() => setShowChannelGrid(false)} hitSlop={12} testID="player-grid-close">
                   <Ionicons name="close" size={22} color={colors.white} />
-                </Pressable>
+                </TVFocusable>
               </View>
 
               <View style={styles.gridSearchBox}>
@@ -433,7 +434,7 @@ export default function PlayerScreen() {
                   {['Todos', ...categories.map((c) => c.category_name)].map((cat) => {
                     const active = cat === selectedCat;
                     return (
-                      <Pressable
+                      <TVFocusable
                         key={cat}
                         onPress={() => setSelectedCat(cat)}
                         style={[styles.gridCatChip, active && styles.gridCatChipActive]}
@@ -442,7 +443,7 @@ export default function PlayerScreen() {
                         <Text style={[styles.gridCatChipText, active && styles.gridCatChipTextActive]} numberOfLines={1}>
                           {cat}
                         </Text>
-                      </Pressable>
+                      </TVFocusable>
                     );
                   })}
                 </ScrollView>
@@ -466,7 +467,7 @@ export default function PlayerScreen() {
                   renderItem={({ item }) => {
                     const active = current.id === `live-${item.stream_id}`;
                     return (
-                      <Pressable
+                      <TVFocusable
                         onPress={() => switchChannel(item)}
                         style={[styles.gridRow, active && styles.gridRowActive]}
                         testID={`player-grid-channel-${item.stream_id}`}
@@ -485,7 +486,7 @@ export default function PlayerScreen() {
                             <Text style={styles.gridRowLiveText}>NO AR</Text>
                           </View>
                         )}
-                      </Pressable>
+                      </TVFocusable>
                     );
                   }}
                 />

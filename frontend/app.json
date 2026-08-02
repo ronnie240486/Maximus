@@ -46,7 +46,13 @@
           }
         }
       ],
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Usado só para mostrar a previsão do tempo da sua região na tela principal."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

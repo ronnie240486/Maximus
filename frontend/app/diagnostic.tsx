@@ -17,6 +17,7 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, proxied } from '@/src/api/client';
 import { parsePlaylistUrl } from '@/src/lib/xtream';
+import TVFocusable from '@/src/components/TVFocusable';
 
 const BACKEND = 'https://renciaapp.manus.space/api/v5';
 
@@ -127,13 +128,13 @@ export default function BackendDiagScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={16} style={styles.backBtn} testID="diag-back">
+        <TVFocusable onPress={() => router.back()} hitSlop={16} style={styles.backBtn} testID="diag-back">
           <Ionicons name="chevron-back" size={24} color={colors.white} />
-        </Pressable>
+        </TVFocusable>
         <Text style={styles.headerTitle}>Diagnóstico</Text>
-        <Pressable onPress={run} hitSlop={16} disabled={running} testID="diag-refresh">
+        <TVFocusable onPress={run} hitSlop={16} disabled={running} testID="diag-refresh">
           <Ionicons name="refresh" size={22} color={running ? colors.textMuted : colors.accentCyan} />
-        </Pressable>
+        </TVFocusable>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
