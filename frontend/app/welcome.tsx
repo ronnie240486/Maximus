@@ -13,6 +13,7 @@ import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { prefetchHomeContent } from '@/src/state/prefetch';
 
 const welcomeAudioSource = require('@/assets/audio/welcome.wav');
+const swooshSource = require('@/assets/audio/swoosh.mp3');
 const FALLBACK_MS = 6000;
 
 export default function WelcomeScreen() {
@@ -29,6 +30,7 @@ export default function WelcomeScreen() {
 
   const player = useAudioPlayer(audioEnabled ? welcomeAudioSource : null);
   const status = useAudioPlayerStatus(player);
+  const swooshPlayer = useAudioPlayer(audioEnabled ? swooshSource : null);
 
   const goNext = () => {
     if (doneRef.current) return;
@@ -91,6 +93,7 @@ export default function WelcomeScreen() {
       return () => clearTimeout(t);
     }
     player.play();
+    swooshPlayer.play();
     const fallback = setTimeout(goNext, FALLBACK_MS);
     return () => clearTimeout(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
