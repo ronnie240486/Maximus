@@ -19,6 +19,7 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
+import { clearHomeCache } from '@/src/state/home-cache';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import TVFocusable from '@/src/components/TVFocusable';
 
@@ -88,6 +89,7 @@ export default function MacLoginScreen() {
         // Não está mais autorizado — limpa a sessão velha e segue pro
         // fluxo normal de verificação abaixo.
         await clearSession();
+        await clearHomeCache();
         setStatus(fresh);
       }
 

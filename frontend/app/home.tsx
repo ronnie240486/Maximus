@@ -23,7 +23,7 @@ import { getDeviceMac } from '@/src/lib/device';
 import { loadSession, saveSession, getXtream, getActivePlaylistIndex, setActivePlaylistIndex, clearSession } from '@/src/state/session';
 import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
-import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache } from '@/src/state/home-cache';
+import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, clearHomeCache } from '@/src/state/home-cache';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
@@ -193,6 +193,7 @@ export default function HomeScreen() {
             });
             if (!fresh.authorized || !stillHasThisPlaylist) {
               await clearSession();
+              await clearHomeCache();
               router.replace('/');
               return;
             }
@@ -274,6 +275,7 @@ export default function HomeScreen() {
     const isRealResponse = fresh.message !== 'Falha de conexão.';
     if (isRealResponse && !fresh.authorized) {
       await clearSession();
+      await clearHomeCache();
       router.replace('/');
       return;
     }
@@ -284,9 +286,19 @@ export default function HomeScreen() {
         return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
       });
       if (!stillHasThisPlaylist) {
-        // Essa lista específica não existe mais no painel — não desloga,
-        // só volta pro índice 0 e deixa o mecanismo de troca automática
-        // (mais abaixo) encontrar uma lista que ainda funcione.
+        // A lista que o app estava usando não existe mais no painel. Só
+        // vale tentar trocar automaticamente pra outra se o painel ainda
+        // mandou alguma lista de verdade — se a resposta veio vazia (lista
+        // removida por completo, não só trocada), não tem pra onde trocar:
+        // desloga e volta pro login, em vez de ficar preso mostrando o
+        // conteúdo antigo em cache pra sempre.
+        const hasAnyOtherPlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
+        if (!hasAnyOtherPlaylist) {
+          await clearSession();
+          await clearHomeCache();
+          router.replace('/');
+          return;
+        }
         await setActivePlaylistIndex(0, false);
         return load();
       }

@@ -40,6 +40,17 @@ export async function loadHomeCache(): Promise<CachedHomeData | null> {
   }
 }
 
+// Chamado quando a sessão é encerrada (MAC bloqueado, lista removida do
+// painel etc.) — sem isso, o próximo login (mesmo de outra conta/teste)
+// pintaria por um instante o conteúdo antigo em cache antes da busca nova
+// chegar, o que é confuso ("por que apareceu filme de outra lista?").
+export async function clearHomeCache(): Promise<void> {
+  cached = null;
+  cachedFeatured = null;
+  await storage.removeItem(STORAGE_KEY);
+  await storage.removeItem(FEATURED_KEY);
+}
+
 // Cache separado pra fileira "Lançamentos em destaque" — antes ela nunca
 // era salva em disco, então toda vez que a Home abria (mesmo não sendo a
 // primeira vez), essa fileira ficava vazia até a internet responder do
