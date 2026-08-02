@@ -654,7 +654,7 @@ export default function HomeScreen() {
                 <Text style={[styles.appNameSmall, isLandscape && { fontSize: 9 }]} numberOfLines={1}>{appName}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                <ClockWeather compact={!isTV} />
+                <ClockWeather compact />
                 <TVFocusable
                   onPress={startVoiceSearch}
                   style={[styles.micBtn, listening && styles.micBtnActive]}

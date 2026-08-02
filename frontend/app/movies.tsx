@@ -30,7 +30,8 @@ import TVFocusable from '@/src/components/TVFocusable';
 const ALL = 'Todos';
 const FAVORITES = 'Favoritos';
 const CACHE_KEY = 'movies';
-const SIDE_COL_WIDTH = 160;
+const SIDE_COL_WIDTH_PHONE = 160;
+const SIDE_COL_WIDTH_TV = 230;
 
 export default function MoviesScreen() {
   const router = useRouter();
@@ -38,6 +39,9 @@ export default function MoviesScreen() {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const numColumns = isLandscape ? 6 : 3;
+  // Coluna mais larga na TV — na largura fixa de celular (160px) os nomes
+  // de categoria mais longos (ex: "Aventura") ficavam cortados/apertados.
+  const SIDE_COL_WIDTH = isTV ? SIDE_COL_WIDTH_TV : SIDE_COL_WIDTH_PHONE;
   // Largura do card calculada em pixels de verdade, a partir da largura
   // real da tela — não usamos mais flex/porcentagem pros cards porque
   // isso dependia do container medir a largura certa, e em paisagem (com
@@ -165,7 +169,14 @@ export default function MoviesScreen() {
             {cat === FAVORITES && (
               <Ionicons name="heart" size={12} color={active ? colors.accentCyan : colors.textSecondary} style={{ marginRight: 4 }} />
             )}
-            <Text style={[isLandscape ? styles.sideChipText : styles.chipText, active && (isLandscape ? styles.sideChipTextActive : styles.chipTextActive)]} numberOfLines={isLandscape ? 2 : 1}>
+            <Text
+              style={[
+                isLandscape ? styles.sideChipText : styles.chipText,
+                active && (isLandscape ? styles.sideChipTextActive : styles.chipTextActive),
+                isLandscape && isTV && { fontSize: 15 },
+              ]}
+              numberOfLines={isLandscape ? 2 : 1}
+            >
               {cat}
             </Text>
           </TVFocusable>
@@ -288,7 +299,11 @@ export default function MoviesScreen() {
 
       {isLandscape ? (
         <View style={{ flex: 1, flexDirection: 'row' }}>
-          <ScrollView style={styles.sideCatCol} contentContainerStyle={styles.sideCatColInner} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={[styles.sideCatCol, { width: SIDE_COL_WIDTH, maxWidth: SIDE_COL_WIDTH, minWidth: SIDE_COL_WIDTH }]}
+            contentContainerStyle={styles.sideCatColInner}
+            showsVerticalScrollIndicator={false}
+          >
             {categoryChips}
           </ScrollView>
           <View style={{ flex: 1, minWidth: 0 }}>{grid}</View>

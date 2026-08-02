@@ -21,6 +21,26 @@ export async function fetchWeather(lat: number, lon: number): Promise<WeatherNow
   }
 }
 
+export type IpLocation = { lat: number; lon: number; city: string | null };
+
+// Alternativa ao GPS pra descobrir a localização — a maioria das TV box não
+// tem GPS/serviços de localização do Google, então `expo-location` nunca
+// resolve nelas e o clima nunca aparecia. Isso estima a localização pelo
+// IP público (bem menos preciso que GPS — geralmente acerta a cidade, não
+// o endereço — mas é o suficiente pra previsão do tempo). Serviço público,
+// sem chave de API.
+export async function fetchLocationByIp(): Promise<IpLocation | null> {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (typeof json?.latitude !== 'number' || typeof json?.longitude !== 'number') return null;
+    return { lat: json.latitude, lon: json.longitude, city: json.city || null };
+  } catch {
+    return null;
+  }
+}
+
 // Tabela reduzida do "WMO Weather interpretation code" que a Open-Meteo usa,
 // mapeada pro ícone do Ionicons mais parecido e uma legenda curta em PT-BR.
 export function weatherIcon(code: number): string {

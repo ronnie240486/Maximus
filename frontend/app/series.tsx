@@ -30,7 +30,8 @@ import TVFocusable from '@/src/components/TVFocusable';
 const ALL = 'Todos';
 const FAVORITES = 'Favoritos';
 const CACHE_KEY = 'series';
-const SIDE_COL_WIDTH = 160;
+const SIDE_COL_WIDTH_PHONE = 160;
+const SIDE_COL_WIDTH_TV = 230;
 
 export default function SeriesScreen() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function SeriesScreen() {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const numColumns = isLandscape ? 6 : 3;
+  const SIDE_COL_WIDTH = isTV ? SIDE_COL_WIDTH_TV : SIDE_COL_WIDTH_PHONE;
   const gridWidth = isLandscape ? width - SIDE_COL_WIDTH : width;
   const itemGap = spacing.sm;
   const itemWidth = (gridWidth - spacing.md * 2 - itemGap * (numColumns - 1)) / numColumns;
@@ -159,7 +161,14 @@ export default function SeriesScreen() {
             {cat === FAVORITES && (
               <Ionicons name="heart" size={12} color={active ? colors.accentCyan : colors.textSecondary} style={{ marginRight: 4 }} />
             )}
-            <Text style={[isLandscape ? styles.sideChipText : styles.chipText, active && (isLandscape ? styles.sideChipTextActive : styles.chipTextActive)]} numberOfLines={isLandscape ? 2 : 1}>
+            <Text
+              style={[
+                isLandscape ? styles.sideChipText : styles.chipText,
+                active && (isLandscape ? styles.sideChipTextActive : styles.chipTextActive),
+                isLandscape && isTV && { fontSize: 15 },
+              ]}
+              numberOfLines={isLandscape ? 2 : 1}
+            >
               {cat}
             </Text>
           </TVFocusable>
@@ -282,7 +291,11 @@ export default function SeriesScreen() {
 
       {isLandscape ? (
         <View style={{ flex: 1, flexDirection: 'row' }}>
-          <ScrollView style={styles.sideCatCol} contentContainerStyle={styles.sideCatColInner} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={[styles.sideCatCol, { width: SIDE_COL_WIDTH, maxWidth: SIDE_COL_WIDTH, minWidth: SIDE_COL_WIDTH }]}
+            contentContainerStyle={styles.sideCatColInner}
+            showsVerticalScrollIndicator={false}
+          >
             {categoryChips}
           </ScrollView>
           <View style={{ flex: 1, minWidth: 0 }}>{grid}</View>

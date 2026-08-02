@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -55,7 +55,6 @@ export default function ChannelsScreen() {
   // Destaque visual da linha (instantâneo) — separado do preview de vídeo
   // em si, que é mais pesado e usa debounce (ver onFocusChannel abaixo).
   const [focusedChannel, setFocusedChannel] = useState<XtreamLive | null>(null);
-  const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { modal: parentalModal, guard } = useParentalGate();
 
   useFocusEffect(
@@ -178,25 +177,31 @@ export default function ChannelsScreen() {
     });
   }, [isTV, filtered]);
 
-  // Chamado a cada movimento do D-pad na lista (TV). Antes, cada um desses
-  // eventos trocava o stream do preview NA HORA — como o D-pad dispara
-  // vários focos por segundo ao segurar pra baixo/cima, isso derrubava uma
-  // nova conexão de vídeo a cada linha percorrida, travando a navegação.
-  // Agora só troca o vídeo de verdade depois que o usuário PARA de se
-  // mexer por um instante; o destaque da linha continua instantâneo.
+  // Chamado a cada movimento do D-pad na lista (TV) — só atualiza o
+  // destaque visual da linha. NÃO carrega vídeo nenhum: antes o preview
+  // trocava sozinho enquanto a pessoa só estava navegando (mesmo com
+  // debounce), o que dava a impressão de "abrir" o canal sem ter
+  // clicado em nada. Ver onPressChannel abaixo pra quando o vídeo
+  // realmente carrega.
   const onFocusChannel = useCallback((item: XtreamLive) => {
     setFocusedChannel(item);
-    if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
-    previewDebounceRef.current = setTimeout(() => {
-      setPreviewChannel(item);
-    }, 350);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
-    };
-  }, []);
+  // 1º clique num canal: só carrega o preview (mini player), não abre
+  // tela cheia ainda. 2º clique no MESMO canal (que já está em preview):
+  // aí sim abre a tela cheia — evita abrir em tela cheia por engano só
+  // por ter apertado OK uma vez navegando.
+  const onPressChannel = useCallback(
+    (item: XtreamLive) => {
+      if (previewChannel?.stream_id === item.stream_id) {
+        openPlayer(item);
+      } else {
+        setPreviewChannel(item);
+        setFocusedChannel(item);
+      }
+    },
+    [previewChannel]
+  );
 
   const openPlayer = (s: XtreamLive) => {
     const categoryName = categories.find((c) => c.category_id === s.category_id)?.category_name;
@@ -331,14 +336,13 @@ export default function ChannelsScreen() {
                 windowSize={7}
                 removeClippedSubviews
                 renderItem={({ item, index }) => {
-                  // Destaque da linha usa o canal em FOCO agora mesmo (sem
-                  // atraso) — só o preview de vídeo em si (mais pesado) é
-                  // que espera o usuário parar de se mexer, ver mais abaixo.
+                  // Destaque da linha usa o canal em FOCO agora mesmo — a
+                  // navegação (D-pad) só destaca, não carrega vídeo nenhum.
                   const rowActive = focusedChannel?.stream_id === item.stream_id;
                   return (
                     <TVFocusable
                       onFocus={() => onFocusChannel(item)}
-                      onPress={() => openPlayer(item)}
+                      onPress={() => onPressChannel(item)}
                       style={[styles.tvRow, rowActive && styles.tvRowActive]}
                       focusStyle={styles.tvRowFocus}
                       testID={`tv-channel-${item.stream_id}`}
@@ -588,9 +592,9 @@ const styles = StyleSheet.create({
 
   // --- Layout de TV (categorias | lista numerada | preview ao vivo) ---
   tvCatCol: {
-    width: 200,
-    maxWidth: 200,
-    minWidth: 200,
+    width: 260,
+    maxWidth: 260,
+    minWidth: 260,
     flexGrow: 0,
     flexShrink: 0,
     borderRightWidth: 1,

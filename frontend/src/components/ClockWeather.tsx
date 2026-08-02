@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing, radius } from '@/src/theme';
-import { fetchWeather, weatherIcon, weatherLabel, WeatherNow } from '@/src/lib/weather';
+import { fetchWeather, fetchLocationByIp, weatherIcon, weatherLabel, WeatherNow } from '@/src/lib/weather';
 import { useIsTV } from '@/src/hooks/useIsTV';
 
 const WEATHER_REFRESH_MS = 20 * 60 * 1000; // clima muda devagar — 20 min está de sobra
@@ -48,34 +48,55 @@ export default function ClockWeather({ compact = false }: Props) {
           const req = await Location.requestForegroundPermissionsAsync();
           finalStatus = req.status;
         }
-        if (finalStatus !== 'granted') {
-          if (mounted) setWeatherDenied(true);
-          return;
+
+        if (finalStatus === 'granted') {
+          try {
+            const pos = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Low, // não precisamos de precisão de metro pra clima
+            });
+            if (!mounted) return;
+
+            const w = await fetchWeather(pos.coords.latitude, pos.coords.longitude);
+            if (mounted) setWeather(w);
+
+            // Best-effort: nome da cidade pra exibir. Se o geocoder reverso
+            // não estiver disponível no aparelho (comum em TV box sem
+            // serviços do Google), a gente simplesmente não mostra nome
+            // nenhum — não é crítico, o clima em si já é o que importa.
+            try {
+              const places = await Location.reverseGeocodeAsync({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+              });
+              const place = places?.[0];
+              if (mounted && place) {
+                setCity(place.city || place.subregion || place.region || null);
+              }
+            } catch {
+              // sem nome de cidade, sem problema
+            }
+            if (mounted && w) return;
+          } catch {
+            // GPS negado no meio do caminho ou indisponível — cai pro
+            // fallback por IP abaixo em vez de desistir.
+          }
         }
 
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low, // não precisamos de precisão de metro pra clima
-        });
+        // Sem permissão de localização OU GPS indisponível (bem comum em
+        // TV box, que raramente tem GPS/serviços de localização do
+        // Google) — estima a localização pelo IP público. Bem menos
+        // preciso, mas garante que o clima apareça mesmo assim.
+        const ipLoc = await fetchLocationByIp();
         if (!mounted) return;
-
-        const w = await fetchWeather(pos.coords.latitude, pos.coords.longitude);
-        if (mounted) setWeather(w);
-
-        // Best-effort: nome da cidade pra exibir. Se o geocoder reverso não
-        // estiver disponível no aparelho (comum em TV box sem serviços do
-        // Google), a gente simplesmente não mostra nome nenhum — não é
-        // crítico, o clima em si já é o que importa.
-        try {
-          const places = await Location.reverseGeocodeAsync({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          const place = places?.[0];
-          if (mounted && place) {
-            setCity(place.city || place.subregion || place.region || null);
-          }
-        } catch {
-          // sem nome de cidade, sem problema
+        if (!ipLoc) {
+          setWeatherDenied(true);
+          return;
+        }
+        const w = await fetchWeather(ipLoc.lat, ipLoc.lon);
+        if (mounted) {
+          setWeather(w);
+          if (ipLoc.city) setCity(ipLoc.city);
+          if (!w) setWeatherDenied(true);
         }
       } catch {
         if (mounted) setWeatherDenied(true);
@@ -96,7 +117,14 @@ export default function ClockWeather({ compact = false }: Props) {
     .replace('.', '');
 
   return (
-    <View style={[styles.wrap, compact && styles.wrapCompact, isTV && styles.wrapTV]} testID="clock-weather">
+    <View
+      style={[
+        styles.wrap,
+        compact && !isTV && styles.wrapCompact,
+        isTV && (compact ? styles.wrapTVCompact : styles.wrapTV),
+      ]}
+      testID="clock-weather"
+    >
       <View>
         <Text style={[styles.time, compact && styles.timeCompact, isTV && styles.timeTV]}>{time}</Text>
         {!compact && <Text style={[styles.date, isTV && styles.dateTV]}>{date}</Text>}
@@ -104,7 +132,7 @@ export default function ClockWeather({ compact = false }: Props) {
 
       {weather && !weatherDenied && (
         <View style={[styles.weatherBlock, compact && styles.weatherBlockCompact]}>
-          <Ionicons name={weatherIcon(weather.code) as any} size={isTV ? 30 : compact ? 14 : 22} color={colors.accentCyan} />
+          <Ionicons name={weatherIcon(weather.code) as any} size={isTV ? (compact ? 22 : 30) : compact ? 14 : 22} color={colors.accentCyan} />
           <View>
             <Text style={[styles.temp, compact && styles.tempCompact, isTV && styles.tempTV]}>{weather.tempC}°</Text>
             {!compact && !!city && (
@@ -130,6 +158,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   wrapTV: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.lg },
+  // Barras estreitas na TV (ex: topo da Home, junto com saudação/busca por
+  // voz/perfil) — texto ainda grande o bastante pra ler de longe, mas sem
+  // o padding/espaçamento generoso do modo TV cheio, que sozinho já
+  // ocupava boa parte da largura da tela.
+  wrapTVCompact: { paddingHorizontal: spacing.sm, paddingVertical: 6, gap: spacing.sm },
   wrapCompact: { paddingHorizontal: 6, paddingVertical: 4, gap: 6 },
   time: { color: colors.white, fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
   timeTV: { fontSize: 32 },

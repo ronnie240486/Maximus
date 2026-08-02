@@ -112,7 +112,13 @@ export default function RadiosScreen() {
     setPlaying(true);
     setBuffering(true);
     try {
-      await player.replaceAsync(radioStreamUrl(station));
+      // Sem User-Agent explícito, vários servidores de rádio
+      // (Shoutcast/Icecast) recusam a conexão — mesma proteção que os
+      // outros players do app já usam pra streams de vídeo.
+      await player.replaceAsync({
+        uri: radioStreamUrl(station),
+        headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
+      });
       player.play();
     } catch {
       setBuffering(false);

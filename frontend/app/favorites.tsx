@@ -56,7 +56,10 @@ export default function FavoritesScreen() {
     setPlaying(true);
     setBuffering(true);
     try {
-      await player.replaceAsync(item.streamUrl);
+      await player.replaceAsync({
+        uri: item.streamUrl,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
+      });
       player.play();
     } catch {
       setBuffering(false);
