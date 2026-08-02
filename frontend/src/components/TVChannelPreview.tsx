@@ -47,9 +47,12 @@ export default function TVChannelPreview({
     p.muted = false;
   });
 
+  const tsFallbackTriedRef = React.useRef(false);
+
   useEffect(() => {
     if (!channel || !creds) return;
     const url = liveStreamUrl(creds, channel.stream_id);
+    tsFallbackTriedRef.current = false;
     try {
       player.replace({ uri: url, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } });
       player.play();
@@ -58,6 +61,26 @@ export default function TVChannelPreview({
       // fica preto, sem travar o resto da tela.
     }
   }, [channel?.stream_id, creds, player]);
+
+  // Alguns servidores Xtream (comum em contas de teste) não servem o
+  // formato HLS (.m3u8) pros canais ao vivo, só o .ts direto — antes de
+  // deixar o preview preto, tenta trocar pra .ts uma vez.
+  useEffect(() => {
+    const sub = player.addListener('statusChange', (s) => {
+      if (s.status !== 'error' || !channel || !creds) return;
+      if (tsFallbackTriedRef.current) return;
+      tsFallbackTriedRef.current = true;
+      const tsUrl = liveStreamUrl(creds, channel.stream_id, 'ts');
+      player
+        .replaceAsync({
+          uri: tsUrl,
+          headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
+        })
+        .then(() => player.play())
+        .catch(() => {});
+    });
+    return () => sub.remove();
+  }, [player, channel, creds]);
 
   useEffect(() => {
     if (!channel || !creds) {

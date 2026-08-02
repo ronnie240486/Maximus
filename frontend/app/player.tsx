@@ -72,6 +72,10 @@ export default function PlayerScreen() {
   const [isLandscape, setIsLandscape] = useState(false);
   const [resizeMode, setResizeMode] = useState<'contain' | 'cover' | 'fill'>('contain');
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guarda a URL (.m3u8) pra qual já tentamos o fallback .ts, pra não
+  // tentar de novo em loop se o .ts também falhar — ver o listener de
+  // erro do player mais abaixo.
+  const tsFallbackTriedFor = useRef<string | null>(null);
 
   const isLive = String(params.id || '').startsWith('live-');
 
@@ -207,6 +211,28 @@ export default function PlayerScreen() {
     const statusSub = player.addListener('statusChange', (s) => {
       setBuffering(s.status === 'loading');
       if (s.status === 'error') {
+        // Alguns servidores Xtream (comum em contas de teste) não servem
+        // o formato HLS (.m3u8) pros canais ao vivo, só o .ts direto —
+        // antes de mostrar erro pro usuário, tenta trocar pra .ts uma
+        // vez. Se isso também falhar (ou já não for um canal .m3u8),
+        // mostra o erro normalmente.
+        const canFallback =
+          isLive &&
+          !!current.stream &&
+          current.stream.includes('.m3u8') &&
+          tsFallbackTriedFor.current !== current.stream;
+        if (canFallback) {
+          tsFallbackTriedFor.current = current.stream;
+          const tsUrl = current.stream.replace(/\.m3u8(\?|$)/, '.ts$1');
+          player
+            .replaceAsync({
+              uri: tsUrl,
+              headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
+            })
+            .then(() => player.play())
+            .catch(() => setError('Não foi possível reproduzir esta transmissão.'));
+          return;
+        }
         setError('Não foi possível reproduzir esta transmissão.');
       } else {
         setError(null);
@@ -219,7 +245,7 @@ export default function PlayerScreen() {
       statusSub.remove();
       playingSub.remove();
     };
-  }, [player]);
+  }, [player, isLive, current.stream]);
 
   // Poll current time / duration for VOD content.
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -116,6 +116,10 @@ export default function ChannelDetailsScreen() {
   const [selectedCat, setSelectedCat] = useState<string>('Todos');
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
+  const [videoError, setVideoError] = useState(false);
+  // Guarda a URL (.m3u8) pra qual já tentamos o fallback .ts — ver o
+  // listener de erro do player mais abaixo.
+  const tsFallbackTriedFor = useRef<string | null>(null);
 
   const creds = getXtream();
   const initialStreamUrl = creds ? liveStreamUrl(creds, current.streamId, 'm3u8') : '';
@@ -130,6 +134,36 @@ export default function ChannelDetailsScreen() {
       p.play();
     }
   );
+
+  // Alguns servidores Xtream (comum em contas de teste) não servem o
+  // formato HLS (.m3u8) pros canais ao vivo, só o .ts direto — antes de
+  // mostrar erro, tenta trocar pra .ts uma vez.
+  useEffect(() => {
+    setVideoError(false);
+    const sub = player.addListener('statusChange', (s) => {
+      if (s.status !== 'error') {
+        setVideoError(false);
+        return;
+      }
+      const streamUrl = initialStreamUrl;
+      const canFallback =
+        !!streamUrl && streamUrl.includes('.m3u8') && tsFallbackTriedFor.current !== streamUrl;
+      if (canFallback) {
+        tsFallbackTriedFor.current = streamUrl;
+        const tsUrl = streamUrl.replace(/\.m3u8(\?|$)/, '.ts$1');
+        player
+          .replaceAsync({
+            uri: tsUrl,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
+          })
+          .then(() => player.play())
+          .catch(() => setVideoError(true));
+        return;
+      }
+      setVideoError(true);
+    });
+    return () => sub.remove();
+  }, [player, initialStreamUrl]);
 
   // Avisa o painel periodicamente qual canal está sendo assistido aqui —
   // essa prévia inline toca sozinha assim que a tela abre, então o
@@ -301,6 +335,28 @@ export default function ChannelDetailsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.black }}>
       <View style={styles.videoWrap}>
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
+        {videoError && (
+          <View style={styles.videoErrorOverlay} testID="cd-video-error">
+            <Ionicons name="alert-circle-outline" size={28} color={colors.white} />
+            <Text style={styles.videoErrorText}>Sem sinal neste canal agora</Text>
+            <Pressable
+              onPress={() => {
+                tsFallbackTriedFor.current = null;
+                setVideoError(false);
+                player.replaceAsync(
+                  initialStreamUrl
+                    ? { uri: initialStreamUrl, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } }
+                    : ''
+                );
+                player.play();
+              }}
+              style={styles.videoErrorRetry}
+              testID="cd-video-error-retry"
+            >
+              <Text style={styles.videoErrorRetryText}>TENTAR NOVAMENTE</Text>
+            </Pressable>
+          </View>
+        )}
         {/* Tocar na área do vídeo já abre direto o player em tela cheia. */}
         <Pressable style={StyleSheet.absoluteFill} onPress={openFullscreenPlayer} testID="cd-video-tap" />
         <TVFocusable onPress={() => router.back()} hitSlop={12} style={styles.videoBackBtn} testID="cd-back">
@@ -520,6 +576,24 @@ export default function ChannelDetailsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.black },
   videoWrap: { width: '100%', aspectRatio: 4 / 3, backgroundColor: colors.darkSurface },
+  videoErrorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11,15,26,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: spacing.md,
+  },
+  videoErrorText: { color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  videoErrorRetry: {
+    marginTop: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.accentCyan,
+  },
+  videoErrorRetryText: { color: colors.accentCyan, fontWeight: '800', fontSize: 11, letterSpacing: 1 },
   videoBackBtn: {
     position: 'absolute',
     top: spacing.sm,
