@@ -11,7 +11,6 @@ import { checkMac } from '@/src/api/client';
 import { loadSession } from '@/src/state/session';
 import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { prefetchHomeContent } from '@/src/state/prefetch';
-import { logSessionEvent } from '@/src/state/debug-log';
 
 const welcomeAudioSource = require('@/assets/audio/welcome.wav');
 const swooshSource = require('@/assets/audio/swoosh.mp3');
@@ -66,7 +65,6 @@ export default function WelcomeScreen() {
       // versão fresca do painel (se vier diferente) discretamente depois,
       // já com a tela em andamento.
       const cached = await loadSession();
-      logSessionEvent('welcome.mount', `sessão lida: status=${cached?.status ?? 'undefined'}`);
       setBg(cached?.bg_url);
       setBanner(cached?.banner_url);
       setLogo(cached?.logo_url);
