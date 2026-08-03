@@ -94,6 +94,12 @@ export function getKidAvatar(id?: string | null): KidAvatarStyle {
 /* eslint-disable global-require */
 const KID_ILLUSTRATED_IMAGES: number[] = [
   require('../../assets/images/kid-avatars/kid-avatar-1.jpg'),
+  require('../../assets/images/kid-avatars/kid-avatar-2.jpg'),
+  require('../../assets/images/kid-avatars/kid-avatar-3.jpg'),
+  require('../../assets/images/kid-avatars/kid-avatar-4.jpg'),
+  require('../../assets/images/kid-avatars/kid-avatar-5.jpg'),
+  require('../../assets/images/kid-avatars/kid-avatar-6.jpg'),
+  require('../../assets/images/kid-avatars/kid-avatar-7.jpg'),
 ];
 /* eslint-enable global-require */
 

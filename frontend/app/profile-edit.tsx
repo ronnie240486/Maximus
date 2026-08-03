@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import {
   AVATARS,
-  KIDS_AVATARS,
   KIDS_ILLUSTRATED_AVATARS,
   isKidAvatarId,
 } from '@/src/lib/avatars';
@@ -168,7 +167,7 @@ export default function EditProfileScreen() {
         </TVFocusable>
 
         <View style={styles.avatarGrid}>
-          {(isKids ? [...KIDS_ILLUSTRATED_AVATARS, ...KIDS_AVATARS] : AVATARS).map((a) => (
+          {(isKids ? KIDS_ILLUSTRATED_AVATARS : AVATARS).map((a) => (
             <TVFocusable
               key={a.id}
               onPress={() => setAvatarId(a.id)}
