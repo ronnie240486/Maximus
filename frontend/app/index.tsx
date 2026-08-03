@@ -51,13 +51,27 @@ export default function MacLoginScreen() {
   const [checkingSession, setCheckingSession] = useState(true);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Enquanto isso for true, o poll automático (runPoll) NÃO FAZ NADA — nem
+  // agenda o próximo, nem age se uma checagem já estava em andamento. Ver
+  // onTestRegister: é ligado assim que a pessoa aperta TESTE.
+  const testFlowActiveRef = useRef(false);
 
   const runPoll = useCallback(
     async (deviceMac: string, isManual = false) => {
       if (!mountedRef.current) return;
+      // ESSENCIAL: nunca deixa o poll automático agir enquanto um teste
+      // está sendo gerado/aquecido. Sem isso, se esse MAC também estiver
+      // cadastrado no painel normal do revendedor (ex: de um teste manual
+      // anterior), esse poll (roda a cada 5s) achava esse cadastro
+      // "autorizado" e entrava sozinho com ELE — sobrescrevendo bem no
+      // meio do processo a sessão de teste que a pessoa tinha acabado de
+      // gerar, mesmo com o teste certinho e funcionando. Foi a causa real
+      // por trás de vários "Lista OFF" que pareciam ser problema no teste
+      // em si, quando na verdade o teste nunca chegava a "grudar".
+      if (testFlowActiveRef.current) return;
       setChecking(true);
       const s = await checkMac(deviceMac);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || testFlowActiveRef.current) return;
       setChecking(false);
       setStatus(s);
       setLastCheck(new Date());
@@ -169,6 +183,15 @@ export default function MacLoginScreen() {
   const onTestRegister = async () => {
     if (!mac || testing) return;
 
+    // Trava o poll automático AGORA, antes de qualquer coisa — ver o
+    // comentário em runPoll pra entender por quê. Também cancela um poll
+    // que porventura já estivesse agendado.
+    testFlowActiveRef.current = true;
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+
     // MAC já cadastrado no painel do revendedor? Sempre pode testar de
     // novo. MAC desconhecido? Só uma vez, pra não virar gerador de teste
     // infinito só de reabrir o app.
@@ -179,6 +202,8 @@ export default function MacLoginScreen() {
           'Teste já utilizado',
           'Esse dispositivo já usou o teste gratuito. Fale com seu revendedor pra liberar o acesso completo.'
         );
+        testFlowActiveRef.current = false;
+        pollRef.current = setTimeout(() => runPoll(mac), POLL_MS);
         return;
       }
     }
@@ -193,6 +218,10 @@ export default function MacLoginScreen() {
         'Não foi possível gerar o teste',
         'Tente novamente em instantes ou fale com seu revendedor.'
       );
+      // Teste falhou — libera o poll automático de volta, já que a
+      // pessoa continua nessa tela.
+      testFlowActiveRef.current = false;
+      pollRef.current = setTimeout(() => runPoll(mac), POLL_MS);
       return;
     }
 
@@ -297,6 +326,8 @@ export default function MacLoginScreen() {
         'Teste gerado, mas não consegui entrar automaticamente',
         'Fale com seu revendedor passando o ID do dispositivo acima.'
       );
+      testFlowActiveRef.current = false;
+      if (mountedRef.current) pollRef.current = setTimeout(() => runPoll(mac), POLL_MS);
     }
   };
 
