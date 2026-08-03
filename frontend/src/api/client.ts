@@ -266,6 +266,10 @@ export type AppExtras = {
   contactInfo?: string;
   resellerEmail?: string;
   legalNotice?: string;
+  lockTitle?: string;
+  lockMessage?: string;
+  lockButtonText?: string;
+  lockButtonUrl?: string;
 };
 
 export async function fetchAppExtras(mac: string): Promise<AppExtras> {
@@ -278,5 +282,9 @@ export async function fetchAppExtras(mac: string): Promise<AppExtras> {
     contactInfo: str(guim.gpcpro_contact_info),
     resellerEmail: str(guim.gpcpro_reseller_email),
     legalNotice: str(guim.gpcpro_legal_notice),
+    lockTitle: str(guim.gpcpro_lock_title),
+    lockMessage: str(guim.gpcpro_lock_message),
+    lockButtonText: str(guim.gpcpro_lock_button_text),
+    lockButtonUrl: str(guim.gpcpro_lock_button_url),
   };
 }

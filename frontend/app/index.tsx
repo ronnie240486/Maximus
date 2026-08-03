@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { checkMac, MacStatus, registerTestDevice, fetchAppExtras } from '@/src/api/client';
+import { checkMac, MacStatus, registerTestDevice, fetchAppExtras, AppExtras } from '@/src/api/client';
 import { hasUsedTest, markTestUsed } from '@/src/state/test-usage';
 import { parsePlaylistUrl, xtream, XtreamCreds } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
@@ -34,7 +34,7 @@ export default function MacLoginScreen() {
   const router = useRouter();
   const isTV = useIsTV();
   const [mac, setMac] = useState<string>('');
-  const [impactPhrase, setImpactPhrase] = useState<string | undefined>();
+  const [extras, setExtras] = useState<AppExtras>({});
   const [status, setStatus] = useState<MacStatus | null>(null);
   const [copied, setCopied] = useState(false);
   const [pollCount, setPollCount] = useState(0);
@@ -110,8 +110,8 @@ export default function MacLoginScreen() {
       // Best-effort: se falhar ou demorar, a tela funciona normal do
       // mesmo jeito, só sem essa frase.
       fetchAppExtras(m)
-        .then((extras) => {
-          if (mountedRef.current) setImpactPhrase(extras.impactPhrase);
+        .then((ex) => {
+          if (mountedRef.current) setExtras(ex);
         })
         .catch(() => {});
 
@@ -362,6 +362,16 @@ export default function MacLoginScreen() {
   const banner = status?.banner_url;
   const appName = status?.app_name;
 
+  // Registrado no painel mas sem acesso (bloqueado pelo revendedor, lista
+  // removida, etc.) — diferente de "nunca vi esse MAC", que é o estado
+  // normal de quem ainda não pediu acesso. Só nesse caso (bloqueado) que
+  // faz sentido mostrar a Tela de Bloqueio personalizada, se o revendedor
+  // tiver preenchido ela no painel.
+  const isBlocked =
+    !!status?.registered &&
+    (!status.authorized || !(status.playlists || []).some((p) => !!parsePlaylistUrl(p.url)));
+  const showLockScreen = isBlocked && !!extras.lockTitle && !!extras.lockMessage;
+
   // Concise summary of the last response for on-screen debug.
   const debugLine = (() => {
     if (!lastCheck) return 'Aguardando primeira verificação...';
@@ -370,8 +380,7 @@ export default function MacLoginScreen() {
     if (status.message === 'Falha de conexão.') {
       return `${time} • FALHA DE REDE (verifique internet/CORS)`;
     }
-    const hasUsablePlaylist = (status.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
-    if (status.registered && (!status.authorized || !hasUsablePlaylist)) {
+    if (isBlocked) {
       return `${time} • registrado mas sem playlist`;
     }
     if (status.registered) {
@@ -388,6 +397,46 @@ export default function MacLoginScreen() {
       <View style={[styles.bg, styles.center]} testID="mac-login-checking-session">
         <ActivityIndicator color={colors.accentCyan} size="large" />
       </View>
+    );
+  }
+
+  if (showLockScreen) {
+    return (
+      <ImageBackground
+        source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
+        style={styles.bg}
+        imageStyle={{ opacity: 0.2 }}
+      >
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <View style={styles.lockWrap} testID="mac-lock-screen">
+            <View style={styles.lockIconCircle}>
+              <Ionicons name="lock-closed" size={30} color={colors.danger} />
+            </View>
+            <Text style={styles.lockTitle}>{extras.lockTitle}</Text>
+            <Text style={styles.lockMessage}>{extras.lockMessage}</Text>
+
+            {!!extras.lockButtonText && !!extras.lockButtonUrl && (
+              <TVFocusable
+                onPress={() => Linking.openURL(extras.lockButtonUrl!).catch(() => {})}
+                style={styles.lockBtn}
+                testID="mac-lock-btn"
+              >
+                <Text style={styles.lockBtnText}>{extras.lockButtonText}</Text>
+              </TVFocusable>
+            )}
+
+            <Text style={styles.lockMacLabel}>ID DO DISPOSITIVO (MAC)</Text>
+            <Pressable onPress={onCopy} hitSlop={12} testID="mac-lock-value-copy">
+              <Text style={styles.lockMacValue}>{mac}</Text>
+            </Pressable>
+
+            <TVFocusable onPress={onCheckNow} style={styles.lockRetryBtn} testID="mac-lock-retry">
+              <Ionicons name="refresh" size={16} color={colors.accentCyan} />
+              <Text style={styles.lockRetryText}>VERIFICAR NOVAMENTE</Text>
+            </TVFocusable>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
     );
   }
 
@@ -411,9 +460,9 @@ export default function MacLoginScreen() {
         </View>
 
         <Text style={styles.title} testID="mac-login-title">Como entrar</Text>
-        {!!impactPhrase && (
+        {!!extras.impactPhrase && (
           <Text style={styles.impactPhrase} testID="mac-impact-phrase">
-            {impactPhrase}
+            {extras.impactPhrase}
           </Text>
         )}
 
@@ -492,6 +541,11 @@ export default function MacLoginScreen() {
             Envie o ID acima para seu revendedor.{'\n'}
             Assim que ativado, o acesso abre automaticamente.
           </Text>
+          {!!extras.contactInfo && (
+            <Text style={styles.hint} testID="mac-contact-info">
+              {extras.contactInfo}
+            </Text>
+          )}
         </View>
 
         <TVFocusable
@@ -553,6 +607,47 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingHorizontal: spacing.xl,
   },
+  lockWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  lockIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(240,153,123,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  lockTitle: {
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  lockMessage: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  lockBtn: {
+    backgroundColor: colors.accentCyan,
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    marginBottom: spacing.xl,
+  },
+  lockBtnText: { color: colors.black, fontWeight: '800', letterSpacing: 1, fontSize: 14 },
+  lockMacLabel: { color: colors.textMuted, fontSize: 11, letterSpacing: 1.5, marginBottom: 4 },
+  lockMacValue: { color: colors.textSecondary, fontSize: 15, fontWeight: '700', marginBottom: spacing.lg },
+  lockRetryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 },
+  lockRetryText: { color: colors.accentCyan, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   centerBlock: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   label: {
     color: colors.textSecondary,
