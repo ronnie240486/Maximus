@@ -21,9 +21,11 @@ import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import Avatar from '@/src/components/Avatar';
 import TVFocusable from '@/src/components/TVFocusable';
+import { useIsTV } from '@/src/hooks/useIsTV';
 
 export default function ProfileSelectionScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [mac, setMac] = useState<string>('');
@@ -109,10 +111,12 @@ export default function ProfileSelectionScreen() {
       imageStyle={{ opacity: 0.2 }}
     >
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <Text style={styles.title} testID="profile-select-title">Quem assiste?</Text>
+        <Text style={[styles.title, isTV && styles.titleTV]} testID="profile-select-title">
+          Quem assiste?
+        </Text>
         <View style={styles.underline} />
 
-        <View style={styles.centerBlock}>
+        <View style={[styles.centerBlock, isTV && styles.centerBlockTV]}>
           {loading ? (
             <ActivityIndicator color={colors.accentCyan} />
           ) : (
@@ -173,6 +177,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 48,
   },
+  // TVs mais antigas costumam cortar uma faixa das bordas da tela
+  // (overscan) — sem essa margem extra, o título e os avatares logo
+  // abaixo dele ficavam perto demais do topo físico da tela e a cabeça
+  // do avatar aparecia cortada.
+  titleTV: { marginTop: 88 },
   underline: {
     width: 48,
     height: 3,
@@ -182,6 +191,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   centerBlock: { flex: 1, justifyContent: 'center' },
+  centerBlockTV: { paddingTop: 32 },
   profileItem: { alignItems: 'center', width: 110 },
   profileFocusTV: { transform: [{ scale: 1.08 }] },
   avatarCard: {
