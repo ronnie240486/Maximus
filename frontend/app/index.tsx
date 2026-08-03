@@ -410,7 +410,7 @@ export default function MacLoginScreen() {
         source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
         onError={() => setBgFailed(true)}
         style={styles.bg}
-        imageStyle={{ opacity: 0.2 }}
+        imageStyle={{ opacity: bg && !bgFailed ? 0.2 : 0.75 }}
       >
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <View style={styles.lockWrap} testID="mac-lock-screen">
@@ -450,7 +450,7 @@ export default function MacLoginScreen() {
       source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
       onError={() => setBgFailed(true)}
       style={styles.bg}
-      imageStyle={{ opacity: 0.25 }}
+      imageStyle={{ opacity: bg && !bgFailed ? 0.25 : 0.75 }}
     >
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.logoWrap}>

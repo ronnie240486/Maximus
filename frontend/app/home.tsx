@@ -694,9 +694,9 @@ export default function HomeScreen() {
       source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
       onError={() => setBgFailed(true)}
       style={styles.bg}
-      imageStyle={{ opacity: 0.35 }}
+      imageStyle={{ opacity: bg && !bgFailed ? 0.35 : 0.75 }}
     >
-      <View style={styles.overlay} />
+      <View style={[styles.overlay, !(bg && !bgFailed) && styles.overlayLight]} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={{ flex: 1, flexDirection: isLandscape ? 'row' : 'column' }}>
           {isLandscape && (
@@ -1071,6 +1071,7 @@ function EmptyHome({ errorCode, onRetry }: { errorCode: string | null; onRetry: 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.black },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  overlayLight: { backgroundColor: 'rgba(0,0,0,0.15)' },
   safe: { flex: 1 },
   bottomNav: {
     flexGrow: 0,

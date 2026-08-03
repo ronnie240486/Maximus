@@ -113,7 +113,7 @@ export default function ProfileSelectionScreen() {
       source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
       onError={() => setBgFailed(true)}
       style={styles.bg}
-      imageStyle={{ opacity: 0.2 }}
+      imageStyle={{ opacity: bg && !bgFailed ? 0.2 : 0.75 }}
     >
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <Text style={[styles.title, isTV && styles.titleTV]} testID="profile-select-title">

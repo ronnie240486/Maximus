@@ -174,7 +174,16 @@ export default function WelcomeScreen() {
           contentFit="cover"
         />
       )}
-      <View style={[StyleSheet.absoluteFillObject, styles.bgOverlay]} />
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          // A imagem padrão já foi feita pra ficar discreta — o
+          // escurecimento forte (feito pra garantir legibilidade em cima
+          // de fotos quaisquer vindas do painel) deixava ela quase
+          // imperceptível, parecendo que "não tinha fundo nenhum".
+          showBg ? styles.bgOverlay : styles.bgOverlayLight,
+        ]}
+      />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <Pressable style={styles.tapArea} onPress={goNext}>
           <View style={styles.center}>
@@ -220,6 +229,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.black },
   bgOverlay: { backgroundColor: 'rgba(11,15,26,0.55)' },
+  bgOverlayLight: { backgroundColor: 'rgba(11,15,26,0.2)' },
   safe: { flex: 1 },
   tapArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   center: { alignItems: 'center', paddingHorizontal: spacing.xl, width: '100%' },
