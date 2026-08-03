@@ -185,20 +185,57 @@ export type TestRegisterResult = {
   raw: string;
 };
 
-// URL do gerador de teste automático (chatbot sigmab.pro), a mesma
-// cadastrada no campo "URL do Servidor (DNS)" do painel. Chamada direto
-// daqui, sem backend no meio — o painel tem um bug que faz esse campo não
-// chegar certo pro app (manda o nome do revendedor em vez do link), então
-// por enquanto não dá pra ler isso dinamicamente. Se esse link mudar de
-// novo, precisa atualizar aqui e gerar um APK novo.
+// URL raiz do painel, sem o /api/v5 ou /api/v4 no final — usada só pra
+// montar a chamada do /api/guim.php abaixo.
+const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2U=');
+
+// URL de FALLBACK do gerador de teste (chatbot sigmab.pro) — só usada se
+// a busca dinâmica abaixo (via /api/guim.php) falhar por qualquer motivo.
+// Antes esse link era sempre fixo porque o campo "URL do Servidor (DNS)"
+// do painel não chegava certo pro app — agora tem um endpoint dedicado
+// (/api/guim.php?mac=...) que devolve isso certinho no campo
+// "gpcpro_server_url", então a gente busca ele toda vez em vez de confiar
+// só nesse valor fixo. Se o revendedor trocar essa URL no painel, o app
+// já pega a nova sem precisar gerar um APK novo.
 // Ofuscado em base64 (ver src/lib/obfuscate.ts) — decodificado:
 //   https://nuvixtv.sigmab.pro/api/chatbot/Yen129WPEa/XYgD9JWr6V
-const TEST_REGISTER_URL = decodeB64(
+const TEST_REGISTER_URL_FALLBACK = decodeB64(
   'aHR0cHM6Ly9udXZpeHR2LnNpZ21hYi5wcm8vYXBpL2NoYXRib3QvWWVuMTI5V1BFYS9YWWdEOUpXcjZW'
 );
 
+// Cache em memória — só busca uma vez por sessão do app, não a cada
+// clique em TESTE.
+let cachedTestRegisterUrl: string | null = null;
+
+async function getTestRegisterUrl(mac: string): Promise<string> {
+  if (cachedTestRegisterUrl) return cachedTestRegisterUrl;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${PANEL_ROOT}/api/guim.php?mac=${encodeURIComponent(mac)}`, {
+      headers: commonHeaders,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const json = await res.json();
+      const url = json?.gpcpro_server_url;
+      if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+        cachedTestRegisterUrl = url;
+        return url;
+      }
+    }
+  } catch {
+    // Sem internet nesse instante, endpoint fora do ar, resposta em
+    // formato inesperado — qualquer que seja o motivo, cai no fallback
+    // fixo abaixo em vez de travar o botão TESTE.
+  }
+  return TEST_REGISTER_URL_FALLBACK;
+}
+
 export async function registerTestDevice(mac: string): Promise<TestRegisterResult> {
-  const upstream = `${TEST_REGISTER_URL}?mac=${encodeURIComponent(mac)}`;
+  const testRegisterUrl = await getTestRegisterUrl(mac);
+  const upstream = `${testRegisterUrl}?mac=${encodeURIComponent(mac)}`;
   try {
     const res = await fetch(proxied(upstream), {
       method: 'POST',
