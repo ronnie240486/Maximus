@@ -8,6 +8,7 @@ import {
   Linking,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +23,7 @@ import { storage } from '@/src/utils/storage';
 import { clearHomeCache } from '@/src/state/home-cache';
 import { clearListCache } from '@/src/state/list-cache';
 import { isWelcomeAudioEnabled, setWelcomeAudioEnabled } from '@/src/state/welcome-audio';
-import { MacStatus, fetchAppExtras, AppExtras } from '@/src/api/client';
+import { MacStatus, fetchAppExtras, AppExtras, fetchApkUpdate } from '@/src/api/client';
 import PinModal from '@/src/components/PinModal';
 import TVFocusable from '@/src/components/TVFocusable';
 import {
@@ -282,6 +283,28 @@ export default function SettingsScreen() {
     if (session?.whatsapp_url) Linking.openURL(session.whatsapp_url).catch(() => {});
   };
 
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const onCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const info = await fetchApkUpdate(mac);
+      if (!info.url) {
+        Alert.alert('Sem atualização', 'Não foi possível encontrar um link de atualização agora. Tente de novo mais tarde.');
+        return;
+      }
+      // Abre o link como veio do painel — seja da Play Store
+      // (market://... ou https://play.google.com/...) ou um link de
+      // download direto do APK, o sistema decide sozinho o que abrir.
+      Linking.openURL(info.url).catch(() => {
+        Alert.alert('Não foi possível abrir', 'O link de atualização não pôde ser aberto neste aparelho.');
+      });
+    } catch {
+      Alert.alert('Erro', 'Não foi possível verificar atualização agora. Confira sua internet e tente de novo.');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   const rows: Row[] = [
     {
       id: 'account',
@@ -342,19 +365,17 @@ export default function SettingsScreen() {
           } as Row,
         ]
       : []),
-    ...(session?.apk_link
-      ? [
-          {
-            id: 'update',
-            title: 'Baixar atualização',
-            subtitle: `Versão disponível: ${session?.version || 'mais recente'}`,
-            icon: <Ionicons name="cloud-download-outline" size={20} color={colors.accentCyan} />,
-            onPress: () => {
-              if (session?.apk_link) Linking.openURL(session.apk_link).catch(() => {});
-            },
-          } as Row,
-        ]
-      : []),
+    {
+      id: 'update',
+      title: checkingUpdate ? 'Verificando...' : 'Verificar atualização',
+      subtitle: 'Busca a versão mais recente do app agora',
+      icon: checkingUpdate ? (
+        <ActivityIndicator size="small" color={colors.accentCyan} />
+      ) : (
+        <Ionicons name="cloud-download-outline" size={20} color={colors.accentCyan} />
+      ),
+      onPress: checkingUpdate ? undefined : onCheckUpdate,
+    },
     {
       id: 'playlists',
       title: 'Listas',

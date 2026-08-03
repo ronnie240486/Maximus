@@ -166,6 +166,36 @@ export async function checkMac(mac: string): Promise<MacStatus> {
   }
 }
 
+// Endpoint dedicado do link/versão do APK — antes o app só torcia pra que
+// check_mac.php mandasse "version"/"apk_link" junto (nem sempre manda), o
+// que fazia o botão de atualização nunca aparecer. Usa /api/v4/update.php
+// de verdade agora, chamado só quando a pessoa aperta o botão em
+// Configurações (não em toda checagem de sessão).
+export type ApkUpdate = { url?: string; version?: string };
+
+export async function fetchApkUpdate(mac: string): Promise<ApkUpdate> {
+  try {
+    const res = await fetch(proxied(`${PANEL_BASE_V4}/update.php?mac=${encodeURIComponent(mac)}`), {
+      headers: commonHeaders,
+    });
+    const json = await safeJson<any>(res);
+    if (!json) return {};
+    // Nomes de campo podem variar (link direto de APK, ou link da Play
+    // Store) — aceita as variações mais comuns em vez de travar num nome
+    // só.
+    const url =
+      json.apk_link || json.download_url || json.url || json.link || json.playstore_url || undefined;
+    const versionRaw = json.version ?? json.apk_version ?? json.versao;
+    const version = versionRaw != null ? String(versionRaw) : undefined;
+    return {
+      url: typeof url === 'string' && url.trim() ? url.trim() : undefined,
+      version,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function checkExpire(mac: string): Promise<{ expired: boolean; expire_date?: string | null }> {
   const upstream = `${PANEL_BASE}/check_expire.php?mac=${encodeURIComponent(mac)}`;
   try {
