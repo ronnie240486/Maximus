@@ -38,6 +38,17 @@ export default function ProfileSelectionScreen() {
     setMac(m);
     setProfiles(list);
 
+    // Sessão de teste: não existe no painel principal, então perguntar pra
+    // ele sempre voltaria "não autorizado" e sobrescreveria a sessão de
+    // teste com a conta normal do painel (se esse MAC também estiver
+    // cadastrado lá) — mesmo bug que já foi corrigido em home.tsx e
+    // index.tsx. Pra conta de teste, usa só o que já está salvo local.
+    if (cachedSession?.status === 'Teste') {
+      setBg(cachedSession?.bg_url);
+      setLoading(false);
+      return;
+    }
+
     // O fundo (bg_url) é uma URL assinada que expira em ~1h — por isso
     // buscamos o status de novo aqui em vez de confiar só no que ficou
     // salvo de uma sessão anterior, que pode estar com o link já vencido.
