@@ -142,17 +142,30 @@ export default function WelcomeScreen() {
 
   const showBanner = !!banner && !imageFailed;
   const showLogo = !showBanner && !!logo && !imageFailed;
+  // Sem banner NEM logo do painel (ex: conta de teste, sem MAC cadastrado
+  // ainda) — mostra o logo padrão do próprio app em vez de ficar só com o
+  // texto "Bem-vindo". Assim que o MAC for cadastrado com uma imagem
+  // própria no painel, volta a usar ela normalmente.
+  const showFallbackLogo = !showBanner && !showLogo;
   const showBg = !!bg && !bgFailed;
 
   return (
     <View style={styles.bg}>
-      {showBg && (
+      {showBg ? (
         <Image
           source={{ uri: bg }}
           style={StyleSheet.absoluteFillObject}
           contentFit="cover"
           onLoad={() => setBgLoaded(true)}
           onError={() => setBgFailed(true)}
+        />
+      ) : (
+        // Mesmo motivo do fallback do logo acima — sem bg_url do painel,
+        // usa a imagem de fundo padrão local em vez de deixar em branco.
+        <Image
+          source={require('@/assets/images/default-bg.png')}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="cover"
         />
       )}
       <View style={[StyleSheet.absoluteFillObject, styles.bgOverlay]} />
@@ -179,6 +192,14 @@ export default function WelcomeScreen() {
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageFailed(true)}
                 testID="welcome-logo"
+              />
+            )}
+            {showFallbackLogo && (
+              <Image
+                source={require('@/assets/images/app-image.png')}
+                style={styles.logoImg}
+                contentFit="contain"
+                testID="welcome-fallback-logo"
               />
             )}
             <Text style={styles.welcomeText}>Bem-vindo ao Maximus Player</Text>

@@ -624,7 +624,11 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground
-      source={bg ? { uri: bg } : undefined}
+      // Sem bg_url do painel (ex: conta de teste, sem MAC cadastrado ainda)
+      // — usa a imagem de fundo padrão do app em vez de deixar sem nada.
+      // Assim que o MAC for cadastrado no painel com uma imagem própria,
+      // volta a usar ela normalmente (bg vem do checkMac acima).
+      source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
       style={styles.bg}
       imageStyle={{ opacity: 0.35 }}
     >

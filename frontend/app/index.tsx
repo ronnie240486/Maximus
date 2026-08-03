@@ -384,7 +384,7 @@ export default function MacLoginScreen() {
 
   return (
     <ImageBackground
-      source={bg ? { uri: bg } : undefined}
+      source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
       style={styles.bg}
       imageStyle={{ opacity: 0.25 }}
     >

@@ -104,7 +104,7 @@ export default function ProfileSelectionScreen() {
 
   return (
     <ImageBackground
-      source={bg ? { uri: bg } : undefined}
+      source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
       style={styles.bg}
       imageStyle={{ opacity: 0.2 }}
     >
