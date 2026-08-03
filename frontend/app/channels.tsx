@@ -34,6 +34,49 @@ const FAVORITES = 'Favoritos';
 const CACHE_KEY = 'channels';
 const SIDE_COL_WIDTH = 160;
 
+// Extraído e memoizado de propósito: sem isso, toda vez que o destaque
+// (D-pad) muda de linha, o componente pai inteiro re-renderiza, e SEM
+// memo isso recriava e re-renderizava TODAS as ~20 linhas visíveis na
+// tela a cada movimento do controle — não só a que realmente mudou. Com
+// React.memo, só as linhas cujas props de verdade mudaram (a que ganhou
+// e a que perdeu o destaque) re-renderizam.
+const ChannelRow = React.memo(function ChannelRow({
+  item,
+  index,
+  isActive,
+  isFavorite,
+  onFocus,
+  onPress,
+}: {
+  item: XtreamLive;
+  index: number;
+  isActive: boolean;
+  isFavorite: boolean;
+  onFocus: (item: XtreamLive) => void;
+  onPress: (item: XtreamLive) => void;
+}) {
+  return (
+    <TVFocusable
+      onFocus={() => onFocus(item)}
+      onPress={() => onPress(item)}
+      style={[styles.tvRow, isActive && styles.tvRowActive]}
+      focusStyle={styles.tvRowFocus}
+      testID={`tv-channel-${item.stream_id}`}
+    >
+      <Text style={styles.tvRowNum}>{item.num ?? index + 1}</Text>
+      {item.stream_icon ? (
+        <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" cachePolicy="memory-disk" />
+      ) : (
+        <MaterialCommunityIcons name="television-classic" size={22} color={colors.textMuted} />
+      )}
+      <Text style={styles.tvRowName} numberOfLines={1}>
+        {item.name}
+      </Text>
+      {isFavorite && <Ionicons name="heart" size={14} color={colors.accentMagenta} />}
+    </TVFocusable>
+  );
+});
+
 export default function ChannelsScreen() {
   const router = useRouter();
   const isTV = useIsTV();
@@ -358,33 +401,16 @@ export default function ChannelsScreen() {
                 maxToRenderPerBatch={20}
                 windowSize={7}
                 removeClippedSubviews
-                renderItem={({ item, index }) => {
-                  // Destaque da linha usa o canal em FOCO agora mesmo — a
-                  // navegação (D-pad) só destaca, não carrega vídeo nenhum.
-                  const rowActive = focusedChannel?.stream_id === item.stream_id;
-                  return (
-                    <TVFocusable
-                      onFocus={() => onFocusChannel(item)}
-                      onPress={() => onPressChannel(item)}
-                      style={[styles.tvRow, rowActive && styles.tvRowActive]}
-                      focusStyle={styles.tvRowFocus}
-                      testID={`tv-channel-${item.stream_id}`}
-                    >
-                      <Text style={styles.tvRowNum}>{item.num ?? index + 1}</Text>
-                      {item.stream_icon ? (
-                        <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" cachePolicy="memory-disk" />
-                      ) : (
-                        <MaterialCommunityIcons name="television-classic" size={22} color={colors.textMuted} />
-                      )}
-                      <Text style={styles.tvRowName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      {favoriteIds.has(`channel-${item.stream_id}`) && (
-                        <Ionicons name="heart" size={14} color={colors.accentMagenta} />
-                      )}
-                    </TVFocusable>
-                  );
-                }}
+                renderItem={({ item, index }) => (
+                  <ChannelRow
+                    item={item}
+                    index={index}
+                    isActive={focusedChannel?.stream_id === item.stream_id}
+                    isFavorite={favoriteIds.has(`channel-${item.stream_id}`)}
+                    onFocus={onFocusChannel}
+                    onPress={onPressChannel}
+                  />
+                )}
               />
             )}
           </View>
