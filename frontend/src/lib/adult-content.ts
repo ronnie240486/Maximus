@@ -65,6 +65,117 @@ export function isKidsCategoryName(categoryName?: string | null): boolean {
   return KIDS_KEYWORDS.some((kw) => n.includes(normalize(kw)));
 }
 
+// Muitos painéis organizam Filmes/Séries por PLATAFORMA (Netflix, Amazon,
+// Disney+...) em vez de por gênero/público — nesse caso, dentro de uma
+// categoria só chamada "Netflix" tem desenho infantil e série adulta
+// juntos, e não tem como separar isso só pelo nome da categoria. Por
+// isso, além de checar a categoria, também batemos o nome do próprio
+// título contra uma lista de desenhos/filmes infantis bem conhecidos —
+// não é uma lista completa (impossível cobrir tudo), mas pega os casos
+// mais comuns mesmo espalhados em categorias mistas.
+const KIDS_TITLE_KEYWORDS = [
+  'peppa pig',
+  'turma da monica',
+  'patrulha canina',
+  'paw patrol',
+  'masha e o urso',
+  'masha and the bear',
+  'bluey',
+  'pj masks',
+  'backyardigans',
+  'dora a aventureira',
+  'dora the explorer',
+  'galinha pintadinha',
+  'mickey mouse',
+  'minnie',
+  'frozen',
+  'toy story',
+  'shrek',
+  'enrolados',
+  'tangled',
+  'moana',
+  'vaiana',
+  'ursinho pooh',
+  'winnie the pooh',
+  'bob esponja',
+  'spongebob',
+  'ben 10',
+  'pokemon',
+  'kung fu panda',
+  'madagascar',
+  'carros 1',
+  'carros 2',
+  'carros 3',
+  'cars 1',
+  'cars 2',
+  'cars 3',
+  'croods',
+  'zootopia',
+  'divertida mente',
+  'inside out',
+  'como treinar seu dragao',
+  'how to train your dragon',
+  'meu malvado favorito',
+  'despicable me',
+  'minions',
+  'rio 2011',
+  'rio 2014',
+  'sing',
+  'trolls',
+  'coco',
+  'luca',
+  'encanto',
+  'soul 2020',
+  'divertida',
+  'gata marota',
+  'sonic o filme',
+  'sonic the hedgehog',
+  'super mario bros',
+  'super mario',
+  'ladrao de raios',
+  'a familia addams',
+  'era do gelo',
+  'ice age',
+  'rex',
+  'up altas aventuras',
+  'wall e',
+  'valente',
+  'brave',
+  'os incriveis',
+  'incredibles',
+  'monstros sa',
+  'monstros university',
+  'monsters inc',
+  'procurando nemo',
+  'finding nemo',
+  'procurando dory',
+  'finding dory',
+  'ratatouille',
+  'meninas superpoderosas',
+  'powerpuff girls',
+  'hora de aventura',
+  'adventure time',
+  'gravity falls',
+  'steven universe',
+  'unikitty',
+  'os padrinhos magicos',
+  'fairly oddparents',
+  'as terriveis aventuras de billy e mandy',
+  'chaves',
+  'chapolin',
+  'sitio do pica pau amarelo',
+  'sid o cientista',
+  'castelo ra tim bum',
+  'cocoricó',
+  'mundo bita',
+];
+
+export function isKidsTitle(name?: string | null): boolean {
+  if (!name) return false;
+  const n = normalize(name);
+  return KIDS_TITLE_KEYWORDS.some((kw) => n.includes(normalize(kw)));
+}
+
 // Usados pelas telas de conteúdo (Canais, Filmes, Séries) quando o perfil
 // ativo é infantil — nesse caso o conteúdo adulto não é só bloqueado por
 // PIN, ele simplesmente não existe: nem a categoria aparece na lista, nem
@@ -99,7 +210,7 @@ export function filterToKidsCategories<T extends { category_name: string }>(
   );
 }
 
-export function filterToKidsItems<T extends { category_id?: string | number }>(
+export function filterToKidsItems<T extends { category_id?: string | number; name?: string }>(
   items: T[],
   categories: { category_id: string | number; category_name: string }[]
 ): T[] {
@@ -108,6 +219,15 @@ export function filterToKidsItems<T extends { category_id?: string | number }>(
       .filter((c) => isKidsCategoryName(c.category_name) && !isAdultCategoryName(c.category_name))
       .map((c) => String(c.category_id))
   );
-  if (kidsIds.size === 0) return [];
-  return items.filter((i) => kidsIds.has(String(i.category_id)));
+  const adultIds = new Set(
+    categories.filter((c) => isAdultCategoryName(c.category_name)).map((c) => String(c.category_id))
+  );
+  return items.filter((i) => {
+    // Categoria explicitamente adulta nunca passa, nem se o nome bater
+    // com algum título infantil conhecido (evita confusão tipo um remake
+    // adulto com nome parecido).
+    if (adultIds.has(String(i.category_id))) return false;
+    if (kidsIds.has(String(i.category_id))) return true;
+    return isKidsTitle(i.name);
+  });
 }
