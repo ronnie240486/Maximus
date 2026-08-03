@@ -28,7 +28,9 @@ import {
   loadProgramReminders,
   toggleProgramReminder,
   popDueProgramReminders,
+  ProgramReminder,
 } from '@/src/state/program-reminders';
+import ProgramReminderPopup from '@/src/components/ProgramReminderPopup';
 import {
   xtream,
   liveStreamUrl,
@@ -109,6 +111,7 @@ export default function ChannelDetailsScreen() {
   const [related, setRelated] = useState<XtreamLive[]>([]);
   const [resolvedCategoryName, setResolvedCategoryName] = useState<string>(params.categoryName || '');
   const [scheduledIds, setScheduledIds] = useState<Set<string>>(new Set());
+  const [dueProgramReminder, setDueProgramReminder] = useState<ProgramReminder | null>(null);
 
   const [showChannelGrid, setShowChannelGrid] = useState(false);
   const [channelList, setChannelList] = useState<XtreamLive[]>([]);
@@ -217,9 +220,7 @@ export default function ChannelDetailsScreen() {
       loadFavorites().then((list) => setFavorited(list.some((f) => f.id === favoriteId)));
       loadProgramReminders().then((list) => setScheduledIds(new Set(list.map((r) => r.id))));
       popDueProgramReminders().then((due) => {
-        due.forEach((r) => {
-          Alert.alert('Está passando agora!', r.title, [{ text: 'OK' }]);
-        });
+        if (due.length) setDueProgramReminder(due[0]);
       });
     }, [favoriteId])
   );
@@ -282,6 +283,17 @@ export default function ChannelDetailsScreen() {
     setShowChannelGrid(false);
     setCurrent({ streamId: c.stream_id, name: c.name, cover: c.stream_icon || '' });
   }, []);
+
+  const onWatchProgramReminder = useCallback(
+    (r: ProgramReminder) => {
+      setDueProgramReminder(null);
+      // Já é esse canal que está aberto — não precisa trocar nada, só
+      // fecha o aviso.
+      if (r.channelId === current.streamId) return;
+      switchToChannel({ stream_id: r.channelId, name: r.channelName, stream_icon: r.channelCover } as XtreamLive);
+    },
+    [current.streamId, switchToChannel]
+  );
 
   const onToggleFavorite = async () => {
     const next = await toggleFavorite({
@@ -573,6 +585,11 @@ export default function ChannelDetailsScreen() {
           </View>
         </View>
       </Modal>
+      <ProgramReminderPopup
+        reminder={dueProgramReminder}
+        onWatchNow={onWatchProgramReminder}
+        onDismiss={() => setDueProgramReminder(null)}
+      />
     </View>
   );
 }

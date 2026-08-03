@@ -28,6 +28,8 @@ import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, cle
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
+import { popDueProgramReminders, ProgramReminder } from '@/src/state/program-reminders';
+import ProgramReminderPopup from '@/src/components/ProgramReminderPopup';
 import { isAdultCategoryName, filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { logSessionEvent } from '@/src/state/debug-log';
@@ -93,6 +95,17 @@ export default function HomeScreen() {
   }
 
   const [mac, setMac] = useState('');
+  const [dueProgramReminder, setDueProgramReminder] = useState<ProgramReminder | null>(null);
+  const onWatchProgramReminder = useCallback(
+    (r: ProgramReminder) => {
+      setDueProgramReminder(null);
+      router.push({
+        pathname: '/channel-details',
+        params: { id: String(r.channelId), name: r.channelName, cover: r.channelCover || '' },
+      });
+    },
+    [router]
+  );
   // Evita chamar checkMac() de novo se a última checagem foi há pouco
   // tempo — sem isso, TODA vez que a Home ganha foco (inclusive voltando
   // de Filmes/Séries/Canais) disparava uma chamada de rede nova, o que
@@ -258,6 +271,13 @@ export default function HomeScreen() {
               ]
             );
           });
+        });
+        // Lembretes de programação de TV (canal já conhecido, diferente dos
+        // jogos acima) — mostra o popup com contagem regressiva de 10s em
+        // vez de um Alert simples, e muda de canal sozinho se a pessoa não
+        // fizer nada.
+        popDueProgramReminders().then((due) => {
+          if (due.length) setDueProgramReminder(due[0]);
         });
         loadFavorites().then((list) => {
           setFeaturedFavIds(new Set(list.filter((f) => f.kind === 'movie' || f.kind === 'series').map((f) => f.id)));
@@ -797,6 +817,11 @@ export default function HomeScreen() {
         </View>
       </SafeAreaView>
       {parentalModal}
+      <ProgramReminderPopup
+        reminder={dueProgramReminder}
+        onWatchNow={onWatchProgramReminder}
+        onDismiss={() => setDueProgramReminder(null)}
+      />
     </ImageBackground>
   );
 }
