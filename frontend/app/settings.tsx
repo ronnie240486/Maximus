@@ -43,7 +43,7 @@ const AUTOPLAY_KEY = 'settings_player_autoplay_next_v1';
 // Só pra conferir se um APK é realmente o mais recente — muda esse texto
 // toda vez que uma correção nova é enviada, e compara com o que aparece
 // aqui dentro do app depois de instalar.
-const BUILD_STAMP = 'build 2026-08-02 — navegacao por controle remoto (TV box) + relogio/clima na tela principal';
+import { BUILD_STAMP } from '@/src/build-info';
 
 type PinFlow =
   | { step: 'create-1' }

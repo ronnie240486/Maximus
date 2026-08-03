@@ -25,6 +25,7 @@ import { clearHomeCache } from '@/src/state/home-cache';
 import { clearListCache } from '@/src/state/list-cache';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import { logSessionEvent } from '@/src/state/debug-log';
+import { BUILD_STAMP, BUILD_SHORT } from '@/src/build-info';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const POLL_MS = 5000;
@@ -490,6 +491,13 @@ export default function MacLoginScreen() {
         </TVFocusable>
 
         <Text style={styles.footer}>{appName || 'Maximus Player'}</Text>
+        <Pressable
+          onPress={() => Alert.alert('O que mudou nesse build', BUILD_STAMP)}
+          hitSlop={10}
+          testID="mac-build-stamp"
+        >
+          <Text style={styles.buildStamp}>{BUILD_SHORT} (toque pra ver o que mudou)</Text>
+        </Pressable>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -679,5 +687,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.md,
     letterSpacing: 1,
+  },
+  buildStamp: {
+    color: colors.textMuted,
+    fontSize: 9,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    opacity: 0.6,
   },
 });

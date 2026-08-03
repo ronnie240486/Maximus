@@ -97,28 +97,12 @@ export default function WelcomeScreen() {
     })();
   }, []);
 
-  // Se a imagem (banner/logo) travar carregando — link vencido, rede lenta,
-  // etc. — não deixa o desenho de "carregando" preso na tela pra sempre.
-  useEffect(() => {
-    if (!banner && !logo) return;
-    const t = setTimeout(() => {
-      if (!imageLoaded) setImageFailed(true);
-    }, 2500);
-    return () => clearTimeout(t);
-  }, [banner, logo, imageLoaded]);
-
-  // Mesma proteção pra imagem de fundo — se travar carregando, simplesmente
-  // não mostra (fica só o preto sólido). Só dispara se ela REALMENTE não
-  // carregou a tempo — antes isso escondia a imagem de qualquer jeito
-  // depois de 2.5s, mesmo já carregada e exibida, cortando o fundo no
-  // meio do efeito sonoro/voz de boas-vindas (que dura mais que isso).
-  useEffect(() => {
-    if (!bg) return;
-    const t = setTimeout(() => {
-      if (!bgLoaded) setBgFailed(true);
-    }, 2500);
-    return () => clearTimeout(t);
-  }, [bg, bgLoaded]);
+  // A imagem só some se der erro de verdade (onError), nunca por timeout —
+  // a tela toda dura só alguns segundos (o tempo do áudio de boas-vindas),
+  // então um timeout "desiste cedo" só corria o risco de esconder a
+  // imagem NO MEIO do áudio mesmo com ela carregando normal, só um pouco
+  // mais devagar. Se a imagem realmente não carregar, a tela já vai sumir
+  // sozinha (goNext) assim que o áudio/fallback terminar de qualquer jeito.
 
   useEffect(() => {
     if (!ready) return;
