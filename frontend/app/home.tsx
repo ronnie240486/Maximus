@@ -92,6 +92,12 @@ export default function HomeScreen() {
   }
 
   const [mac, setMac] = useState('');
+  // Evita chamar checkMac() de novo se a última checagem foi há pouco
+  // tempo — sem isso, TODA vez que a Home ganha foco (inclusive voltando
+  // de Filmes/Séries/Canais) disparava uma chamada de rede nova, o que
+  // pesava na sensação de navegação lenta, principalmente em TV box com
+  // rede mais fraca.
+  const lastFocusCheckRef = React.useRef(0);
   // Keyed slots instead of a flat array so each section can be filled in
   // independently as its own fetch resolves, without waiting on the others.
   const [slots, setSlots] = useState<{
@@ -197,21 +203,29 @@ export default function HomeScreen() {
               return;
             }
           } else {
-            const m = await getDeviceMac();
-            if (cancelled) return;
-            const fresh = await checkMac(m);
-            if (cancelled) return;
-            const isRealResponse = fresh.message !== 'Falha de conexão.';
-            if (isRealResponse) {
-              const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
-                const parsed = parsePlaylistUrl(p.url);
-                return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
-              });
-              if (!fresh.authorized || !stillHasThisPlaylist) {
-                await clearSession();
-                await clearHomeCache();
-                router.replace('/');
-                return;
+            const now = Date.now();
+            if (now - lastFocusCheckRef.current < 45000) {
+              // Checou o painel há menos de 45s — pula essa verificação
+              // dessa vez, evita bater na rede toda hora só por navegar
+              // pra frente e voltar entre as telas.
+            } else {
+              lastFocusCheckRef.current = now;
+              const m = await getDeviceMac();
+              if (cancelled) return;
+              const fresh = await checkMac(m);
+              if (cancelled) return;
+              const isRealResponse = fresh.message !== 'Falha de conexão.';
+              if (isRealResponse) {
+                const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
+                  const parsed = parsePlaylistUrl(p.url);
+                  return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
+                });
+                if (!fresh.authorized || !stillHasThisPlaylist) {
+                  await clearSession();
+                  await clearHomeCache();
+                  router.replace('/');
+                  return;
+                }
               }
             }
           }
@@ -608,18 +622,19 @@ export default function HomeScreen() {
     router.push({ pathname: '/movies', params: match ? { initialCategory: match.category_name } : {} });
   };
 
+  const navIconSize = isTV ? 26 : 18;
   const allNavItems = [
-    { key: 'home', label: 'Início', testID: 'nav-home', icon: (active: boolean) => <Ionicons name="home" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: undefined },
-    { key: 'live', label: 'Canais', testID: 'nav-live', icon: (active: boolean) => <MaterialCommunityIcons name="television-classic" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/channels') },
-    { key: 'movies', label: 'Filmes', testID: 'nav-movies', icon: (active: boolean) => <MaterialCommunityIcons name="movie-open" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/movies') },
-    { key: 'series', label: 'Séries', testID: 'nav-series', icon: (active: boolean) => <Ionicons name="film" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/series') },
-    { key: 'games', label: 'Jogos', testID: 'nav-games', icon: (active: boolean) => <MaterialCommunityIcons name="soccer" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/games') },
-    { key: 'placar', label: 'Placar', testID: 'nav-placar', icon: (active: boolean) => <MaterialCommunityIcons name="scoreboard-outline" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/placar') },
-    { key: 'kids', label: 'Kids', testID: 'nav-kids', icon: (active: boolean) => <MaterialCommunityIcons name="drawing" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: openKids },
-    { key: 'radios', label: 'Rádios', testID: 'nav-radios', icon: (active: boolean) => <MaterialCommunityIcons name="radio" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/radios') },
-    { key: 'search', label: 'Busca', testID: 'nav-search', icon: (active: boolean) => <Ionicons name="search" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/search') },
-    { key: 'diagnostic', label: 'Diagnóstico', testID: 'nav-diagnostic', icon: (active: boolean) => <Ionicons name="pulse" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/diagnostic') },
-    { key: 'settings', label: 'Ajustes', testID: 'nav-settings', icon: (active: boolean) => <Ionicons name="settings" size={18} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/settings') },
+    { key: 'home', label: 'Início', testID: 'nav-home', icon: (active: boolean) => <Ionicons name="home" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: undefined },
+    { key: 'live', label: 'Canais', testID: 'nav-live', icon: (active: boolean) => <MaterialCommunityIcons name="television-classic" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/channels') },
+    { key: 'movies', label: 'Filmes', testID: 'nav-movies', icon: (active: boolean) => <MaterialCommunityIcons name="movie-open" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/movies') },
+    { key: 'series', label: 'Séries', testID: 'nav-series', icon: (active: boolean) => <Ionicons name="film" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/series') },
+    { key: 'games', label: 'Jogos', testID: 'nav-games', icon: (active: boolean) => <MaterialCommunityIcons name="soccer" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/games') },
+    { key: 'placar', label: 'Placar', testID: 'nav-placar', icon: (active: boolean) => <MaterialCommunityIcons name="scoreboard-outline" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/placar') },
+    { key: 'kids', label: 'Kids', testID: 'nav-kids', icon: (active: boolean) => <MaterialCommunityIcons name="drawing" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: openKids },
+    { key: 'radios', label: 'Rádios', testID: 'nav-radios', icon: (active: boolean) => <MaterialCommunityIcons name="radio" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/radios') },
+    { key: 'search', label: 'Busca', testID: 'nav-search', icon: (active: boolean) => <Ionicons name="search" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/search') },
+    { key: 'diagnostic', label: 'Diagnóstico', testID: 'nav-diagnostic', icon: (active: boolean) => <Ionicons name="pulse" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/diagnostic') },
+    { key: 'settings', label: 'Ajustes', testID: 'nav-settings', icon: (active: boolean) => <Ionicons name="settings" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/settings') },
   ];
 
   return (
@@ -638,7 +653,7 @@ export default function HomeScreen() {
           {isLandscape && (
             <ScrollView
               showsVerticalScrollIndicator={false}
-              style={styles.sideNav}
+              style={[styles.sideNav, isTV && styles.sideNavTV]}
               contentContainerStyle={styles.sideNavInner}
               testID="bottom-nav"
             >
@@ -651,11 +666,14 @@ export default function HomeScreen() {
                       setActiveNav(it.key);
                       it.onPress?.();
                     }}
-                    style={styles.sideNavItem}
+                    style={[styles.sideNavItem, isTV && styles.sideNavItemTV]}
                     testID={it.testID}
                   >
                     {it.icon(active)}
-                    <Text style={[styles.sideNavLabel, active && styles.bottomNavLabelActive]} numberOfLines={1}>
+                    <Text
+                      style={[styles.sideNavLabel, isTV && styles.sideNavLabelTV, active && styles.bottomNavLabelActive]}
+                      numberOfLines={1}
+                    >
                       {it.label}
                     </Text>
                   </TVFocusable>
@@ -718,7 +736,7 @@ export default function HomeScreen() {
                     />
                   ) : null
                 }
-                renderItem={({ item }) => <SectionRow section={item} onOpen={openItem} isLandscape={isLandscape} />}
+                renderItem={({ item }) => <SectionRow section={item} onOpen={openItem} isLandscape={isLandscape} isTV={isTV} />}
               />
             )}
           </View>
@@ -891,11 +909,21 @@ function FeaturedHero({
   );
 }
 
-function SectionRow({ section, onOpen, isLandscape }: { section: Section; onOpen: (item: HomeItem) => void; isLandscape: boolean }) {
-  const posterWidth = isLandscape ? 130 : 90;
-  const circularWidth = isLandscape ? 88 : 64;
-  const circularCardSize = isLandscape ? 88 : 64;
-  const circularImgSize = isLandscape ? 60 : 44;
+function SectionRow({
+  section,
+  onOpen,
+  isLandscape,
+  isTV,
+}: {
+  section: Section;
+  onOpen: (item: HomeItem) => void;
+  isLandscape: boolean;
+  isTV?: boolean | null;
+}) {
+  const posterWidth = isTV ? 160 : isLandscape ? 130 : 90;
+  const circularWidth = isTV ? 110 : isLandscape ? 88 : 64;
+  const circularCardSize = isTV ? 110 : isLandscape ? 88 : 64;
+  const circularImgSize = isTV ? 76 : isLandscape ? 60 : 44;
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -916,10 +944,12 @@ function SectionRow({ section, onOpen, isLandscape }: { section: Section; onOpen
                   {item.logo ? (
                     <Image source={{ uri: item.logo }} style={{ width: circularImgSize, height: circularImgSize }} contentFit="contain" />
                   ) : (
-                    <Ionicons name="tv" size={22} color={colors.black} />
+                    <Ionicons name="tv" size={isTV ? 32 : 22} color={colors.black} />
                   )}
                 </View>
-                <Text style={styles.circularName} numberOfLines={1}>{item.name}</Text>
+                <Text style={[styles.circularName, isTV && styles.circularNameTV]} numberOfLines={1}>
+                  {item.name}
+                </Text>
               </View>
             ) : (
               <View style={[styles.posterItem, { width: posterWidth }]}>
@@ -927,10 +957,12 @@ function SectionRow({ section, onOpen, isLandscape }: { section: Section; onOpen
                   {item.logo ? (
                     <Image source={{ uri: item.logo }} style={styles.posterImg} contentFit="cover" />
                   ) : (
-                    <Ionicons name="image" size={26} color={colors.textMuted} />
+                    <Ionicons name="image" size={isTV ? 36 : 26} color={colors.textMuted} />
                   )}
                 </View>
-                <Text style={styles.posterName} numberOfLines={1}>{item.name}</Text>
+                <Text style={[styles.posterName, isTV && styles.posterNameTV]} numberOfLines={1}>
+                  {item.name}
+                </Text>
               </View>
             )}
           </Pressable>
@@ -989,9 +1021,12 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: 'rgba(255,255,255,0.06)',
   },
+  sideNavTV: { width: 112, maxWidth: 112, minWidth: 112 },
   sideNavInner: { paddingVertical: spacing.sm, gap: spacing.sm, alignItems: 'center' },
   sideNavItem: { alignItems: 'center', gap: 2, width: 52 },
+  sideNavItemTV: { width: 92, paddingVertical: 6, gap: 4 },
   sideNavLabel: { color: colors.textSecondary, fontSize: 8, fontWeight: '600', textAlign: 'center' },
+  sideNavLabelTV: { fontSize: 12 },
   profileFallback: {
     width: 34,
     height: 34,
@@ -1109,6 +1144,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
+  circularNameTV: { fontSize: 14, marginTop: 6 },
   posterItem: { width: 90 },
   posterCard: {
     width: 90,
@@ -1121,6 +1157,7 @@ const styles = StyleSheet.create({
   },
   posterImg: { width: '100%', height: '100%' },
   posterName: { color: colors.white, fontSize: 11, marginTop: 6 },
+  posterNameTV: { fontSize: 15, marginTop: 8 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
   emptyTitle: {
     color: colors.white,
