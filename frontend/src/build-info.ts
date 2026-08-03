@@ -2,12 +2,15 @@
 // na tela de MAC/login (visível ANTES de logar, pra confirmar rapidinho
 // que o APK instalado é o mais novo) e em Configurações > Versão.
 export const BUILD_STAMP =
-  'build 2026-08-02 (17h+) — corrige teste ficando sem lista (sessão sendo ' +
-  'sobrescrita), protocolo/formato da lista de teste, fallback .m3u8→.ts, ' +
-  'rádios sem som/vazias, clima sem GPS na TV, banner escuro, categorias ' +
-  'estreitas na TV, canal abrindo sozinho ao navegar, boas-vindas fora de ' +
-  'sincronia, proteção anti-clone do APK, Perfil Infantil';
+  'build 2026-08-03 (madrugada) — corrige 2 áudios tocando junto no preview ' +
+  'de canal da TV, navegação por D-pad até a sidebar (nextFocusLeft), ' +
+  'buffer de vídeo maior nos canais ao vivo, categoria trocando de canal ' +
+  'sozinha, overscan cortando avatar na tela de Perfis, sidebar/textos ' +
+  'maiores na TV, entrada mais rápida nas boas-vindas, lembrete de ' +
+  'programação com contagem regressiva de 10s e troca automática de canal, ' +
+  'campos do painel (Tela de Bloqueio, Frase de Impacto, Website, etc), ' +
+  'URL do teste buscada dinamicamente do painel';
 
 // Versão curta pra mostrar direto na tela, sem precisar tocar em nada —
 // só a data/hora, pra bater o olho e já saber se é o build mais recente.
-export const BUILD_SHORT = 'build 2026-08-02 17h+';
+export const BUILD_SHORT = 'build 2026-08-03 madrugada';
