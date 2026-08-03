@@ -24,6 +24,7 @@ import { saveSession, loadSession, clearSession } from '@/src/state/session';
 import { clearHomeCache } from '@/src/state/home-cache';
 import { clearListCache } from '@/src/state/list-cache';
 import { useIsTV } from '@/src/hooks/useIsTV';
+import { logSessionEvent } from '@/src/state/debug-log';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const POLL_MS = 5000;
@@ -68,15 +69,24 @@ export default function MacLoginScreen() {
       // gerar, mesmo com o teste certinho e funcionando. Foi a causa real
       // por trás de vários "Lista OFF" que pareciam ser problema no teste
       // em si, quando na verdade o teste nunca chegava a "grudar".
-      if (testFlowActiveRef.current) return;
+      if (testFlowActiveRef.current) {
+        logSessionEvent('index.runPoll', 'BLOQUEADO no início (testFlowActiveRef ativo)');
+        return;
+      }
       setChecking(true);
       const s = await checkMac(deviceMac);
-      if (!mountedRef.current || testFlowActiveRef.current) return;
+      if (!mountedRef.current || testFlowActiveRef.current) {
+        if (testFlowActiveRef.current) {
+          logSessionEvent('index.runPoll', 'BLOQUEADO (testFlowActiveRef ativo) — não sobrescreveu');
+        }
+        return;
+      }
       setChecking(false);
       setStatus(s);
       setLastCheck(new Date());
       setPollCount((c) => c + 1);
       if (s.authorized && (s.playlists || []).some((p) => !!parsePlaylistUrl(p.url))) {
+        logSessionEvent('index.runPoll', `SALVANDO sessão normal (playlist: ${s.playlists?.[0]?.name || '?'})`);
         await saveSession(s);
         router.replace('/welcome');
         return;
@@ -107,6 +117,7 @@ export default function MacLoginScreen() {
           const expiresAt = cached.expire_date ? new Date(cached.expire_date) : null;
           const stillValid = expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() > Date.now();
           if (stillValid) {
+            logSessionEvent('index.mountCheck', 'sessão de TESTE local ainda válida, entrando direto');
             router.replace('/welcome');
             return;
           }
@@ -121,6 +132,10 @@ export default function MacLoginScreen() {
           // playlist que dá pra usar antes de liberar a entrada.
           const hasUsablePlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
           if (fresh.authorized && hasUsablePlaylist) {
+            logSessionEvent(
+              'index.mountCheck',
+              `SALVANDO sessão normal no mount (playlist: ${fresh.playlists?.[0]?.name || '?'})`
+            );
             await saveSession(fresh);
             router.replace('/welcome');
             return;
@@ -316,6 +331,7 @@ export default function MacLoginScreen() {
       if (!status?.registered) {
         await markTestUsed(mac);
       }
+      logSessionEvent('index.onTestRegister', `SALVANDO sessão de TESTE (server: ${server})`);
       await saveSession(testStatus);
       router.replace('/welcome');
     } catch {

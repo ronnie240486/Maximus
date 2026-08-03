@@ -29,6 +29,7 @@ import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
 import { isAdultCategoryName, filterOutAdultItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
+import { logSessionEvent } from '@/src/state/debug-log';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
@@ -289,6 +290,7 @@ export default function HomeScreen() {
     // ele sempre voltaria "não autorizado". Só confere localmente se o
     // prazo do teste já venceu.
     if (session?.status === 'Teste') {
+      logSessionEvent('home.load', 'sessão é TESTE — pulando checkMac (correto)');
       const expiresAt = session.expire_date ? new Date(session.expire_date) : null;
       if (expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
         await clearSession();
@@ -299,6 +301,7 @@ export default function HomeScreen() {
     } else {
       // Confirma com o painel que o MAC continua autorizado. Se o revendedor
       // bloqueou o MAC de vez, não tem mais o que fazer aqui — desloga.
+      logSessionEvent('home.load', `sessão NÃO é teste (status=${session?.status ?? 'undefined'}) — vai consultar painel`);
       const fresh = await checkMac(m);
       const isRealResponse = fresh.message !== 'Falha de conexão.';
       if (isRealResponse && !fresh.authorized) {
@@ -308,6 +311,7 @@ export default function HomeScreen() {
         return;
       }
       if (isRealResponse) {
+        logSessionEvent('home.load', `SALVANDO sessão normal (playlist: ${fresh.playlists?.[0]?.name || '?'})`);
         await saveSession(fresh); // mantém sessão local sempre atualizada
         const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
           const parsed = parsePlaylistUrl(p.url);

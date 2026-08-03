@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { getDeviceMac } from '@/src/lib/device';
 import { checkMac } from '@/src/api/client';
 import { parsePlaylistUrl, xtream } from '@/src/lib/xtream';
 import { getSession, loadSession } from '@/src/state/session';
+import { getSessionLog, clearSessionLog } from '@/src/state/debug-log';
 import TVFocusable from '@/src/components/TVFocusable';
 
 type CheckState = 'checking' | 'ok' | 'off';
@@ -25,6 +26,18 @@ export default function BackendDiagScreen() {
   const [internetState, setInternetState] = useState<CheckState>('checking');
   const [listState, setListState] = useState<CheckState>('checking');
   const [checking, setChecking] = useState(true);
+
+  const onViewLogs = useCallback(async () => {
+    const logs = await getSessionLog();
+    Alert.alert(
+      'Logs de depuração',
+      logs.length ? logs.join('\n') : 'Nenhum log ainda — cria um teste ou navega pelo app primeiro.',
+      [
+        { text: 'Limpar', onPress: () => clearSessionLog(), style: 'destructive' },
+        { text: 'Fechar', style: 'cancel' },
+      ]
+    );
+  }, []);
 
   const run = useCallback(async () => {
     setChecking(true);
@@ -137,6 +150,13 @@ export default function BackendDiagScreen() {
             </>
           )}
         </View>
+
+        {/* Botão temporário de depuração — só existe pra rastrear de vez o
+            bug da sessão de teste sendo sobrescrita. Remover depois. */}
+        <TVFocusable onPress={onViewLogs} style={styles.debugBtn} testID="diag-view-logs">
+          <Ionicons name="bug-outline" size={16} color={colors.textMuted} />
+          <Text style={styles.debugBtnText}>Ver logs de depuração</Text>
+        </TVFocusable>
       </View>
     </SafeAreaView>
   );
@@ -198,4 +218,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   summaryText: { color: colors.white, fontSize: 14, flex: 1 },
+  debugBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.lg,
+    paddingVertical: 10,
+  },
+  debugBtnText: { color: colors.textMuted, fontSize: 12 },
 });

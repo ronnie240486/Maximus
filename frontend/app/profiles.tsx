@@ -16,6 +16,7 @@ import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { loadProfiles, Profile } from '@/src/state/profiles';
 import { loadSession, saveSession, clearSession } from '@/src/state/session';
+import { logSessionEvent } from '@/src/state/debug-log';
 import { checkMac } from '@/src/api/client';
 import { setActiveProfileId } from '@/src/state/active-profile';
 import Avatar from '@/src/components/Avatar';
@@ -44,6 +45,7 @@ export default function ProfileSelectionScreen() {
     // cadastrado lá) — mesmo bug que já foi corrigido em home.tsx e
     // index.tsx. Pra conta de teste, usa só o que já está salvo local.
     if (cachedSession?.status === 'Teste') {
+      logSessionEvent('profiles.load', 'sessão é TESTE — pulando checkMac (correto)');
       setBg(cachedSession?.bg_url);
       setLoading(false);
       return;
@@ -52,6 +54,10 @@ export default function ProfileSelectionScreen() {
     // O fundo (bg_url) é uma URL assinada que expira em ~1h — por isso
     // buscamos o status de novo aqui em vez de confiar só no que ficou
     // salvo de uma sessão anterior, que pode estar com o link já vencido.
+    logSessionEvent(
+      'profiles.load',
+      `sessão NÃO é teste (status=${cachedSession?.status ?? 'undefined'}) — vai consultar painel`
+    );
     const fresh = await checkMac(m);
 
     // O painel respondeu de verdade (não foi falha de rede) e disse que
@@ -65,7 +71,10 @@ export default function ProfileSelectionScreen() {
     }
 
     const session = fresh.authorized ? fresh : cachedSession;
-    if (fresh.authorized) await saveSession(fresh);
+    if (fresh.authorized) {
+      logSessionEvent('profiles.load', `SALVANDO sessão normal (playlist: ${fresh.playlists?.[0]?.name || '?'})`);
+      await saveSession(fresh);
+    }
 
     setBg(session?.bg_url);
     setLoading(false);

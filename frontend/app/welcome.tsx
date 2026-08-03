@@ -11,6 +11,7 @@ import { checkMac } from '@/src/api/client';
 import { loadSession } from '@/src/state/session';
 import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
 import { prefetchHomeContent } from '@/src/state/prefetch';
+import { logSessionEvent } from '@/src/state/debug-log';
 
 const welcomeAudioSource = require('@/assets/audio/welcome.wav');
 const swooshSource = require('@/assets/audio/swoosh.mp3');
@@ -58,6 +59,7 @@ export default function WelcomeScreen() {
       // ~1h — busca fresco aqui em vez de confiar só na sessão salva,
       // igual a tela de Perfis já faz, pra sempre bater a mesma imagem.
       const cached = await loadSession();
+      logSessionEvent('welcome.mount', `sessão lida: status=${cached?.status ?? 'undefined'}`);
       setBg(cached?.bg_url);
       setBanner(cached?.banner_url);
       setLogo(cached?.logo_url);
