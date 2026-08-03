@@ -27,7 +27,8 @@ import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, cle
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
-import { isAdultCategoryName } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
@@ -337,20 +338,25 @@ export default function HomeScreen() {
     // spinner only comes down once we have something to show, or once all
     // three have finished trying (so it doesn't flash "empty" between the
     // first section landing and the rest still being in flight).
+    const kidsMode = await isActiveProfileKids();
+
     let settled = 0;
     const maybeStopSpinner = (gotSomething: boolean) => {
       settled += 1;
       if (gotSomething || settled >= 3) setLoading(false);
     };
 
-    const liveP = xtream.liveStreams(creds).then((live) => {
-      const gotSomething = !!(live && live.length);
+    const liveCatsP = kidsMode ? xtream.liveCategories(creds) : Promise.resolve(null);
+    const liveP = Promise.all([xtream.liveStreams(creds), liveCatsP]).then(([live, liveCats]) => {
+      const filteredLive =
+        kidsMode && liveCats ? filterOutAdultItems(live || [], liveCats) : live;
+      const gotSomething = !!(filteredLive && filteredLive.length);
       if (gotSomething) {
         setSlots((prev) => ({
           ...prev,
           live: {
             title: 'CANAIS MAIS ASSISTIDOS',
-            items: dedupeByName(live!).slice(0, 12).map((s: XtreamLive) => ({
+            items: dedupeByName(filteredLive!).slice(0, 12).map((s: XtreamLive) => ({
               id: `live-${s.stream_id}`,
               name: s.name,
               logo: s.stream_icon || undefined,
@@ -363,17 +369,20 @@ export default function HomeScreen() {
         // precisa buscar tudo de novo do zero na primeira visita depois
         // de já ter passado pela Home.
         loadListCache<unknown, XtreamLive>('channels').then((existing) => {
-          saveListCache('channels', existing?.categories || [], live!);
+          saveListCache('channels', existing?.categories || [], filteredLive!);
         });
       }
       maybeStopSpinner(gotSomething);
-      return live;
+      return filteredLive;
     });
 
-    const moviesP = xtream.vodStreams(creds).then((movies) => {
-      const gotSomething = !!(movies && movies.length);
+    const vodCatsP = kidsMode ? xtream.vodCategories(creds) : Promise.resolve(null);
+    const moviesP = Promise.all([xtream.vodStreams(creds), vodCatsP]).then(([movies, vodCats]) => {
+      const filteredMovies =
+        kidsMode && vodCats ? filterOutAdultItems(movies || [], vodCats) : movies;
+      const gotSomething = !!(filteredMovies && filteredMovies.length);
       if (gotSomething) {
-        const deduped = dedupeByName(movies!);
+        const deduped = dedupeByName(filteredMovies!);
         setSlots((prev) => ({
           ...prev,
           movies: {
@@ -387,21 +396,24 @@ export default function HomeScreen() {
           },
         }));
         loadListCache<unknown, XtreamMovie>('movies').then((existing) => {
-          saveListCache('movies', existing?.categories || [], movies!);
+          saveListCache('movies', existing?.categories || [], filteredMovies!);
         });
       }
       maybeStopSpinner(gotSomething);
-      return movies;
+      return filteredMovies;
     });
 
-    const seriesP = xtream.seriesList(creds).then((series) => {
-      const gotSomething = !!(series && series.length);
+    const seriesCatsP = kidsMode ? xtream.seriesCategories(creds) : Promise.resolve(null);
+    const seriesP = Promise.all([xtream.seriesList(creds), seriesCatsP]).then(([series, seriesCats]) => {
+      const filteredSeries =
+        kidsMode && seriesCats ? filterOutAdultItems(series || [], seriesCats) : series;
+      const gotSomething = !!(filteredSeries && filteredSeries.length);
       if (gotSomething) {
         setSlots((prev) => ({
           ...prev,
           series: {
             title: 'SÉRIES POPULARES',
-            items: dedupeByName(series!).slice(0, 20).map((s: XtreamSeries) => ({
+            items: dedupeByName(filteredSeries!).slice(0, 20).map((s: XtreamSeries) => ({
               id: `series-${s.series_id}`,
               name: s.name,
               logo: s.cover || undefined,
@@ -412,11 +424,11 @@ export default function HomeScreen() {
           },
         }));
         loadListCache<unknown, XtreamSeries>('series').then((existing) => {
-          saveListCache('series', existing?.categories || [], series!);
+          saveListCache('series', existing?.categories || [], filteredSeries!);
         });
       }
       maybeStopSpinner(gotSomething);
-      return series;
+      return filteredSeries;
     });
 
     // Destaque combina filme e série, embaralhado — assim não é sempre a

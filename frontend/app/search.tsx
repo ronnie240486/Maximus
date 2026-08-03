@@ -23,6 +23,8 @@ import {
   XtreamMovie,
   XtreamSeries,
 } from '@/src/lib/xtream';
+import { filterOutAdultItems } from '@/src/lib/adult-content';
+import { isActiveProfileKids } from '@/src/state/profiles';
 import TVFocusable from '@/src/components/TVFocusable';
 
 type Row =
@@ -49,14 +51,20 @@ export default function SearchScreen() {
         setLoading(false);
         return;
       }
-      const [l, m, s] = await Promise.all([
+      const kidsMode = await isActiveProfileKids();
+      const [l, m, s, liveCats, vodCats, seriesCats] = await Promise.all([
         xtream.liveStreams(creds),
         xtream.vodStreams(creds),
         xtream.seriesList(creds),
+        kidsMode ? xtream.liveCategories(creds) : Promise.resolve(null),
+        kidsMode ? xtream.vodCategories(creds) : Promise.resolve(null),
+        kidsMode ? xtream.seriesCategories(creds) : Promise.resolve(null),
       ]);
-      setLive(l || []);
-      setMovies(m || []);
-      setSeries(s || []);
+      // Perfil infantil: conteúdo adulto não aparece nem na busca — mesma
+      // proteção já aplicada em Canais/Filmes/Séries/Home.
+      setLive(kidsMode && liveCats ? filterOutAdultItems(l || [], liveCats) : l || []);
+      setMovies(kidsMode && vodCats ? filterOutAdultItems(m || [], vodCats) : m || []);
+      setSeries(kidsMode && seriesCats ? filterOutAdultItems(s || [], seriesCats) : s || []);
       setLoading(false);
       if (!params.voice) {
         setTimeout(() => inputRef.current?.focus(), 100);

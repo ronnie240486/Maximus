@@ -20,7 +20,8 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamSeries } from '@/src/lib/xtream';
-import { isAdultCategoryName } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterOutAdultCategories, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
@@ -105,16 +106,33 @@ export default function SeriesScreen() {
     load();
   }, [load]);
 
-  const catNames = useMemo<string[]>(() => [FAVORITES, ALL, ...categories.map((c) => c.category_name)], [categories]);
+  const [kidsMode, setKidsMode] = useState(false);
+  useEffect(() => {
+    isActiveProfileKids().then(setKidsMode);
+  }, []);
+
+  const visibleCategories = useMemo(
+    () => (kidsMode ? filterOutAdultCategories(categories) : categories),
+    [categories, kidsMode]
+  );
+  const visibleSeries = useMemo(
+    () => (kidsMode ? filterOutAdultItems(series, categories) : series),
+    [series, categories, kidsMode]
+  );
+
+  const catNames = useMemo<string[]>(
+    () => [FAVORITES, ALL, ...visibleCategories.map((c) => c.category_name)],
+    [visibleCategories]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let base: XtreamSeries[];
     if (selectedCat === FAVORITES) {
-      base = dedupeByName(series.filter((s) => favoriteIds.has(`series-${s.series_id}`)));
+      base = dedupeByName(visibleSeries.filter((s) => favoriteIds.has(`series-${s.series_id}`)));
     } else {
-      const catId = selectedCat === ALL ? null : categories.find((c) => c.category_name === selectedCat)?.category_id;
-      const matches = series.filter((s) => {
+      const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+      const matches = visibleSeries.filter((s) => {
         const catOk = !catId || s.category_id === catId;
         const qOk = !q || s.name.toLowerCase().includes(q);
         return catOk && qOk;

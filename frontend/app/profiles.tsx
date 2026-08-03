@@ -129,6 +129,11 @@ export default function ProfileSelectionScreen() {
                   <TVFocusable onPress={() => openHome(p)} style={styles.profileItem} focusStyle={styles.profileFocusTV} testID={`profile-${p.id}`}>
                     <View style={styles.avatarCard}>
                       <Avatar id={p.avatar_id} size={92} radius={14} />
+                      {p.isKids && (
+                        <View style={styles.kidsBadge}>
+                          <Text style={styles.kidsBadgeText}>KIDS</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={styles.profileName} numberOfLines={1}>{p.name}</Text>
                   </TVFocusable>
@@ -179,6 +184,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  kidsBadge: {
+    position: 'absolute',
+    bottom: 6,
+    alignSelf: 'center',
+    backgroundColor: colors.accentCyan,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  kidsBadgeText: { color: colors.black, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   addCard: {
     borderWidth: 1.5,
     borderColor: colors.textMuted,

@@ -20,7 +20,8 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamMovie } from '@/src/lib/xtream';
-import { isAdultCategoryName } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterOutAdultCategories, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
@@ -113,16 +114,35 @@ export default function MoviesScreen() {
     load();
   }, [load]);
 
-  const catNames = useMemo<string[]>(() => [FAVORITES, ALL, ...categories.map((c) => c.category_name)], [categories]);
+  const [kidsMode, setKidsMode] = useState(false);
+  useEffect(() => {
+    isActiveProfileKids().then(setKidsMode);
+  }, []);
+
+  // Perfil infantil: conteúdo adulto não existe pra ele, nem categoria nem
+  // item — ver o mesmo padrão em channels.tsx.
+  const visibleCategories = useMemo(
+    () => (kidsMode ? filterOutAdultCategories(categories) : categories),
+    [categories, kidsMode]
+  );
+  const visibleMovies = useMemo(
+    () => (kidsMode ? filterOutAdultItems(movies, categories) : movies),
+    [movies, categories, kidsMode]
+  );
+
+  const catNames = useMemo<string[]>(
+    () => [FAVORITES, ALL, ...visibleCategories.map((c) => c.category_name)],
+    [visibleCategories]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let base: XtreamMovie[];
     if (selectedCat === FAVORITES) {
-      base = dedupeByName(movies.filter((m) => favoriteIds.has(`movie-${m.stream_id}`)));
+      base = dedupeByName(visibleMovies.filter((m) => favoriteIds.has(`movie-${m.stream_id}`)));
     } else {
-      const catId = selectedCat === ALL ? null : categories.find((c) => c.category_name === selectedCat)?.category_id;
-      const matches = movies.filter((m) => {
+      const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+      const matches = visibleMovies.filter((m) => {
         const catOk = !catId || m.category_id === catId;
         const qOk = !q || m.name.toLowerCase().includes(q);
         return catOk && qOk;

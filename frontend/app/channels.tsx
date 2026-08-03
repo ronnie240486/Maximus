@@ -20,7 +20,8 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamLive, getLastXtreamError } from '@/src/lib/xtream';
-import { isAdultCategoryName } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterOutAdultCategories, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
@@ -118,9 +119,27 @@ export default function ChannelsScreen() {
     load();
   }, [load]);
 
+  const [kidsMode, setKidsMode] = useState(false);
+  useEffect(() => {
+    isActiveProfileKids().then(setKidsMode);
+  }, []);
+
+  // Perfil infantil: conteúdo adulto não é só bloqueado por PIN, ele
+  // simplesmente não existe — nem a categoria aparece na lista, nem os
+  // itens dela aparecem em "Todos". Tudo daqui pra baixo usa essas
+  // versões filtradas, nunca `categories`/`streams` direto.
+  const visibleCategories = useMemo(
+    () => (kidsMode ? filterOutAdultCategories(categories) : categories),
+    [categories, kidsMode]
+  );
+  const visibleStreams = useMemo(
+    () => (kidsMode ? filterOutAdultItems(streams, categories) : streams),
+    [streams, categories, kidsMode]
+  );
+
   const catNames = useMemo<string[]>(() => {
-    return [FAVORITES, ALL, ...categories.map((c) => c.category_name)];
-  }, [categories]);
+    return [FAVORITES, ALL, ...visibleCategories.map((c) => c.category_name)];
+  }, [visibleCategories]);
 
   // Contagem por categoria (mostrada ao lado do nome na coluna da TV).
   // Precisa ser memoizada: sem isso, esse cálculo (um filter() por
@@ -132,32 +151,32 @@ export default function ChannelsScreen() {
     const map: Record<string, number> = {};
     for (const cat of catNames) {
       if (cat === ALL) {
-        map[cat] = streams.length;
+        map[cat] = visibleStreams.length;
       } else if (cat === FAVORITES) {
         map[cat] = favoriteIds.size;
       } else {
-        const catId = categories.find((c) => c.category_name === cat)?.category_id;
-        map[cat] = catId ? streams.filter((s) => s.category_id === catId).length : 0;
+        const catId = visibleCategories.find((c) => c.category_name === cat)?.category_id;
+        map[cat] = catId ? visibleStreams.filter((s) => s.category_id === catId).length : 0;
       }
     }
     return map;
-  }, [catNames, streams, categories, favoriteIds]);
+  }, [catNames, visibleStreams, visibleCategories, favoriteIds]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (selectedCat === FAVORITES) {
-      const matches = streams.filter((s) => favoriteIds.has(`channel-${s.stream_id}`));
+      const matches = visibleStreams.filter((s) => favoriteIds.has(`channel-${s.stream_id}`));
       return dedupeByName(matches);
     }
     const selectedCatId =
-      selectedCat === ALL ? null : categories.find((c) => c.category_name === selectedCat)?.category_id;
-    const matches = streams.filter((s) => {
+      selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+    const matches = visibleStreams.filter((s) => {
       const catOk = !selectedCatId || s.category_id === selectedCatId;
       const qOk = !q || s.name.toLowerCase().includes(q);
       return catOk && qOk;
     });
     return dedupeByName(matches);
-  }, [streams, categories, selectedCat, query, favoriteIds]);
+  }, [visibleStreams, visibleCategories, selectedCat, query, favoriteIds]);
 
   // Mantém sempre algum canal em preview na TV: escolhe o primeiro da lista
   // filtrada se ainda não tem nenhum, ou se o que estava em foco sumiu do

@@ -13,7 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
-import { AVATARS } from '@/src/lib/avatars';
+import { AVATARS, KIDS_AVATARS, isKidAvatarId } from '@/src/lib/avatars';
 import Avatar from '@/src/components/Avatar';
 import { deleteProfile, loadProfiles, Profile, upsertProfile } from '@/src/state/profiles';
 import TVFocusable from '@/src/components/TVFocusable';
@@ -30,6 +30,7 @@ export default function EditProfileScreen() {
   const [selectedId, setSelectedId] = useState<string | undefined>(params.profileId);
   const [name, setName] = useState('');
   const [avatarId, setAvatarId] = useState<string>('avatar_1');
+  const [isKids, setIsKids] = useState(false);
 
   const load = useCallback(async () => {
     const list = await loadProfiles();
@@ -39,6 +40,7 @@ export default function EditProfileScreen() {
       if (p) {
         setName(p.name);
         setAvatarId(p.avatar_id);
+        setIsKids(!!p.isKids);
       }
     }
     setLoading(false);
@@ -52,18 +54,30 @@ export default function EditProfileScreen() {
     setSelectedId(p.id);
     setName(p.name);
     setAvatarId(p.avatar_id);
+    setIsKids(!!p.isKids);
   };
 
   const startNew = () => {
     setSelectedId(undefined);
     setName('');
     setAvatarId('avatar_1');
+    setIsKids(false);
+  };
+
+  // Ao ligar/desligar "Perfil infantil", troca também o avatar pra um do
+  // conjunto certo — sem isso, dava pra salvar um perfil marcado como
+  // infantil mas com uma foto de avatar normal (ou vice-versa).
+  const onToggleKids = (next: boolean) => {
+    setIsKids(next);
+    const currentIsKidAvatar = isKidAvatarId(avatarId);
+    if (next && !currentIsKidAvatar) setAvatarId(KIDS_AVATARS[0].id);
+    if (!next && currentIsKidAvatar) setAvatarId(AVATARS[0].id);
   };
 
   const onSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId });
+    await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId, isKids });
     setSaving(false);
     router.back();
   };
@@ -136,8 +150,20 @@ export default function EditProfileScreen() {
           <Text style={styles.smallLabel}>AVATAR</Text>
         </View>
 
+        <TVFocusable onPress={() => onToggleKids(!isKids)} style={styles.kidsToggleRow} testID="edit-kids-toggle">
+          <View style={{ flex: 1 }}>
+            <Text style={styles.kidsToggleTitle}>Perfil infantil</Text>
+            <Text style={styles.kidsToggleSubtitle}>
+              Sem canais e filmes adultos — nem com PIN, o conteúdo simplesmente não aparece
+            </Text>
+          </View>
+          <View style={[styles.switchTrack, isKids && styles.switchTrackOn]}>
+            <View style={[styles.switchThumb, isKids && styles.switchThumbOn]} />
+          </View>
+        </TVFocusable>
+
         <View style={styles.avatarGrid}>
-          {AVATARS.map((a) => (
+          {(isKids ? KIDS_AVATARS : AVATARS).map((a) => (
             <TVFocusable
               key={a.id}
               onPress={() => setAvatarId(a.id)}
@@ -254,6 +280,33 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   avatarChoiceActive: { borderColor: colors.accentCyan },
+  kidsToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.darkSurfaceAlt,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  kidsToggleTitle: { color: colors.white, fontSize: 14, fontWeight: '700' },
+  kidsToggleSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 3, lineHeight: 16 },
+  switchTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.darkSurface,
+    padding: 3,
+    justifyContent: 'center',
+  },
+  switchTrackOn: { backgroundColor: colors.accentCyan },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.textMuted,
+  },
+  switchThumbOn: { backgroundColor: colors.black, alignSelf: 'flex-end' },
   input: {
     backgroundColor: colors.darkSurfaceAlt,
     color: colors.white,

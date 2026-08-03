@@ -58,3 +58,32 @@ export function getAvatar(id?: string | null): AvatarStyle {
   if (!id) return AVATARS[0];
   return AVATARS.find((a) => a.id === id) || AVATARS[0];
 }
+
+// Avatares do perfil infantil: ícone + cor de fundo, em vez das fotos
+// usadas nos perfis normais — não precisa de nenhuma imagem nova, e fica
+// visualmente bem diferente (mais lúdico, menos "foto de gente").
+export type KidAvatarStyle = { id: string; icon: string; color: string };
+
+export const KIDS_AVATARS: KidAvatarStyle[] = [
+  { id: 'kid_1', icon: 'rocket', color: '#FF6B6B' },
+  { id: 'kid_2', icon: 'paw', color: '#4ECDC4' },
+  { id: 'kid_3', icon: 'balloon', color: '#FFD93D' },
+  { id: 'kid_4', icon: 'ice-cream', color: '#FF8FB1' },
+  { id: 'kid_5', icon: 'football', color: '#6BCB77' },
+  { id: 'kid_6', icon: 'star', color: '#845EC2' },
+  { id: 'kid_7', icon: 'happy', color: '#FFA45B' },
+  { id: 'kid_8', icon: 'fish', color: '#4D96FF' },
+  { id: 'kid_9', icon: 'flower', color: '#FF66C4' },
+  { id: 'kid_10', icon: 'game-controller', color: '#00C2A8' },
+  { id: 'kid_11', icon: 'sunny', color: '#FFC93C' },
+  { id: 'kid_12', icon: 'planet', color: '#7A5CFA' },
+];
+
+export function isKidAvatarId(id?: string | null): boolean {
+  return !!id && id.startsWith('kid_');
+}
+
+export function getKidAvatar(id?: string | null): KidAvatarStyle {
+  if (!id) return KIDS_AVATARS[0];
+  return KIDS_AVATARS.find((a) => a.id === id) || KIDS_AVATARS[0];
+}
