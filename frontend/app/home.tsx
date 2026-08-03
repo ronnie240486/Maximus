@@ -1003,6 +1003,10 @@ function SectionRow({
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
         showsHorizontalScrollIndicator={false}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews
         renderItem={({ item, index }) => (
           <TVFocusable
             onPress={() => onOpen(item)}
