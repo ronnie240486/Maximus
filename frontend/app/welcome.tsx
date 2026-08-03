@@ -196,7 +196,7 @@ export default function WelcomeScreen() {
             )}
             {showFallbackLogo && (
               <Image
-                source={require('@/assets/images/app-image.png')}
+                source={require('@/assets/images/icon.png')}
                 style={styles.logoImg}
                 contentFit="contain"
                 testID="welcome-fallback-logo"

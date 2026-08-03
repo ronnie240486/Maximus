@@ -684,13 +684,11 @@ export default function HomeScreen() {
                   <Ionicons name={listening ? 'mic' : 'mic-outline'} size={18} color={listening ? colors.black : colors.accentCyan} />
                 </TVFocusable>
                 <TVFocusable onPress={() => router.replace('/profiles')} testID="nav-profile">
-                  {logo ? (
-                    <Image source={{ uri: logo }} style={{ width: isLandscape ? 28 : 34, height: isLandscape ? 28 : 34, borderRadius: 17 }} contentFit="cover" />
-                  ) : (
-                    <View style={styles.profileFallback}>
-                      <Ionicons name="person" size={16} color={colors.black} />
-                    </View>
-                  )}
+                  <Image
+                    source={logo ? { uri: logo } : require('@/assets/images/icon.png')}
+                    style={{ width: isLandscape ? 28 : 34, height: isLandscape ? 28 : 34, borderRadius: 17 }}
+                    contentFit="cover"
+                  />
                 </TVFocusable>
               </View>
             </View>

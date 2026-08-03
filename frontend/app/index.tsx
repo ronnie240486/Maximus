@@ -453,9 +453,12 @@ export default function MacLoginScreen() {
           ) : logo ? (
             <Image source={{ uri: logo }} style={styles.logoImg} contentFit="contain" />
           ) : (
-            <View style={styles.logoCircle} testID="app-logo">
-              <Ionicons name="play" size={30} color={colors.black} />
-            </View>
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.logoImg}
+              contentFit="contain"
+              testID="app-logo"
+            />
           )}
         </View>
 
