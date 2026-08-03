@@ -22,7 +22,7 @@ import { storage } from '@/src/utils/storage';
 import { clearHomeCache } from '@/src/state/home-cache';
 import { clearListCache } from '@/src/state/list-cache';
 import { isWelcomeAudioEnabled, setWelcomeAudioEnabled } from '@/src/state/welcome-audio';
-import { MacStatus } from '@/src/api/client';
+import { MacStatus, fetchAppExtras, AppExtras } from '@/src/api/client';
 import PinModal from '@/src/components/PinModal';
 import TVFocusable from '@/src/components/TVFocusable';
 import {
@@ -67,6 +67,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [mac, setMac] = useState('');
   const [session, setSession] = useState<MacStatus | null>(null);
+  const [extras, setExtras] = useState<AppExtras>({});
   const [parentalLock, setParentalLock] = useState(false);
   const [pinExists, setPinExists] = useState(false);
   const [autoplayNext, setAutoplayNext] = useState(true);
@@ -90,6 +91,10 @@ export default function SettingsScreen() {
       setParentalLock(parental);
       setPinExists(hasPin);
       setAutoplayNext(autoplay !== false);
+
+      // Best-effort: Website / e-mail do revendedor / aviso legal, se o
+      // revendedor tiver preenchido no painel. Não trava a tela se falhar.
+      fetchAppExtras(m).then(setExtras).catch(() => {});
 
       // Mensagem do provedor de IPTV (ex: aviso de pagamento) — vem do
       // próprio servidor Xtream, separado do painel Maximus.
@@ -302,6 +307,38 @@ export default function SettingsScreen() {
             subtitle: session?.reseller_contact || session?.reseller_whatsapp,
             icon: <Ionicons name="logo-whatsapp" size={20} color={colors.accentCyan} />,
             onPress: openWhatsapp,
+          } as Row,
+        ]
+      : []),
+    ...(extras.websiteUrl
+      ? [
+          {
+            id: 'website',
+            title: 'Website',
+            subtitle: extras.websiteUrl,
+            icon: <Ionicons name="globe-outline" size={20} color={colors.accentCyan} />,
+            onPress: () => Linking.openURL(extras.websiteUrl!).catch(() => {}),
+          } as Row,
+        ]
+      : []),
+    ...(extras.resellerEmail
+      ? [
+          {
+            id: 'reseller-email',
+            title: 'E-mail do revendedor',
+            subtitle: extras.resellerEmail,
+            icon: <Ionicons name="mail-outline" size={20} color={colors.accentCyan} />,
+            onPress: () => Linking.openURL(`mailto:${extras.resellerEmail}`).catch(() => {}),
+          } as Row,
+        ]
+      : []),
+    ...(extras.legalNotice
+      ? [
+          {
+            id: 'legal-notice',
+            title: 'Aviso legal',
+            icon: <Ionicons name="document-text-outline" size={20} color={colors.accentCyan} />,
+            onPress: () => Alert.alert('Aviso legal', extras.legalNotice!),
           } as Row,
         ]
       : []),

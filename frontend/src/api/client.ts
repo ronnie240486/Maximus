@@ -203,12 +203,14 @@ const TEST_REGISTER_URL_FALLBACK = decodeB64(
   'aHR0cHM6Ly9udXZpeHR2LnNpZ21hYi5wcm8vYXBpL2NoYXRib3QvWWVuMTI5V1BFYS9YWWdEOUpXcjZW'
 );
 
-// Cache em memória — só busca uma vez por sessão do app, não a cada
-// clique em TESTE.
-let cachedTestRegisterUrl: string | null = null;
+// Cache em memória do /api/guim.php inteiro — busca uma vez por sessão do
+// app só, tanto a URL do gerador de teste quanto os campos extras abaixo
+// (frase de impacto, website, e-mail do revendedor, aviso legal) usam essa
+// mesma resposta em vez de disparar uma chamada de rede cada um.
+let cachedGuim: Record<string, unknown> | null = null;
 
-async function getTestRegisterUrl(mac: string): Promise<string> {
-  if (cachedTestRegisterUrl) return cachedTestRegisterUrl;
+async function fetchGuim(mac: string): Promise<Record<string, unknown> | null> {
+  if (cachedGuim) return cachedGuim;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -219,17 +221,22 @@ async function getTestRegisterUrl(mac: string): Promise<string> {
     clearTimeout(timeout);
     if (res.ok) {
       const json = await res.json();
-      const url = json?.gpcpro_server_url;
-      if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
-        cachedTestRegisterUrl = url;
-        return url;
+      if (json && typeof json === 'object') {
+        cachedGuim = json;
+        return json;
       }
     }
   } catch {
     // Sem internet nesse instante, endpoint fora do ar, resposta em
-    // formato inesperado — qualquer que seja o motivo, cai no fallback
-    // fixo abaixo em vez de travar o botão TESTE.
+    // formato inesperado — quem chamou trata o retorno null.
   }
+  return null;
+}
+
+async function getTestRegisterUrl(mac: string): Promise<string> {
+  const guim = await fetchGuim(mac);
+  const url = guim?.gpcpro_server_url;
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) return url;
   return TEST_REGISTER_URL_FALLBACK;
 }
 
@@ -247,4 +254,29 @@ export async function registerTestDevice(mac: string): Promise<TestRegisterResul
   } catch (e: any) {
     return { ok: false, url: upstream, raw: e?.message || String(e) };
   }
+}
+
+// Campos do painel que ainda não tinham lugar nenhum no app — buscados do
+// mesmo /api/guim.php acima. Cada um só aparece se o revendedor de fato
+// preencheu ele no painel (senão fica undefined, e a tela que usa isso
+// simplesmente não mostra a linha/texto correspondente).
+export type AppExtras = {
+  websiteUrl?: string;
+  impactPhrase?: string;
+  contactInfo?: string;
+  resellerEmail?: string;
+  legalNotice?: string;
+};
+
+export async function fetchAppExtras(mac: string): Promise<AppExtras> {
+  const guim = await fetchGuim(mac);
+  if (!guim) return {};
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  return {
+    websiteUrl: str(guim.gpcpro_contact_website),
+    impactPhrase: str(guim.gpcpro_impact_phrase),
+    contactInfo: str(guim.gpcpro_contact_info),
+    resellerEmail: str(guim.gpcpro_reseller_email),
+    legalNotice: str(guim.gpcpro_legal_notice),
+  };
 }

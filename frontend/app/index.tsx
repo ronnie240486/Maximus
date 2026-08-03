@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { checkMac, MacStatus, registerTestDevice } from '@/src/api/client';
+import { checkMac, MacStatus, registerTestDevice, fetchAppExtras } from '@/src/api/client';
 import { hasUsedTest, markTestUsed } from '@/src/state/test-usage';
 import { parsePlaylistUrl, xtream, XtreamCreds } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
@@ -34,6 +34,7 @@ export default function MacLoginScreen() {
   const router = useRouter();
   const isTV = useIsTV();
   const [mac, setMac] = useState<string>('');
+  const [impactPhrase, setImpactPhrase] = useState<string | undefined>();
   const [status, setStatus] = useState<MacStatus | null>(null);
   const [copied, setCopied] = useState(false);
   const [pollCount, setPollCount] = useState(0);
@@ -105,6 +106,14 @@ export default function MacLoginScreen() {
       const m = await getDeviceMac();
       if (!mountedRef.current) return;
       setMac(m);
+
+      // Best-effort: se falhar ou demorar, a tela funciona normal do
+      // mesmo jeito, só sem essa frase.
+      fetchAppExtras(m)
+        .then((extras) => {
+          if (mountedRef.current) setImpactPhrase(extras.impactPhrase);
+        })
+        .catch(() => {});
 
       // Mesmo com sessão salva, sempre confirma de novo com o painel antes
       // de liberar — se o revendedor bloqueou a lista nesse meio tempo, o
@@ -402,6 +411,11 @@ export default function MacLoginScreen() {
         </View>
 
         <Text style={styles.title} testID="mac-login-title">Como entrar</Text>
+        {!!impactPhrase && (
+          <Text style={styles.impactPhrase} testID="mac-impact-phrase">
+            {impactPhrase}
+          </Text>
+        )}
 
         <View style={styles.centerBlock}>
           <Text style={styles.label}>ID DO DISPOSITIVO (MAC)</Text>
@@ -530,6 +544,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     marginTop: spacing.xl,
+  },
+  impactPhrase: {
+    color: colors.accentCyan,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xl,
   },
   centerBlock: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   label: {
