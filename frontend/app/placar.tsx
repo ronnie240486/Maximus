@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,13 @@ const SPORTS: SportDef[] = [
   { key: 'nfl', label: 'Futebol Americano', source: 'espn', espnPath: 'football/nfl' },
   { key: 'volleyball', label: 'Vôlei', source: 'sportsdb', sportsdbSport: 'Volleyball' },
   { key: 'mma', label: 'MMA', source: 'espn', espnPath: 'mma/ufc' },
+  { key: 'basketball', label: 'Basquete (NBA)', source: 'espn', espnPath: 'basketball/nba' },
+  { key: 'wnba', label: 'Basquete (WNBA)', source: 'espn', espnPath: 'basketball/wnba' },
+  { key: 'hockey', label: 'Hóquei no Gelo', source: 'espn', espnPath: 'hockey/nhl' },
+  { key: 'golf', label: 'Golfe', source: 'espn', espnPath: 'golf/pga' },
+  { key: 'f1', label: 'Fórmula 1', source: 'espn', espnPath: 'racing/f1' },
+  { key: 'nascar', label: 'Nascar', source: 'espn', espnPath: 'racing/nascar-premier' },
+  { key: 'indycar', label: 'IndyCar', source: 'espn', espnPath: 'racing/irl' },
 ];
 const DAYS_AHEAD = 4;
 
@@ -38,6 +46,8 @@ type ScoreEvent = {
   away: string;
   homeScore: string | null;
   awayScore: string | null;
+  homeLogo?: string | null;
+  awayLogo?: string | null;
   time: string | null; // "HH:mm"
   date: string; // "YYYY-MM-DD"
   status: string | null;
@@ -75,6 +85,12 @@ function normalizeEspnEvent(raw: any): ScoreEvent | null {
     away: away?.team?.displayName || away?.athlete?.displayName || '—',
     homeScore: started ? home?.score ?? null : null,
     awayScore: started ? away?.score ?? null : null,
+    // Times (esportes coletivos) já vêm com o escudo pronto — esportes
+    // individuais (tênis, golfe, MMA, corrida) não têm "team", só
+    // "athlete", que não tem escudo, então fica null e a tela usa um
+    // ícone genérico no lugar.
+    homeLogo: home?.team?.logo || null,
+    awayLogo: away?.team?.logo || null,
     time: d ? `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}` : null,
     date: d ? isoDate(d) : isoDate(new Date()),
     status: comp.status?.type?.description ?? null,
@@ -226,8 +242,26 @@ export default function PlacarScreen() {
                 return (
                   <View key={e.id} style={styles.card}>
                     <View style={styles.teamsCol}>
-                      <Text style={styles.teamName} numberOfLines={1}>{e.home}</Text>
-                      <Text style={styles.teamName} numberOfLines={1}>{e.away}</Text>
+                      <View style={styles.teamRow}>
+                        {e.homeLogo ? (
+                          <Image source={{ uri: e.homeLogo }} style={styles.teamLogo} contentFit="contain" />
+                        ) : (
+                          <View style={styles.teamLogoFallback}>
+                            <Ionicons name="person" size={12} color={colors.textMuted} />
+                          </View>
+                        )}
+                        <Text style={styles.teamName} numberOfLines={1}>{e.home}</Text>
+                      </View>
+                      <View style={styles.teamRow}>
+                        {e.awayLogo ? (
+                          <Image source={{ uri: e.awayLogo }} style={styles.teamLogo} contentFit="contain" />
+                        ) : (
+                          <View style={styles.teamLogoFallback}>
+                            <Ionicons name="person" size={12} color={colors.textMuted} />
+                          </View>
+                        )}
+                        <Text style={styles.teamName} numberOfLines={1}>{e.away}</Text>
+                      </View>
                     </View>
                     <View style={styles.scoreCol}>
                       {started ? (
@@ -285,8 +319,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginBottom: spacing.xs,
   },
-  teamsCol: { flex: 1, gap: 4 },
-  teamName: { color: colors.white, fontSize: 14, fontWeight: '600' },
+  teamsCol: { flex: 1, gap: 6 },
+  teamRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  teamLogo: { width: 22, height: 22 },
+  teamLogoFallback: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.darkSurfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamName: { color: colors.white, fontSize: 14, fontWeight: '600', flexShrink: 1 },
   scoreCol: { alignItems: 'flex-end', gap: 4 },
   scoreText: { color: colors.accentCyan, fontSize: 16, fontWeight: '800' },
   timeText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
