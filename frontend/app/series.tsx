@@ -227,7 +227,7 @@ export default function SeriesScreen() {
           >
             <View style={styles.posterCard}>
               {item.cover ? (
-                <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit="cover" />
+                <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
                 <Ionicons name="film" size={30} color={colors.textMuted} />
               )}

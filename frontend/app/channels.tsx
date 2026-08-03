@@ -372,7 +372,7 @@ export default function ChannelsScreen() {
                     >
                       <Text style={styles.tvRowNum}>{item.num ?? index + 1}</Text>
                       {item.stream_icon ? (
-                        <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" />
+                        <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" cachePolicy="memory-disk" />
                       ) : (
                         <MaterialCommunityIcons name="television-classic" size={22} color={colors.textMuted} />
                       )}
@@ -452,7 +452,7 @@ export default function ChannelsScreen() {
             >
               <View style={styles.logoBox}>
                 {item.stream_icon ? (
-                  <Image source={{ uri: item.stream_icon }} style={styles.logoImg} contentFit="contain" />
+                  <Image source={{ uri: item.stream_icon }} style={styles.logoImg} contentFit="contain" cachePolicy="memory-disk" />
                 ) : (
                   <MaterialCommunityIcons name="television-classic" size={28} color={colors.textMuted} />
                 )}

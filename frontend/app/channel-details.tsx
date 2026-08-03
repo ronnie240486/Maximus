@@ -568,7 +568,7 @@ export default function ChannelDetailsScreen() {
                   <TVFocusable onPress={() => switchToChannel(item)} style={styles.gridRow} testID={`cd-grid-channel-${item.stream_id}`}>
                     <View style={styles.gridLogoBox}>
                       {item.stream_icon ? (
-                        <Image source={{ uri: item.stream_icon }} style={styles.gridLogoImg} contentFit="contain" />
+                        <Image source={{ uri: item.stream_icon }} style={styles.gridLogoImg} contentFit="contain" cachePolicy="memory-disk" />
                       ) : (
                         <MaterialCommunityIcons name="television-classic" size={18} color={colors.textMuted} />
                       )}

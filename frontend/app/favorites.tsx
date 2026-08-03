@@ -160,7 +160,7 @@ export default function FavoritesScreen() {
               <TVFocusable onPress={() => openItem(item)} style={styles.poster} focusStyle={styles.posterFocusTV} testID={`favorite-${item.id}`}>
                 <View style={[styles.posterCard, item.kind === 'radio' && styles.posterCardRadio]}>
                   {item.cover ? (
-                    <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit={item.kind === 'radio' ? 'contain' : 'cover'} />
+                    <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit={item.kind === 'radio' ? 'contain' : 'cover'} cachePolicy="memory-disk" />
                   ) : (
                     <MaterialCommunityIcons
                       name={item.kind === 'channel' ? 'television-classic' : item.kind === 'radio' ? 'radio' : 'movie-open'}

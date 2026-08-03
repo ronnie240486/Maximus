@@ -1013,7 +1013,7 @@ function SectionRow({
               <View style={[styles.circularItem, { width: circularWidth }]}>
                 <View style={[styles.circularCard, { width: circularCardSize, height: circularCardSize, borderRadius: circularCardSize / 2 }]}>
                   {item.logo ? (
-                    <Image source={{ uri: item.logo }} style={{ width: circularImgSize, height: circularImgSize }} contentFit="contain" />
+                    <Image source={{ uri: item.logo }} style={{ width: circularImgSize, height: circularImgSize }} contentFit="contain" cachePolicy="memory-disk" />
                   ) : (
                     <Ionicons name="tv" size={isTV ? 32 : 22} color={colors.black} />
                   )}
@@ -1026,7 +1026,7 @@ function SectionRow({
               <View style={[styles.posterItem, { width: posterWidth }]}>
                 <View style={[styles.posterCard, { width: posterWidth, height: posterWidth * (130 / 90) }]}>
                   {item.logo ? (
-                    <Image source={{ uri: item.logo }} style={styles.posterImg} contentFit="cover" />
+                    <Image source={{ uri: item.logo }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" />
                   ) : (
                     <Ionicons name="image" size={isTV ? 36 : 26} color={colors.textMuted} />
                   )}

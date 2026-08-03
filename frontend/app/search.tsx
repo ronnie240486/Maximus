@@ -209,7 +209,7 @@ export default function SearchScreen() {
             >
               <View style={styles.logoBox}>
                 {item.icon ? (
-                  <Image source={{ uri: item.icon }} style={styles.logoImg} contentFit="contain" />
+                  <Image source={{ uri: item.icon }} style={styles.logoImg} contentFit="contain" cachePolicy="memory-disk" />
                 ) : (
                   <MaterialCommunityIcons
                     name={item.kind === 'live' ? 'television-classic' : item.kind === 'movie' ? 'movie-open' : 'filmstrip'}

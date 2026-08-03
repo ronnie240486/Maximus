@@ -237,7 +237,7 @@ export default function MoviesScreen() {
           >
             <View style={styles.posterCard}>
               {item.stream_icon ? (
-                <Image source={{ uri: item.stream_icon }} style={styles.posterImg} contentFit="cover" />
+                <Image source={{ uri: item.stream_icon }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
                 <MaterialCommunityIcons name="movie-open" size={30} color={colors.textMuted} />
               )}
