@@ -45,6 +45,10 @@ export default function TVChannelPreview({
     // mexer por um instante, então só toca o som de um canal por vez — dá
     // pra deixar audível.
     p.muted = false;
+    p.bufferOptions = {
+      preferredForwardBufferDuration: 30,
+      minBufferForPlayback: 5,
+    };
   });
 
   const tsFallbackTriedRef = React.useRef(false);

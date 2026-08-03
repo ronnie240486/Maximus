@@ -178,9 +178,11 @@ export default function ChannelsScreen() {
     return dedupeByName(matches);
   }, [visibleStreams, visibleCategories, selectedCat, query, favoriteIds]);
 
-  // Mantém sempre algum canal em preview na TV: escolhe o primeiro da lista
-  // filtrada se ainda não tem nenhum, ou se o que estava em foco sumiu do
-  // filtro atual (ex: trocou de categoria).
+  // Ao trocar de categoria (ou filtro), só ATUALIZA O DESTAQUE do primeiro
+  // canal da nova lista — nunca carrega vídeo nenhum sozinho. Antes disso
+  // trocar de categoria já disparava o preview do primeiro canal da lista
+  // nova sem a pessoa ter clicado em nada; agora só o clique explícito
+  // (ver onPressChannel) é que carrega o vídeo.
   useEffect(() => {
     if (!isTV) return;
     if (!filtered.length) {
@@ -188,12 +190,14 @@ export default function ChannelsScreen() {
       setFocusedChannel(null);
       return;
     }
-    setPreviewChannel((prev) => {
+    setFocusedChannel((prev) => {
       if (prev && filtered.some((s) => s.stream_id === prev.stream_id)) return prev;
-      const next = filtered[0];
-      setFocusedChannel(next);
-      return next;
+      return filtered[0];
     });
+    // Se o canal que estava em preview sumiu do filtro atual (ex: trocou
+    // de categoria e ele não pertence a ela), tira do preview também —
+    // mas sem substituir por outro sozinho.
+    setPreviewChannel((prev) => (prev && filtered.some((s) => s.stream_id === prev.stream_id) ? prev : null));
   }, [isTV, filtered]);
 
   // Chamado a cada movimento do D-pad na lista (TV) — só atualiza o

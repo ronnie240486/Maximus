@@ -56,44 +56,50 @@ export default function WelcomeScreen() {
       setAudioEnabled(enabled);
 
       // As imagens (fundo/banner/logo) são URLs assinadas que expiram em
-      // ~1h — busca fresco aqui em vez de confiar só na sessão salva,
-      // igual a tela de Perfis já faz, pra sempre bater a mesma imagem.
+      // ~1h — por isso ainda buscamos fresco do painel, mas SEM esperar
+      // essa resposta pra começar a tela. Antes, o áudio/visual só
+      // começava depois que essa chamada de rede (checkMac) E o
+      // pré-carregamento da imagem terminassem — numa rede mais lenta
+      // (comum em TV box), isso prendia a pessoa numa tela cinza/em
+      // branco por vários segundos antes de qualquer coisa acontecer.
+      // Agora usa o que já está salvo local NA HORA, e só troca pela
+      // versão fresca do painel (se vier diferente) discretamente depois,
+      // já com a tela em andamento.
       const cached = await loadSession();
       logSessionEvent('welcome.mount', `sessão lida: status=${cached?.status ?? 'undefined'}`);
       setBg(cached?.bg_url);
       setBanner(cached?.banner_url);
       setLogo(cached?.logo_url);
 
-      const fresh = await checkMac(m);
-      let finalBg = cached?.bg_url;
-      let finalBanner = cached?.banner_url;
-      let finalLogo = cached?.logo_url;
-      if (fresh.authorized) {
-        finalBg = fresh.bg_url;
-        finalBanner = fresh.banner_url;
-        finalLogo = fresh.logo_url;
-        setBg(finalBg);
-        setBanner(finalBanner);
-        setLogo(finalLogo);
-      }
-
-      // Pré-carrega as imagens ANTES de liberar o áudio — sem isso, o
-      // áudio (voz "Bem-vindo..." + efeito) começava assim que a URL da
-      // imagem ficava conhecida, mas a imagem em si (bytes baixados da
-      // rede) só aparecia um pouco depois, dando a impressão de áudio e
-      // imagem fora de sincronia. Tem um teto de 2s pra isso não atrasar
-      // a entrada se a imagem estiver lenta/fora do ar.
-      const toPrefetch = [finalBanner, finalLogo, finalBg].filter(
+      // Pré-carrega só a imagem que JÁ TEMOS (local/cache), com um teto
+      // bem curto — é só pra imagem e áudio começarem juntos (ver fix
+      // anterior), não faz sentido esperar mais que isso.
+      const cachedToPrefetch = [cached?.banner_url, cached?.logo_url, cached?.bg_url].filter(
         (u): u is string => !!u
       );
-      if (toPrefetch.length) {
+      if (cachedToPrefetch.length) {
         await Promise.race([
-          Image.prefetch(toPrefetch).catch(() => {}),
-          new Promise((resolve) => setTimeout(resolve, 2000)),
+          Image.prefetch(cachedToPrefetch).catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 800)),
         ]);
       }
 
       setReady(true);
+
+      // Checagem fresca com o painel acontece em paralelo, sem travar a
+      // entrada — se vier uma imagem diferente da salva, troca discretamente
+      // enquanto a tela já está tocando (a imagem só é substituída de
+      // verdade quando a nova já carregou, graças ao onLoad/onError normal
+      // do componente Image).
+      checkMac(m)
+        .then((fresh) => {
+          if (fresh.authorized) {
+            setBg(fresh.bg_url);
+            setBanner(fresh.banner_url);
+            setLogo(fresh.logo_url);
+          }
+        })
+        .catch(() => {});
     })();
   }, []);
 

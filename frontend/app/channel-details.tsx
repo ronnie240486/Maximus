@@ -131,6 +131,10 @@ export default function ChannelDetailsScreen() {
       : '',
     (p) => {
       p.loop = false;
+      p.bufferOptions = {
+        preferredForwardBufferDuration: 30,
+        minBufferForPlayback: 5,
+      };
       p.play();
     }
   );
