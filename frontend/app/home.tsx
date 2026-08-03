@@ -132,6 +132,15 @@ export default function HomeScreen() {
   const [featured, setFeatured] = useState<FeaturedEntry[]>([]);
   const [featuredFavIds, setFeaturedFavIds] = useState<Set<string>>(new Set());
   const [bg, setBg] = useState<string | undefined>();
+  // Se a URL da imagem de fundo do painel vier preenchida mas FALHAR ao
+  // carregar (link assinado vencido, servidor de imagem fora do ar, etc.),
+  // sem isso a tela ficava sem fundo nenhum — nunca caía pro padrão porque
+  // `bg` continuava "preenchido" (só que quebrado). Reseta toda vez que a
+  // URL muda, pra dar uma nova chance de carregar.
+  const [bgFailed, setBgFailed] = useState(false);
+  useEffect(() => {
+    setBgFailed(false);
+  }, [bg]);
   const [logo, setLogo] = useState<string | undefined>();
   const [appName, setAppName] = useState<string>('Maximus Player');
   // Only show the full-screen spinner when there's nothing to paint yet
@@ -678,10 +687,12 @@ export default function HomeScreen() {
   return (
     <ImageBackground
       // Sem bg_url do painel (ex: conta de teste, sem MAC cadastrado ainda)
-      // — usa a imagem de fundo padrão do app em vez de deixar sem nada.
-      // Assim que o MAC for cadastrado no painel com uma imagem própria,
-      // volta a usar ela normalmente (bg vem do checkMac acima).
-      source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
+      // OU a URL falhou ao carregar (link vencido, servidor fora do ar) —
+      // usa a imagem de fundo padrão do app em vez de deixar sem nada.
+      // Assim que o MAC for cadastrado no painel com uma imagem própria
+      // que carregue de verdade, volta a usar ela normalmente.
+      source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
+      onError={() => setBgFailed(true)}
       style={styles.bg}
       imageStyle={{ opacity: 0.35 }}
     >

@@ -36,6 +36,7 @@ export default function MacLoginScreen() {
   const [mac, setMac] = useState<string>('');
   const [extras, setExtras] = useState<AppExtras>({});
   const [status, setStatus] = useState<MacStatus | null>(null);
+  const [bgFailed, setBgFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -361,6 +362,9 @@ export default function MacLoginScreen() {
   const logo = status?.logo_url;
   const banner = status?.banner_url;
   const appName = status?.app_name;
+  useEffect(() => {
+    setBgFailed(false);
+  }, [bg]);
 
   // Registrado no painel mas sem acesso (bloqueado pelo revendedor, lista
   // removida, etc.) — diferente de "nunca vi esse MAC", que é o estado
@@ -403,7 +407,8 @@ export default function MacLoginScreen() {
   if (showLockScreen) {
     return (
       <ImageBackground
-        source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
+        source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
+        onError={() => setBgFailed(true)}
         style={styles.bg}
         imageStyle={{ opacity: 0.2 }}
       >
@@ -442,7 +447,8 @@ export default function MacLoginScreen() {
 
   return (
     <ImageBackground
-      source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
+      source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
+      onError={() => setBgFailed(true)}
       style={styles.bg}
       imageStyle={{ opacity: 0.25 }}
     >

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,10 @@ export default function ProfileSelectionScreen() {
   const [loading, setLoading] = useState(true);
   const [mac, setMac] = useState<string>('');
   const [bg, setBg] = useState<string | undefined>(undefined);
+  const [bgFailed, setBgFailed] = useState(false);
+  useEffect(() => {
+    setBgFailed(false);
+  }, [bg]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,7 +110,8 @@ export default function ProfileSelectionScreen() {
 
   return (
     <ImageBackground
-      source={bg ? { uri: bg } : require('@/assets/images/default-bg.png')}
+      source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
+      onError={() => setBgFailed(true)}
       style={styles.bg}
       imageStyle={{ opacity: 0.2 }}
     >
