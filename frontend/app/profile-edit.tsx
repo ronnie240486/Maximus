@@ -13,7 +13,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
-import { AVATARS, KIDS_AVATARS, isKidAvatarId } from '@/src/lib/avatars';
+import {
+  AVATARS,
+  KIDS_AVATARS,
+  KIDS_ILLUSTRATED_AVATARS,
+  isKidAvatarId,
+} from '@/src/lib/avatars';
 import Avatar from '@/src/components/Avatar';
 import { deleteProfile, loadProfiles, Profile, upsertProfile } from '@/src/state/profiles';
 import TVFocusable from '@/src/components/TVFocusable';
@@ -69,8 +74,8 @@ export default function EditProfileScreen() {
   // infantil mas com uma foto de avatar normal (ou vice-versa).
   const onToggleKids = (next: boolean) => {
     setIsKids(next);
-    const currentIsKidAvatar = isKidAvatarId(avatarId);
-    if (next && !currentIsKidAvatar) setAvatarId(KIDS_AVATARS[0].id);
+    const currentIsKidAvatar = isKidAvatarId(avatarId) || avatarId.startsWith('kidart_');
+    if (next && !currentIsKidAvatar) setAvatarId(KIDS_ILLUSTRATED_AVATARS[0].id);
     if (!next && currentIsKidAvatar) setAvatarId(AVATARS[0].id);
   };
 
@@ -163,7 +168,7 @@ export default function EditProfileScreen() {
         </TVFocusable>
 
         <View style={styles.avatarGrid}>
-          {(isKids ? KIDS_AVATARS : AVATARS).map((a) => (
+          {(isKids ? [...KIDS_ILLUSTRATED_AVATARS, ...KIDS_AVATARS] : AVATARS).map((a) => (
             <TVFocusable
               key={a.id}
               onPress={() => setAvatarId(a.id)}

@@ -87,3 +87,25 @@ export function getKidAvatar(id?: string | null): KidAvatarStyle {
   if (!id) return KIDS_AVATARS[0];
   return KIDS_AVATARS.find((a) => a.id === id) || KIDS_AVATARS[0];
 }
+
+// Avatares infantis ilustrados (imagem de verdade, estilo desenho/anime
+// fantasia) — mesmo padrão do AVATARS normal, mas numa pasta própria.
+// Diferente dos ícones acima (kid_N), esses usam o prefixo kidart_N.
+/* eslint-disable global-require */
+const KID_ILLUSTRATED_IMAGES: number[] = [
+  require('../../assets/images/kid-avatars/kid-avatar-1.jpg'),
+];
+/* eslint-enable global-require */
+
+export const KIDS_ILLUSTRATED_AVATARS: AvatarStyle[] = KID_ILLUSTRATED_IMAGES.map((image, i) => ({
+  id: `kidart_${i + 1}`,
+  image,
+}));
+
+export function isKidIllustratedAvatarId(id?: string | null): boolean {
+  return !!id && id.startsWith('kidart_');
+}
+
+export function getKidIllustratedAvatar(id?: string | null): AvatarStyle {
+  return KIDS_ILLUSTRATED_AVATARS.find((a) => a.id === id) || KIDS_ILLUSTRATED_AVATARS[0];
+}
