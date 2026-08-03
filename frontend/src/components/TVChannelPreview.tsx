@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing, radius } from '@/src/theme';
@@ -50,6 +51,24 @@ export default function TVChannelPreview({
       minBufferForPlayback: 5,
     };
   });
+
+  // A tela de Canais continua "viva" (só escondida) quando `onOpenFull`
+  // navega pro player em tela cheia por cima dela — sem isso, o preview
+  // continuava tocando junto com o vídeo grande, dois áudios ao mesmo
+  // tempo, travando a TV box. Pausa ao sair, retoma ao voltar. Mesma
+  // correção que channel-details.tsx já tinha; faltava aqui.
+  useFocusEffect(
+    useCallback(() => {
+      try {
+        player.play();
+      } catch {}
+      return () => {
+        try {
+          player.pause();
+        } catch {}
+      };
+    }, [player])
+  );
 
   const tsFallbackTriedRef = React.useRef(false);
 

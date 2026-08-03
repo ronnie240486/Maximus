@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   useWindowDimensions,
+  findNodeHandle,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -623,6 +624,23 @@ export default function HomeScreen() {
   };
 
   const navIconSize = isTV ? 26 : 18;
+  // Ref pro item "Início" da sidebar — usado como destino de nextFocusLeft
+  // pros elementos mais à esquerda do conteúdo (banner de destaque, e o
+  // primeiro item de cada fileira), pra resolver a navegação por D-pad
+  // precisando de MUITOS cliques pra esquerda pra sair do conteúdo e
+  // chegar na sidebar (o algoritmo espacial padrão do Android TV não
+  // prioriza isso sozinho).
+  const homeNavRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const [homeNavHandle, setHomeNavHandle] = useState<number | undefined>();
+  useEffect(() => {
+    if (!isTV) return;
+    // Espera o próximo tick pra garantir que o node nativo já existe.
+    const t = setTimeout(() => {
+      const handle = findNodeHandle(homeNavRef.current);
+      if (handle) setHomeNavHandle(handle);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [isTV]);
   const allNavItems = [
     { key: 'home', label: 'Início', testID: 'nav-home', icon: (active: boolean) => <Ionicons name="home" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: undefined },
     { key: 'live', label: 'Canais', testID: 'nav-live', icon: (active: boolean) => <MaterialCommunityIcons name="television-classic" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/channels') },
@@ -662,6 +680,7 @@ export default function HomeScreen() {
                 return (
                   <TVFocusable
                     key={it.key}
+                    ref={it.key === 'home' ? homeNavRef : undefined}
                     onPress={() => {
                       setActiveNav(it.key);
                       it.onPress?.();
@@ -733,10 +752,13 @@ export default function HomeScreen() {
                       onTrailer={openFeaturedTrailer}
                       onToggleFavorite={toggleFeaturedFavorite}
                       isLandscape={isLandscape}
+                      nextFocusLeft={homeNavHandle}
                     />
                   ) : null
                 }
-                renderItem={({ item }) => <SectionRow section={item} onOpen={openItem} isLandscape={isLandscape} isTV={isTV} />}
+                renderItem={({ item }) => (
+                  <SectionRow section={item} onOpen={openItem} isLandscape={isLandscape} isTV={isTV} nextFocusLeft={homeNavHandle} />
+                )}
               />
             )}
           </View>
@@ -786,6 +808,7 @@ function FeaturedHero({
   onTrailer,
   onToggleFavorite,
   isLandscape,
+  nextFocusLeft,
 }: {
   items: FeaturedEntry[];
   favIds: Set<string>;
@@ -793,6 +816,7 @@ function FeaturedHero({
   onTrailer: (item: FeaturedEntry) => void;
   onToggleFavorite: (item: FeaturedEntry) => void;
   isLandscape: boolean;
+  nextFocusLeft?: number;
 }) {
   const [index, setIndex] = useState(0);
   const [infoCache, setInfoCache] = useState<Record<string, { plot?: string; genre?: string; rating?: string | number; releaseDate?: string; backdrop?: string }>>({});
@@ -884,10 +908,15 @@ function FeaturedHero({
             <Text style={styles.heroPlot} numberOfLines={3}>{info.plot}</Text>
           )}
           <View style={styles.heroActions}>
-            <Pressable onPress={() => onOpen(current)} style={styles.heroPlayBtn} testID={`hero-play-${current.id}`}>
+            <TVFocusable
+              onPress={() => onOpen(current)}
+              style={styles.heroPlayBtn}
+              testID={`hero-play-${current.id}`}
+              nextFocusLeft={nextFocusLeft}
+            >
               <Ionicons name="play" size={16} color={colors.black} />
               <Text style={styles.heroPlayText}>ASSISTIR</Text>
-            </Pressable>
+            </TVFocusable>
             <Pressable onPress={() => onTrailer(current)} style={styles.heroInfoBtn} testID={`hero-trailer-${current.id}`}>
               <Ionicons name="logo-youtube" size={16} color={colors.white} />
               <Text style={styles.heroInfoText}>TRAILER</Text>
@@ -914,11 +943,13 @@ function SectionRow({
   onOpen,
   isLandscape,
   isTV,
+  nextFocusLeft,
 }: {
   section: Section;
   onOpen: (item: HomeItem) => void;
   isLandscape: boolean;
   isTV?: boolean | null;
+  nextFocusLeft?: number;
 }) {
   const posterWidth = isTV ? 160 : isLandscape ? 130 : 90;
   const circularWidth = isTV ? 110 : isLandscape ? 88 : 64;
@@ -936,8 +967,12 @@ function SectionRow({
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
         showsHorizontalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => onOpen(item)} testID={`home-item-${item.id}`}>
+        renderItem={({ item, index }) => (
+          <TVFocusable
+            onPress={() => onOpen(item)}
+            testID={`home-item-${item.id}`}
+            nextFocusLeft={index === 0 ? nextFocusLeft : undefined}
+          >
             {item.circular ? (
               <View style={[styles.circularItem, { width: circularWidth }]}>
                 <View style={[styles.circularCard, { width: circularCardSize, height: circularCardSize, borderRadius: circularCardSize / 2 }]}>
@@ -965,7 +1000,7 @@ function SectionRow({
                 </Text>
               </View>
             )}
-          </Pressable>
+          </TVFocusable>
         )}
       />
     </View>
