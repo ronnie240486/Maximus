@@ -170,15 +170,6 @@ export default function PlayerScreen() {
     current.stream ? { uri: current.stream, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } } : '',
     (p) => {
       p.loop = false;
-      // Buffer maior que o padrão (20s → 30s de antecedência, 2s → 5s de
-      // "colchão" antes de voltar a tocar depois de travar) — ajuda a
-      // segurar picos de rede sem travar tanto, ao custo de um pouco mais
-      // de tempo pra começar a tocar. Mais importante ainda em TV box,
-      // que costuma ter rede/processamento mais fraco que celular.
-      p.bufferOptions = {
-        preferredForwardBufferDuration: 30,
-        minBufferForPlayback: 5,
-      };
       p.play();
     }
   );
