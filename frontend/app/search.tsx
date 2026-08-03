@@ -23,7 +23,7 @@ import {
   XtreamMovie,
   XtreamSeries,
 } from '@/src/lib/xtream';
-import { filterOutAdultItems } from '@/src/lib/adult-content';
+import { filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import TVFocusable from '@/src/components/TVFocusable';
 
@@ -62,9 +62,9 @@ export default function SearchScreen() {
       ]);
       // Perfil infantil: conteúdo adulto não aparece nem na busca — mesma
       // proteção já aplicada em Canais/Filmes/Séries/Home.
-      setLive(kidsMode && liveCats ? filterOutAdultItems(l || [], liveCats) : l || []);
-      setMovies(kidsMode && vodCats ? filterOutAdultItems(m || [], vodCats) : m || []);
-      setSeries(kidsMode && seriesCats ? filterOutAdultItems(s || [], seriesCats) : s || []);
+      setLive(kidsMode && liveCats ? filterToKidsItems(l || [], liveCats) : l || []);
+      setMovies(kidsMode && vodCats ? filterToKidsItems(m || [], vodCats) : m || []);
+      setSeries(kidsMode && seriesCats ? filterToKidsItems(s || [], seriesCats) : s || []);
       setLoading(false);
       if (!params.voice) {
         setTimeout(() => inputRef.current?.focus(), 100);

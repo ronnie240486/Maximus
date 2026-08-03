@@ -27,7 +27,7 @@ import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, cle
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
-import { isAdultCategoryName, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { logSessionEvent } from '@/src/state/debug-log';
 import { dedupeByName } from '@/src/lib/dedupe';
@@ -353,7 +353,7 @@ export default function HomeScreen() {
     const liveCatsP = kidsMode ? xtream.liveCategories(creds) : Promise.resolve(null);
     const liveP = Promise.all([xtream.liveStreams(creds), liveCatsP]).then(([live, liveCats]) => {
       const filteredLive =
-        kidsMode && liveCats ? filterOutAdultItems(live || [], liveCats) : live;
+        kidsMode && liveCats ? filterToKidsItems(live || [], liveCats) : live;
       const gotSomething = !!(filteredLive && filteredLive.length);
       if (gotSomething) {
         setSlots((prev) => ({
@@ -383,7 +383,7 @@ export default function HomeScreen() {
     const vodCatsP = kidsMode ? xtream.vodCategories(creds) : Promise.resolve(null);
     const moviesP = Promise.all([xtream.vodStreams(creds), vodCatsP]).then(([movies, vodCats]) => {
       const filteredMovies =
-        kidsMode && vodCats ? filterOutAdultItems(movies || [], vodCats) : movies;
+        kidsMode && vodCats ? filterToKidsItems(movies || [], vodCats) : movies;
       const gotSomething = !!(filteredMovies && filteredMovies.length);
       if (gotSomething) {
         const deduped = dedupeByName(filteredMovies!);
@@ -410,7 +410,7 @@ export default function HomeScreen() {
     const seriesCatsP = kidsMode ? xtream.seriesCategories(creds) : Promise.resolve(null);
     const seriesP = Promise.all([xtream.seriesList(creds), seriesCatsP]).then(([series, seriesCats]) => {
       const filteredSeries =
-        kidsMode && seriesCats ? filterOutAdultItems(series || [], seriesCats) : series;
+        kidsMode && seriesCats ? filterToKidsItems(series || [], seriesCats) : series;
       const gotSomething = !!(filteredSeries && filteredSeries.length);
       if (gotSomething) {
         setSlots((prev) => ({

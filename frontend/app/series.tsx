@@ -20,7 +20,7 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamSeries } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterOutAdultCategories, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -112,11 +112,11 @@ export default function SeriesScreen() {
   }, []);
 
   const visibleCategories = useMemo(
-    () => (kidsMode ? filterOutAdultCategories(categories) : categories),
+    () => (kidsMode ? filterToKidsCategories(categories) : categories),
     [categories, kidsMode]
   );
   const visibleSeries = useMemo(
-    () => (kidsMode ? filterOutAdultItems(series, categories) : series),
+    () => (kidsMode ? filterToKidsItems(series, categories) : series),
     [series, categories, kidsMode]
   );
 

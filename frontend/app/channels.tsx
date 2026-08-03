@@ -20,7 +20,7 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamLive, getLastXtreamError } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterOutAdultCategories, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -129,11 +129,11 @@ export default function ChannelsScreen() {
   // itens dela aparecem em "Todos". Tudo daqui pra baixo usa essas
   // versões filtradas, nunca `categories`/`streams` direto.
   const visibleCategories = useMemo(
-    () => (kidsMode ? filterOutAdultCategories(categories) : categories),
+    () => (kidsMode ? filterToKidsCategories(categories) : categories),
     [categories, kidsMode]
   );
   const visibleStreams = useMemo(
-    () => (kidsMode ? filterOutAdultItems(streams, categories) : streams),
+    () => (kidsMode ? filterToKidsItems(streams, categories) : streams),
     [streams, categories, kidsMode]
   );
 

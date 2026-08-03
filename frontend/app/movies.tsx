@@ -20,7 +20,7 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamMovie } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterOutAdultCategories, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -122,11 +122,11 @@ export default function MoviesScreen() {
   // Perfil infantil: conteúdo adulto não existe pra ele, nem categoria nem
   // item — ver o mesmo padrão em channels.tsx.
   const visibleCategories = useMemo(
-    () => (kidsMode ? filterOutAdultCategories(categories) : categories),
+    () => (kidsMode ? filterToKidsCategories(categories) : categories),
     [categories, kidsMode]
   );
   const visibleMovies = useMemo(
-    () => (kidsMode ? filterOutAdultItems(movies, categories) : movies),
+    () => (kidsMode ? filterToKidsItems(movies, categories) : movies),
     [movies, categories, kidsMode]
   );
 
