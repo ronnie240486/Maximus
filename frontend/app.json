@@ -8,6 +8,12 @@
     "scheme": "interactiveplayer",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8689cf66-c386-4180-a6c1-c070e2600314"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.interactiveplayer.app"
@@ -32,6 +38,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-updates",
       [
         "expo-video",
         {
@@ -67,6 +74,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8689cf66-c386-4180-a6c1-c070e2600314"
+      }
     }
   }
 }

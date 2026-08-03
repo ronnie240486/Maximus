@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
+import * as Updates from "expo-updates";
 import { useEffect, useState } from "react";
 import { LogBox, StatusBar, View, Text, StyleSheet } from "react-native";
 
@@ -23,6 +24,30 @@ export default function RootLayout() {
 
   useEffect(() => {
     setIntegrityOk(verifyAppIntegrity().ok);
+  }, []);
+
+  useEffect(() => {
+    // Checa e aplica atualização OTA (código JS/TS novo, sem precisar de
+    // build novo) assim que o app abre. Padrão do expo-updates baixa a
+    // atualização mas só aplica na PRÓXIMA abertura — sem isso, a pessoa
+    // precisaria fechar e abrir o app DUAS vezes pra ver a mudança. Aqui,
+    // já baixa e recarrega sozinho na primeira abertura depois de
+    // publicada uma atualização nova.
+    // Não roda em desenvolvimento (Updates.isEnabled é false no Expo Go /
+    // dev build), só em builds de verdade.
+    if (!Updates.isEnabled) return;
+    (async () => {
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        if (result.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch {
+        // Sem internet nesse instante, servidor de update fora do ar,
+        // etc. — segue com a versão já instalada normalmente.
+      }
+    })();
   }, []);
 
   if (!loaded && !error) return null;
