@@ -135,30 +135,44 @@ export default function MoviesScreen() {
     [visibleCategories]
   );
 
-  const filtered = useMemo(() => {
+  const sortItems = useCallback(
+    (items: XtreamMovie[]) => {
+      const sorted = [...items];
+      if (sortBy === 'az') {
+        sorted.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      } else if (sortBy === 'date') {
+        sorted.sort((a, b) => Number(b.added || 0) - Number(a.added || 0));
+      } else if (sortBy === 'rating') {
+        sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+      }
+      return sorted;
+    },
+    [sortBy]
+  );
+
+  // Filtro pesado (categoria + busca + dedupe de milhares de itens) — de
+  // propósito SEM favoriteIds nas dependências. Favoritar/desfavoritar um
+  // item antes recalculava isso tudo de novo mesmo em outra categoria
+  // qualquer, sem precisar — só a aba "Favoritos" de fato depende de quem
+  // está favoritado.
+  const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let base: XtreamMovie[];
+    const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+    const matches = visibleMovies.filter((m) => {
+      const catOk = !catId || m.category_id === catId;
+      const qOk = !q || m.name.toLowerCase().includes(q);
+      return catOk && qOk;
+    });
+    return sortItems(dedupeByName(matches));
+  }, [visibleMovies, visibleCategories, selectedCat, query, sortItems]);
+
+  const filtered = useMemo(() => {
     if (selectedCat === FAVORITES) {
-      base = dedupeByName(visibleMovies.filter((m) => favoriteIds.has(`movie-${m.stream_id}`)));
-    } else {
-      const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
-      const matches = visibleMovies.filter((m) => {
-        const catOk = !catId || m.category_id === catId;
-        const qOk = !q || m.name.toLowerCase().includes(q);
-        return catOk && qOk;
-      });
-      base = dedupeByName(matches);
+      const base = dedupeByName(visibleMovies.filter((m) => favoriteIds.has(`movie-${m.stream_id}`)));
+      return sortItems(base);
     }
-    const sorted = [...base];
-    if (sortBy === 'az') {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    } else if (sortBy === 'date') {
-      sorted.sort((a, b) => Number(b.added || 0) - Number(a.added || 0));
-    } else if (sortBy === 'rating') {
-      sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
-    }
-    return sorted;
-  }, [movies, categories, selectedCat, query, favoriteIds, sortBy]);
+    return nonFavFiltered;
+  }, [selectedCat, favoriteIds, visibleMovies, nonFavFiltered, sortItems]);
 
   const openMovie = (m: XtreamMovie) => {
     const categoryName = categories.find((c) => c.category_id === m.category_id)?.category_name;

@@ -56,6 +56,34 @@ export function parsePlaylistUrl(url: string): XtreamCreds | null {
 // cap every call so a single slow endpoint can't block the whole screen.
 const DEFAULT_TIMEOUT_MS = 9000;
 
+// Cache em memória (só dura enquanto o app está aberto, não salva em disco)
+// + eliminação de chamadas concorrentes idênticas. Sem isso, era comum a
+// MESMA lista gigante (ex: get_vod_streams com milhares de itens) ser
+// buscada 2-3 vezes ao mesmo tempo quando telas diferentes pedem os mesmos
+// dados quase juntas (ex: a Home carrega "Filmes em alta" enquanto a
+// pessoa já está entrando na tela de Filmes, que pede a lista completa).
+//
+// TTL curto por ação: listas grandes que raramente mudam (categorias,
+// canais/filmes/séries) ficam em cache por 2 minutos; qualquer coisa
+// sensível a tempo real (autenticação — pode trazer aviso de pagamento
+// atualizado — e EPG "o que está passando agora") nunca fica em cache de
+// verdade, só ganha a eliminação de chamada duplicada (dedupe), que é
+// sempre segura independente da ação.
+const CACHEABLE_TTL_MS: Record<string, number> = {
+  get_live_categories: 120_000,
+  get_vod_categories: 120_000,
+  get_series_categories: 120_000,
+  get_live_streams: 120_000,
+  get_vod_streams: 120_000,
+  get_series: 120_000,
+  get_series_info: 120_000,
+  get_vod_info: 120_000,
+};
+
+type CacheEntry = { value: unknown; expiresAt: number };
+const xtreamCache = new Map<string, CacheEntry>();
+const xtreamInFlight = new Map<string, Promise<unknown>>();
+
 async function xtreamGet<T>(
   creds: XtreamCreds,
   action: string,
@@ -69,29 +97,54 @@ async function xtreamGet<T>(
     ...extra,
   });
   const url = `${creds.server}/player_api.php?${params.toString()}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(routeUrl(url), { headers: commonHeaders, signal: controller.signal });
-    if (!res.ok) {
-      lastError = res.status === 403
-        ? 'BLOCKED_CLOUDFLARE'
-        : `HTTP_${res.status}`;
-      return null;
+  const cacheKey = url; // já inclui server+credenciais+ação+parâmetros
+
+  const ttl = CACHEABLE_TTL_MS[action] || 0;
+  if (ttl > 0) {
+    const cached = xtreamCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value as T;
     }
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('json')) {
-      lastError = 'BLOCKED_CLOUDFLARE';
-      return null;
-    }
-    lastError = null;
-    return (await res.json()) as T;
-  } catch (e: any) {
-    lastError = e?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
-    return null;
-  } finally {
-    clearTimeout(timer);
   }
+
+  // Eliminação de chamada duplicada: se essa MESMA URL já está sendo
+  // buscada agora (outra tela pediu ao mesmo tempo), espera a chamada em
+  // andamento em vez de disparar outra rede idêntica.
+  const existing = xtreamInFlight.get(cacheKey);
+  if (existing) return existing as Promise<T | null>;
+
+  const promise = (async (): Promise<T | null> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(routeUrl(url), {
+        headers: { ...commonHeaders, 'Accept-Encoding': 'gzip' },
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        lastError = res.status === 403 ? 'BLOCKED_CLOUDFLARE' : `HTTP_${res.status}`;
+        return null;
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('json')) {
+        lastError = 'BLOCKED_CLOUDFLARE';
+        return null;
+      }
+      lastError = null;
+      const json = (await res.json()) as T;
+      if (ttl > 0) xtreamCache.set(cacheKey, { value: json, expiresAt: Date.now() + ttl });
+      return json;
+    } catch (e: any) {
+      lastError = e?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
+      return null;
+    } finally {
+      clearTimeout(timer);
+      xtreamInFlight.delete(cacheKey);
+    }
+  })();
+
+  xtreamInFlight.set(cacheKey, promise);
+  return promise;
 }
 
 let lastError: string | null = null;

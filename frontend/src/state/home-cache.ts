@@ -23,9 +23,22 @@ export function getHomeCache(): CachedHomeData | null {
   return cached;
 }
 
+// Grava em disco com debounce de 500ms — a Home costuma chamar isso umas
+// 3 vezes seguidas (canais ao vivo, filmes, séries cada um resolvendo
+// separado), e sem debounce isso virava 3 gravações físicas grudadas em
+// AsyncStorage. A versão em MEMÓRIA (`cached`, usada pra leitura instantânea
+// dentro da mesma sessão) continua atualizando na hora — só a escrita em
+// disco de verdade é que fica pra depois, juntando várias chamadas seguidas
+// numa escrita só (sempre com o valor mais recente).
+let saveHomeCacheTimer: ReturnType<typeof setTimeout> | null = null;
+
 export async function saveHomeCache(sections: unknown): Promise<void> {
   cached = { sections, savedAt: Date.now() };
-  await storage.setItem(STORAGE_KEY, JSON.stringify(cached));
+  if (saveHomeCacheTimer) clearTimeout(saveHomeCacheTimer);
+  saveHomeCacheTimer = setTimeout(() => {
+    saveHomeCacheTimer = null;
+    if (cached) storage.setItem(STORAGE_KEY, JSON.stringify(cached)).catch(() => {});
+  }, 500);
 }
 
 export async function loadHomeCache(): Promise<CachedHomeData | null> {
@@ -45,6 +58,14 @@ export async function loadHomeCache(): Promise<CachedHomeData | null> {
 // pintaria por um instante o conteúdo antigo em cache antes da busca nova
 // chegar, o que é confuso ("por que apareceu filme de outra lista?").
 export async function clearHomeCache(): Promise<void> {
+  if (saveHomeCacheTimer) {
+    clearTimeout(saveHomeCacheTimer);
+    saveHomeCacheTimer = null;
+  }
+  if (saveFeaturedCacheTimer) {
+    clearTimeout(saveFeaturedCacheTimer);
+    saveFeaturedCacheTimer = null;
+  }
   cached = null;
   cachedFeatured = null;
   await storage.removeItem(STORAGE_KEY);
@@ -58,10 +79,15 @@ export async function clearHomeCache(): Promise<void> {
 // enquanto busca uma leva nova (embaralhada de novo) por trás.
 const FEATURED_KEY = 'home_featured_cache_v1';
 let cachedFeatured: unknown[] | null = null;
+let saveFeaturedCacheTimer: ReturnType<typeof setTimeout> | null = null;
 
 export async function saveFeaturedCache(items: unknown[]): Promise<void> {
   cachedFeatured = items;
-  await storage.setItem(FEATURED_KEY, JSON.stringify(items));
+  if (saveFeaturedCacheTimer) clearTimeout(saveFeaturedCacheTimer);
+  saveFeaturedCacheTimer = setTimeout(() => {
+    saveFeaturedCacheTimer = null;
+    if (cachedFeatured) storage.setItem(FEATURED_KEY, JSON.stringify(cachedFeatured)).catch(() => {});
+  }, 500);
 }
 
 export async function loadFeaturedCache(): Promise<unknown[] | null> {

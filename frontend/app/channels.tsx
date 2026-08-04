@@ -175,6 +175,20 @@ export default function ChannelsScreen() {
     () => (kidsMode ? filterToKidsCategories(categories) : categories),
     [categories, kidsMode]
   );
+  // Busca O(1) em vez de percorrer a lista de categorias toda vez (era
+  // usado dentro de loop pra montar a contagem por categoria, e de novo
+  // pra CADA card renderizado na grade do celular — com centenas de
+  // categorias, isso se somava rápido).
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categories) map.set(c.category_id, c.category_name);
+    return map;
+  }, [categories]);
+  const categoryIdByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of visibleCategories) map.set(c.category_name, c.category_id);
+    return map;
+  }, [visibleCategories]);
   const visibleStreams = useMemo(
     () => (kidsMode ? filterToKidsItems(streams, categories) : streams),
     [streams, categories, kidsMode]
@@ -198,28 +212,31 @@ export default function ChannelsScreen() {
       } else if (cat === FAVORITES) {
         map[cat] = favoriteIds.size;
       } else {
-        const catId = visibleCategories.find((c) => c.category_name === cat)?.category_id;
+        const catId = categoryIdByName.get(cat);
         map[cat] = catId ? visibleStreams.filter((s) => s.category_id === catId).length : 0;
       }
     }
     return map;
-  }, [catNames, visibleStreams, visibleCategories, favoriteIds]);
+  }, [catNames, visibleStreams, categoryIdByName, favoriteIds]);
 
-  const filtered = useMemo(() => {
+  const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (selectedCat === FAVORITES) {
-      const matches = visibleStreams.filter((s) => favoriteIds.has(`channel-${s.stream_id}`));
-      return dedupeByName(matches);
-    }
-    const selectedCatId =
-      selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+    const selectedCatId = selectedCat === ALL ? null : categoryIdByName.get(selectedCat);
     const matches = visibleStreams.filter((s) => {
       const catOk = !selectedCatId || s.category_id === selectedCatId;
       const qOk = !q || s.name.toLowerCase().includes(q);
       return catOk && qOk;
     });
     return dedupeByName(matches);
-  }, [visibleStreams, visibleCategories, selectedCat, query, favoriteIds]);
+  }, [visibleStreams, categoryIdByName, selectedCat, query]);
+
+  const filtered = useMemo(() => {
+    if (selectedCat === FAVORITES) {
+      const matches = visibleStreams.filter((s) => favoriteIds.has(`channel-${s.stream_id}`));
+      return dedupeByName(matches);
+    }
+    return nonFavFiltered;
+  }, [selectedCat, favoriteIds, visibleStreams, nonFavFiltered]);
 
   // Ao trocar de categoria (ou filtro), só ATUALIZA O DESTAQUE do primeiro
   // canal da nova lista — nunca carrega vídeo nenhum sozinho. Antes disso
@@ -493,7 +510,7 @@ export default function ChannelsScreen() {
                 <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
                 {!!item.category_id && (
                   <Text style={styles.cardCat} numberOfLines={1}>
-                    {categories.find((c) => c.category_id === item.category_id)?.category_name || ''}
+                    {categoryNameById.get(item.category_id) || ''}
                   </Text>
                 )}
               </View>

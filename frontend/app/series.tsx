@@ -125,30 +125,41 @@ export default function SeriesScreen() {
     [visibleCategories]
   );
 
-  const filtered = useMemo(() => {
+  const sortItems = useCallback(
+    (items: XtreamSeries[]) => {
+      const sorted = [...items];
+      if (sortBy === 'az') {
+        sorted.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      } else if (sortBy === 'date') {
+        sorted.sort((a, b) => (Date.parse(b.releaseDate || '') || 0) - (Date.parse(a.releaseDate || '') || 0));
+      } else if (sortBy === 'rating') {
+        sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+      }
+      return sorted;
+    },
+    [sortBy]
+  );
+
+  // Mesmo motivo do movies.tsx: filtro pesado sem favoriteIds nas
+  // dependências — favoritar não recalcula mais a lista inteira.
+  const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let base: XtreamSeries[];
+    const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+    const matches = visibleSeries.filter((s) => {
+      const catOk = !catId || s.category_id === catId;
+      const qOk = !q || s.name.toLowerCase().includes(q);
+      return catOk && qOk;
+    });
+    return sortItems(dedupeByName(matches));
+  }, [visibleSeries, visibleCategories, selectedCat, query, sortItems]);
+
+  const filtered = useMemo(() => {
     if (selectedCat === FAVORITES) {
-      base = dedupeByName(visibleSeries.filter((s) => favoriteIds.has(`series-${s.series_id}`)));
-    } else {
-      const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
-      const matches = visibleSeries.filter((s) => {
-        const catOk = !catId || s.category_id === catId;
-        const qOk = !q || s.name.toLowerCase().includes(q);
-        return catOk && qOk;
-      });
-      base = dedupeByName(matches);
+      const base = dedupeByName(visibleSeries.filter((s) => favoriteIds.has(`series-${s.series_id}`)));
+      return sortItems(base);
     }
-    const sorted = [...base];
-    if (sortBy === 'az') {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    } else if (sortBy === 'date') {
-      sorted.sort((a, b) => (Date.parse(b.releaseDate || '') || 0) - (Date.parse(a.releaseDate || '') || 0));
-    } else if (sortBy === 'rating') {
-      sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
-    }
-    return sorted;
-  }, [series, categories, selectedCat, query, favoriteIds, sortBy]);
+    return nonFavFiltered;
+  }, [selectedCat, favoriteIds, visibleSeries, nonFavFiltered, sortItems]);
 
   const openSeries = (s: XtreamSeries) => {
     const categoryName = categories.find((c) => c.category_id === s.category_id)?.category_name;
