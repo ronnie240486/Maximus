@@ -27,6 +27,7 @@ import { getDeviceMac } from '@/src/lib/device';
 import { sendHeartbeat } from '@/src/api/client';
 import { xtream, liveStreamUrl, XtreamLive, XtreamCategory, XtreamEpgListing, decodeEpgText } from '@/src/lib/xtream';
 import TVFocusable from '@/src/components/TVFocusable';
+import EpgStrip from '@/src/components/EpgStrip';
 
 const HIDE_AFTER_MS = 3500;
 
@@ -477,6 +478,17 @@ export default function PlayerScreen() {
                 )}
               </View>
             </View>
+
+            {isLive && (
+              <View style={styles.epgStripWrap}>
+                <EpgStrip
+                  creds={getXtream()}
+                  channelId={Number(String(current.id).replace('live-', ''))}
+                  channelName={channelName}
+                  channelCover={logo}
+                />
+              </View>
+            )}
           </SafeAreaView>
         </>
       )}
@@ -697,6 +709,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: spacing.md,
   },
+  epgStripWrap: { paddingBottom: spacing.md },
   logoBlock: { width: 72, alignItems: 'center' },
   logoCard: {
     width: 60,

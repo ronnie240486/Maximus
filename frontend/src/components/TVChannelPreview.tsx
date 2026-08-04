@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing, radius } from '@/src/theme';
 import TVFocusable from './TVFocusable';
-import { XtreamCreds, XtreamLive, liveStreamUrl, xtream, decodeEpgText } from '@/src/lib/xtream';
+import EpgStrip from './EpgStrip';
+import { XtreamCreds, XtreamLive, liveStreamUrl } from '@/src/lib/xtream';
 
 type Props = {
   channel: XtreamLive | null;
@@ -34,8 +35,6 @@ export default function TVChannelPreview({
   onOpenFull,
   onSearch,
 }: Props) {
-  const [nowPlaying, setNowPlaying] = useState<{ title: string; start: string; end: string } | null>(null);
-  const [loadingEpg, setLoadingEpg] = useState(false);
 
   const player = useVideoPlayer('', (p) => {
     p.loop = true;
@@ -101,37 +100,6 @@ export default function TVChannelPreview({
     return () => sub.remove();
   }, [player, channel, creds]);
 
-  useEffect(() => {
-    if (!channel || !creds) {
-      setNowPlaying(null);
-      return;
-    }
-    let cancelled = false;
-    setLoadingEpg(true);
-    xtream
-      .shortEpg(creds, channel.stream_id, 1)
-      .then((res) => {
-        if (cancelled) return;
-        setLoadingEpg(false);
-        const listing = res?.epg_listings?.[0];
-        if (!listing) {
-          setNowPlaying(null);
-          return;
-        }
-        setNowPlaying({
-          title: decodeEpgText(listing.title),
-          start: formatEpgTime(listing.start),
-          end: formatEpgTime(listing.end),
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setLoadingEpg(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [channel?.stream_id, creds]);
-
   if (!channel) {
     return (
       <View style={[styles.wrap, styles.center]}>
@@ -151,17 +119,10 @@ export default function TVChannelPreview({
         <Text style={styles.channelName} numberOfLines={1}>
           {channel.name}
         </Text>
-        {loadingEpg ? (
-          <ActivityIndicator color={colors.accentCyan} size="small" style={{ marginTop: 4, alignSelf: 'flex-start' }} />
-        ) : nowPlaying ? (
-          <Text style={styles.epgText} numberOfLines={1}>
-            {nowPlaying.start} ~ {nowPlaying.end}  {nowPlaying.title}
-          </Text>
-        ) : (
-          <Text style={styles.epgText} numberOfLines={1}>
-            Sem informação de programação
-          </Text>
-        )}
+      </View>
+
+      <View style={styles.epgStripWrap}>
+        <EpgStrip creds={creds} channelId={channel.stream_id} channelName={channel.name} channelCover={channel.stream_icon} />
       </View>
 
       <View style={styles.actionsRow}>
@@ -188,12 +149,6 @@ export default function TVChannelPreview({
   );
 }
 
-function formatEpgTime(raw: string): string {
-  // Xtream manda "YYYY-MM-DD HH:mm:ss" — só o HH:mm interessa aqui.
-  const m = raw.match(/(\d{2}):(\d{2}):\d{2}$/);
-  return m ? `${m[1]}:${m[2]}` : raw;
-}
-
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.darkSurface, borderRadius: radius.md, overflow: 'hidden' },
   center: { alignItems: 'center', justifyContent: 'center' },
@@ -201,7 +156,7 @@ const styles = StyleSheet.create({
   videoBox: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.black },
   infoBar: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   channelName: { color: colors.white, fontSize: 18, fontWeight: '800' },
-  epgText: { color: colors.accentCyan, fontSize: 13, marginTop: 4 },
+  epgStripWrap: { paddingVertical: spacing.xs },
   actionsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
