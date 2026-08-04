@@ -11,6 +11,7 @@ import {
   ScrollView,
   Linking,
   Alert,
+  findNodeHandle,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +29,7 @@ import { sendHeartbeat } from '@/src/api/client';
 import { xtream, liveStreamUrl, XtreamLive, XtreamCategory, XtreamEpgListing, decodeEpgText } from '@/src/lib/xtream';
 import TVFocusable from '@/src/components/TVFocusable';
 import EpgStrip from '@/src/components/EpgStrip';
+import { useIsTV } from '@/src/hooks/useIsTV';
 
 const HIDE_AFTER_MS = 3500;
 
@@ -65,6 +67,23 @@ export default function PlayerScreen() {
   }>();
 
   const [buffering, setBuffering] = useState(true);
+  const isTV = useIsTV();
+  // Ref do botão "voltar" no topo — usado como destino de nextFocusUp dos
+  // controles centrais (play/pause, avançar/voltar 10s). Sem isso, o D-pad
+  // não tinha como saber que apertar CIMA a partir do centro deveria
+  // pular pra fileira de botões do topo (voltar, grade de canais, modo de
+  // tela, etc) — o algoritmo espacial padrão do Android TV não prioriza
+  // isso sozinho, mesmo com esses botões já sendo focáveis.
+  const topBarRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const [topBarHandle, setTopBarHandle] = useState<number | undefined>();
+  useEffect(() => {
+    if (!isTV) return;
+    const t = setTimeout(() => {
+      const handle = findNodeHandle(topBarRef.current);
+      if (handle) setTopBarHandle(handle);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [isTV]);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(true);
   const [showControls, setShowControls] = useState(true);
@@ -381,7 +400,7 @@ export default function PlayerScreen() {
 
           <SafeAreaView style={styles.safe} edges={['top', 'bottom']} pointerEvents="box-none">
             <View style={styles.topBar} pointerEvents="box-none">
-              <TVFocusable onPress={() => router.back()} hitSlop={12} style={styles.topBtn} testID="player-back">
+              <TVFocusable ref={topBarRef} onPress={() => router.back()} hitSlop={12} style={styles.topBtn} testID="player-back">
                 <Ionicons name="chevron-back" size={22} color={colors.white} />
               </TVFocusable>
               <Text style={styles.topTitle} numberOfLines={1}>{channelName}</Text>
@@ -413,6 +432,7 @@ export default function PlayerScreen() {
                 style={[styles.sideBtn, isLive && { opacity: 0.4 }]}
                 disabled={isLive}
                 testID="player-seek-back"
+                nextFocusUp={topBarHandle}
               >
                 <MaterialCommunityIcons name="rewind-10" size={32} color={colors.white} />
               </TVFocusable>
@@ -420,6 +440,7 @@ export default function PlayerScreen() {
                 onPress={togglePlay}
                 style={styles.playBtn}
                 testID="player-play-pause"
+                nextFocusUp={topBarHandle}
               >
                 <Ionicons
                   name={playing ? 'pause' : 'play'}
@@ -432,6 +453,7 @@ export default function PlayerScreen() {
                 style={[styles.sideBtn, isLive && { opacity: 0.4 }]}
                 disabled={isLive}
                 testID="player-seek-fwd"
+                nextFocusUp={topBarHandle}
               >
                 <MaterialCommunityIcons name="fast-forward-10" size={32} color={colors.white} />
               </TVFocusable>
