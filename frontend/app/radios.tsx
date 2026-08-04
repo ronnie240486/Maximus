@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: 8, textAlign: 'center' },
   emptySub: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
   station: {},
-  stationFocusTV: { transform: [{ scale: 1.08 }], borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 10 },
+  stationFocusTV: { borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 10 },
   stationCard: {
     aspectRatio: 1,
     borderRadius: 10,

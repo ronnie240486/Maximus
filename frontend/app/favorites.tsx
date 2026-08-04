@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: 8 },
   emptySub: { color: colors.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18 },
   poster: { flex: 1 / 3, maxWidth: '32%' },
-  posterFocusTV: { transform: [{ scale: 1.08 }], borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 10 },
+  posterFocusTV: { borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 10 },
   posterCard: {
     aspectRatio: 2 / 3,
     borderRadius: 8,

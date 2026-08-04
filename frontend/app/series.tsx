@@ -433,7 +433,6 @@ const styles = StyleSheet.create({
   emptySub: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
   poster: {},
   posterFocusTV: {
-    transform: [{ scale: 1.08 }],
     borderWidth: 2,
     borderColor: colors.accentCyan,
     borderRadius: 10,

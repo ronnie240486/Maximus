@@ -114,34 +114,45 @@ async function xtreamGet<T>(
   if (existing) return existing as Promise<T | null>;
 
   const promise = (async (): Promise<T | null> => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(routeUrl(url), {
-        headers: { ...commonHeaders, 'Accept-Encoding': 'gzip' },
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        lastError = res.status === 403 ? 'BLOCKED_CLOUDFLARE' : `HTTP_${res.status}`;
+    // Só tenta de novo em falha PASSAGEIRA (timeout, sem rede no instante) —
+    // bloqueio de Cloudflare ou erro HTTP normalmente é permanente pra
+    // aquela chamada, tentar de novo só demoraria mais sem resolver nada.
+    const RETRY_DELAYS_MS = [1000, 3000];
+    for (let attempt = 0; ; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(routeUrl(url), {
+          headers: { ...commonHeaders, 'Accept-Encoding': 'gzip' },
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          lastError = res.status === 403 ? 'BLOCKED_CLOUDFLARE' : `HTTP_${res.status}`;
+          return null;
+        }
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('json')) {
+          lastError = 'BLOCKED_CLOUDFLARE';
+          return null;
+        }
+        lastError = null;
+        const json = (await res.json()) as T;
+        if (ttl > 0) xtreamCache.set(cacheKey, { value: json, expiresAt: Date.now() + ttl });
+        return json;
+      } catch (e: any) {
+        lastError = e?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
+        if (attempt < RETRY_DELAYS_MS.length) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
         return null;
+      } finally {
+        clearTimeout(timer);
       }
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('json')) {
-        lastError = 'BLOCKED_CLOUDFLARE';
-        return null;
-      }
-      lastError = null;
-      const json = (await res.json()) as T;
-      if (ttl > 0) xtreamCache.set(cacheKey, { value: json, expiresAt: Date.now() + ttl });
-      return json;
-    } catch (e: any) {
-      lastError = e?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
-      return null;
-    } finally {
-      clearTimeout(timer);
-      xtreamInFlight.delete(cacheKey);
     }
-  })();
+  })().finally(() => {
+    xtreamInFlight.delete(cacheKey);
+  });
 
   xtreamInFlight.set(cacheKey, promise);
   return promise;

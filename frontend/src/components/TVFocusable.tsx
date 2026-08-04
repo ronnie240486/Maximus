@@ -62,6 +62,5 @@ const styles = StyleSheet.create({
   defaultFocus: {
     borderWidth: 2,
     borderColor: colors.accentCyan,
-    transform: [{ scale: 1.06 }],
   },
 });

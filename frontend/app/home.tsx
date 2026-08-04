@@ -545,6 +545,34 @@ export default function HomeScreen() {
         return prev;
       });
     }
+
+    // Pré-carrega Filmes e Séries em segundo plano, DEPOIS que a Home já
+    // terminou o essencial (não compete por rede/CPU com o que a pessoa
+    // está vendo agora). Grava no mesmo cache que as telas de Filmes e
+    // Séries leem (list-cache.ts) — assim, quando a pessoa de fato clicar
+    // nelas, o cache já está quente e abre instantâneo, em vez de esperar
+    // a rede do zero. Silencioso: se falhar, a tela de Filmes/Séries
+    // busca do zero normalmente quando abrir, sem problema nenhum.
+    (async () => {
+      try {
+        const [movieCats, movieStreams] = await Promise.all([
+          xtream.vodCategories(creds),
+          xtream.vodStreams(creds),
+        ]);
+        if (movieCats || movieStreams) {
+          await saveListCache('movies', movieCats || [], movieStreams || []);
+        }
+      } catch {}
+      try {
+        const [seriesCats, seriesStreams] = await Promise.all([
+          xtream.seriesCategories(creds),
+          xtream.seriesList(creds),
+        ]);
+        if (seriesCats || seriesStreams) {
+          await saveListCache('series', seriesCats || [], seriesStreams || []);
+        }
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {

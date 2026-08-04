@@ -445,7 +445,6 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: 8 },
   poster: {},
   posterFocusTV: {
-    transform: [{ scale: 1.08 }],
     borderWidth: 2,
     borderColor: colors.accentCyan,
     borderRadius: 10,
