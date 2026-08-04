@@ -9,6 +9,9 @@ import { useVideoPlayer } from 'expo-video';
 import { colors, spacing } from '@/src/theme';
 import { loadFavorites, toggleFavorite, FavoriteItem, FavoriteKind } from '@/src/state/favorites';
 import TVFocusable from '@/src/components/TVFocusable';
+import { useIsTV } from '@/src/hooks/useIsTV';
+import { getXtream } from '@/src/state/session';
+import { liveStreamUrl } from '@/src/lib/xtream';
 
 const TABS: { key: FavoriteKind | 'all'; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -20,6 +23,7 @@ const TABS: { key: FavoriteKind | 'all'; label: string }[] = [
 
 export default function FavoritesScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [tab, setTab] = useState<FavoriteKind | 'all'>('all');
   const [currentRadio, setCurrentRadio] = useState<FavoriteItem | null>(null);
@@ -94,6 +98,21 @@ export default function FavoritesScreen() {
     if (item.kind === 'series') {
       router.push({ pathname: '/series-details', params: { id: String(item.refId), name: item.name, cover: item.cover || '' } });
       return;
+    }
+    if (isTV) {
+      const creds = getXtream();
+      if (creds) {
+        router.push({
+          pathname: '/player',
+          params: {
+            id: `live-${item.refId}`,
+            name: item.name,
+            stream: liveStreamUrl(creds, Number(item.refId), 'm3u8'),
+            logo: item.cover || '',
+          },
+        });
+        return;
+      }
     }
     router.push({
       pathname: '/channel-details',
