@@ -401,6 +401,12 @@ export default function ChannelsScreen() {
                 maxToRenderPerBatch={20}
                 windowSize={7}
                 removeClippedSubviews
+                // Altura da linha é fixa (56px, ver styles.tvRow) — dizer
+                // isso de antemão evita o React Native ter que MEDIR cada
+                // item na hora de rolar/pular pra um índice, o que pesa
+                // mais em processador fraco (comum em TV box). Essencial
+                // pra rolagem suave com D-pad em listas longas.
+                getItemLayout={(_, index) => ({ length: 56, offset: 56 * index, index })}
                 renderItem={({ item, index }) => (
                   <ChannelRow
                     item={item}
@@ -676,6 +682,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
+    height: 56,
   },
   tvRowActive: { backgroundColor: 'rgba(76,232,240,0.10)' },
   tvRowFocus: {
