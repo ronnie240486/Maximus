@@ -5,7 +5,7 @@
 //   import { storage } from "@/src/utils/storage";
 //   await storage.getItem(key, fallback);      // the `fallback` arg is REQUIRED
 //
-// Namespaces: general KV -> getItem/setItem/removeItem (AsyncStorage);
+// Namespaces: general KV -> getItem/setItem/removeItem (MMKV, ver abaixo);
 //             tokens/secrets -> secureGet/secureSet/secureRemove (Keychain).
 // Values are auto JSON-serialized (string|number|boolean|null) in this implementation — never JSON.stringify/parse yourself.
 // Helpers NEVER throw: a miss returns `fallback`, a failed write returns `false` (failures are SILENT).
@@ -16,21 +16,48 @@
 // way on both sides — the login/AuthContext (write) and the API client/interceptor (read). A
 // mismatched method or key silently returns the fallback, surfacing as a logged-out state or 401/403
 // with no error in the logs.
+//
+// MMKV em vez de AsyncStorage: leitura/escrita síncrona, escrita em C++,
+// 10-30x mais rápida — importa bastante em TV box de processador mais
+// fraco, onde AsyncStorage (que serializa tudo passando pela ponte
+// JS↔nativo) é um gargalo real e silencioso.
+//
+// MIGRAÇÃO: quem já tinha o app instalado tem tudo salvo no AsyncStorage
+// antigo — pra não perder nada, toda LEITURA que não encontra a chave no
+// MMKV cai pro AsyncStorage como respaldo, e se achar lá, já copia pro
+// MMKV na hora (essa mesma chave nunca mais precisa desse caminho de
+// novo). Migração "preguiçosa", por chave, sem precisar de nenhum passo
+// especial nem risco de perder tudo de uma vez se algo der errado no meio.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
+import { MMKV } from "react-native-mmkv";
 
 import { AssertNoExtras, StorageBase, StorageItemValue } from "./storage-base";
 
+const mmkv = new MMKV({ id: "maximus-kv" });
+
 export class Storage extends StorageBase {
-  // General KV — backed by AsyncStorage.
-  // `fallback` is required and returned on any miss/parse error — a missing key looks identical to a stored `null`.
+  // General KV — backed by MMKV, com respaldo de leitura no AsyncStorage
+  // antigo (ver nota de migração acima).
   async getItem<Fallback extends StorageItemValue>(
     key: string,
     fallback: Fallback,
   ): Promise<Fallback | null> {
     try {
-      const raw = await AsyncStorage.getItem(key);
+      let raw = mmkv.getString(key) ?? null;
+      if (raw === null) {
+        const legacy = await AsyncStorage.getItem(key);
+        if (legacy !== null) {
+          raw = legacy;
+          try {
+            mmkv.set(key, legacy);
+          } catch {
+            // Falha ao copiar pro MMKV não é motivo pra falhar a leitura —
+            // só significa que essa chave tenta migrar de novo na próxima.
+          }
+        }
+      }
       return this.retrieve(raw, fallback);
     } catch (e) {
       this.warn("getItem", key, e);
@@ -43,7 +70,7 @@ export class Storage extends StorageBase {
     value: Value,
   ): Promise<boolean> {
     try {
-      await AsyncStorage.setItem(key, JSON.stringify(value));
+      mmkv.set(key, JSON.stringify(value));
       return true;
     } catch (e) {
       this.warn("setItem", key, e);
@@ -53,7 +80,11 @@ export class Storage extends StorageBase {
 
   async removeItem(key: string): Promise<boolean> {
     try {
-      await AsyncStorage.removeItem(key);
+      mmkv.delete(key);
+      // Remove do AsyncStorage antigo também, se ainda existir lá — sem
+      // isso, uma leitura futura poderia "ressuscitar" um valor apagado
+      // (o respaldo de leitura acima acharia ele de novo no AsyncStorage).
+      AsyncStorage.removeItem(key).catch(() => {});
       return true;
     } catch (e) {
       this.warn("removeItem", key, e);
