@@ -741,6 +741,7 @@ export default function HomeScreen() {
     { key: 'search', label: 'Busca', testID: 'nav-search', icon: (active: boolean) => <Ionicons name="search" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/search') },
     { key: 'diagnostic', label: 'Diagnóstico', testID: 'nav-diagnostic', icon: (active: boolean) => <Ionicons name="pulse" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/diagnostic') },
     { key: 'settings', label: 'Ajustes', testID: 'nav-settings', icon: (active: boolean) => <Ionicons name="settings" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/settings') },
+    { key: 'cameras', label: 'Cameras', testID: 'nav-cameras', icon: (active: boolean) => <Ionicons name="videocam" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/cameras') },
   ];
 
   return (
