@@ -19,7 +19,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
-import { xtream, XtreamCategory, XtreamLive, getLastXtreamError } from '@/src/lib/xtream';
+import { xtream, XtreamCategory, XtreamLive, getLastXtreamError, liveStreamUrl } from '@/src/lib/xtream';
 import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
@@ -299,6 +299,28 @@ export default function ChannelsScreen() {
   const openPlayer = (s: XtreamLive) => {
     const categoryName = categories.find((c) => c.category_id === s.category_id)?.category_name;
     guard(categoryName, () => {
+      // Na TV, o fluxo "lista → preview pequeno → channel-details (tela
+      // do meio, com EPG) → tela cheia" exigia 2 cliques em OK e deixava
+      // essa tela do meio viva rodando por trás quando ia pra tela cheia
+      // (2 players ativos ao mesmo tempo, travando a TV box). Direto pra
+      // tela cheia aqui: 1 clique, sem tela intermediária pra ficar presa
+      // rodando. No celular mantém o fluxo normal (channel-details tem o
+      // EPG detalhado que faz sentido ali).
+      if (isTV) {
+        const creds = getXtream();
+        if (!creds) return;
+        router.push({
+          pathname: '/player',
+          params: {
+            id: `live-${s.stream_id}`,
+            name: s.name,
+            stream: liveStreamUrl(creds, s.stream_id, 'm3u8'),
+            logo: s.stream_icon || '',
+            adult: isAdultCategoryName(categoryName) ? '1' : '',
+          },
+        });
+        return;
+      }
       router.push({
         pathname: '/channel-details',
         params: {

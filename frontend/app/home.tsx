@@ -668,10 +668,27 @@ export default function HomeScreen() {
     }
     if (!item.stream) return;
     guard(item.name, () => {
+      const channelId = item.id.replace('live-', '').replace('continue-live-', '');
+      if (isTV) {
+        const creds = getXtream();
+        if (creds) {
+          router.push({
+            pathname: '/player',
+            params: {
+              id: `live-${channelId}`,
+              name: item.name,
+              stream: liveStreamUrl(creds, Number(channelId), 'm3u8'),
+              logo: item.logo || '',
+              adult: adultFlag,
+            },
+          });
+          return;
+        }
+      }
       router.push({
         pathname: '/channel-details',
         params: {
-          id: item.id.replace('live-', '').replace('continue-live-', ''),
+          id: channelId,
           name: item.name,
           cover: item.logo || '',
           adult: adultFlag,
