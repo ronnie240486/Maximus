@@ -78,11 +78,26 @@ const CACHEABLE_TTL_MS: Record<string, number> = {
   get_series: 120_000,
   get_series_info: 120_000,
   get_vod_info: 120_000,
+  // TTL bem mais curto que o resto — é "o que está passando agora", não
+  // pode ficar velho por minutos. Mas precisa de ALGUM cache (mesmo curto)
+  // pra o pré-carregamento em background (ver channels.tsx) valer a pena;
+  // sem isso, o pré-carregamento buscaria e a tela pediria nova de novo
+  // um instante depois, dobrando o trabalho à toa.
+  get_short_epg: 45_000,
 };
 
 type CacheEntry = { value: unknown; expiresAt: number };
 const xtreamCache = new Map<string, CacheEntry>();
 const xtreamInFlight = new Map<string, Promise<unknown>>();
+
+// Métricas simples pra mostrar em Configurações — só conta, não guarda
+// nada sensível. Zera quando o app reabre (é só da sessão atual).
+let cacheHits = 0;
+let cacheMisses = 0;
+export function getXtreamCacheStats(): { hits: number; misses: number; hitRate: number } {
+  const total = cacheHits + cacheMisses;
+  return { hits: cacheHits, misses: cacheMisses, hitRate: total > 0 ? cacheHits / total : 0 };
+}
 
 async function xtreamGet<T>(
   creds: XtreamCreds,
@@ -103,8 +118,10 @@ async function xtreamGet<T>(
   if (ttl > 0) {
     const cached = xtreamCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
+      cacheHits++;
       return cached.value as T;
     }
+    cacheMisses++;
   }
 
   // Eliminação de chamada duplicada: se essa MESMA URL já está sendo
@@ -123,7 +140,7 @@ async function xtreamGet<T>(
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const res = await fetch(routeUrl(url), {
-          headers: { ...commonHeaders, 'Accept-Encoding': 'gzip' },
+          headers: commonHeaders,
           signal: controller.signal,
         });
         if (!res.ok) {

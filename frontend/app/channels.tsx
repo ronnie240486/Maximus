@@ -26,6 +26,7 @@ import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
+import { getListPerfProps } from '@/src/hooks/useIsLowEndDevice';
 import TVFocusable from '@/src/components/TVFocusable';
 import TVChannelPreview from '@/src/components/TVChannelPreview';
 
@@ -80,6 +81,8 @@ const ChannelRow = React.memo(function ChannelRow({
 export default function ChannelsScreen() {
   const router = useRouter();
   const isTV = useIsTV();
+  const listPerf = getListPerfProps(20);
+  const gridListPerf = getListPerfProps(12);
   const params = useLocalSearchParams<{ initialQuery?: string; initialCategory?: string }>();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -155,6 +158,13 @@ export default function ChannelsScreen() {
     const cats = await catsPromise;
     if (list && list.length) {
       saveListCache(CACHE_KEY, cats || [], list);
+
+      // Pré-carrega o EPG ("o que está passando agora") dos primeiros ~15
+      // canais em segundo plano — quando a pessoa focar/abrir um desses
+      // canais, o EPG já está pronto (ou quase), sem esperar a rede na
+      // hora. Silencioso: se falhar, a tela busca normalmente quando
+      // precisar de verdade.
+      Promise.all(list.slice(0, 15).map((c) => xtream.shortEpg(creds, c.stream_id, 1).catch(() => null)));
     }
   }, []);
 
@@ -414,9 +424,9 @@ export default function ChannelsScreen() {
               <FlatList
                 data={filtered}
                 keyExtractor={(c) => String(c.stream_id)}
-                initialNumToRender={20}
-                maxToRenderPerBatch={20}
-                windowSize={7}
+                initialNumToRender={listPerf.initialNumToRender}
+                maxToRenderPerBatch={listPerf.maxToRenderPerBatch}
+                windowSize={listPerf.windowSize}
                 removeClippedSubviews
                 // Altura da linha é fixa (56px, ver styles.tvRow) — dizer
                 // isso de antemão evita o React Native ter que MEDIR cada
@@ -489,9 +499,9 @@ export default function ChannelsScreen() {
           numColumns={numColumns}
           columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
           contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.sm }}
-          initialNumToRender={12}
-          maxToRenderPerBatch={12}
-          windowSize={7}
+          initialNumToRender={gridListPerf.initialNumToRender}
+          maxToRenderPerBatch={gridListPerf.maxToRenderPerBatch}
+          windowSize={gridListPerf.windowSize}
           removeClippedSubviews
           renderItem={({ item }) => (
             <Pressable

@@ -1,11 +1,13 @@
 import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
+import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { LogBox, StatusBar, View, Text, StyleSheet } from "react-native";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { verifyAppIntegrity } from "@/src/lib/integrity";
+import { storage } from "@/src/utils/storage";
 
 LogBox.ignoreAllLogs(true);
 
@@ -24,6 +26,26 @@ export default function RootLayout() {
 
   useEffect(() => {
     setIntegrityOk(verifyAppIntegrity().ok);
+  }, []);
+
+  useEffect(() => {
+    // expo-image não expõe uma forma de checar o TAMANHO atual do cache de
+    // imagens em disco (só limpar tudo) — então em vez de "limpa se passar
+    // de X MB", limpa por TEMPO: uma vez a cada 7 dias, o suficiente pra
+    // não deixar acumular sem limite numa TV box com pouco espaço,
+    // silencioso, sem nenhum aviso ou travamento pro usuário.
+    const CLEAR_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+    const KEY = 'last_image_cache_clear_at';
+    (async () => {
+      const last = await storage.getItem<number>(KEY, 0);
+      const now = Date.now();
+      if (!last || now - last > CLEAR_INTERVAL_MS) {
+        try {
+          await Image.clearDiskCache();
+        } catch {}
+        await storage.setItem(KEY, now);
+      }
+    })();
   }, []);
 
   useEffect(() => {

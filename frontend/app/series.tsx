@@ -26,6 +26,7 @@ import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
+import { getListPerfProps } from '@/src/hooks/useIsLowEndDevice';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const ALL = 'Todos';
@@ -37,6 +38,7 @@ const SIDE_COL_WIDTH_TV = 230;
 export default function SeriesScreen() {
   const router = useRouter();
   const isTV = useIsTV();
+  const listPerf = getListPerfProps(15);
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const numColumns = isLandscape ? 6 : 3;
@@ -225,9 +227,9 @@ export default function SeriesScreen() {
         numColumns={numColumns}
         columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.md }}
-        initialNumToRender={15}
-        maxToRenderPerBatch={15}
-        windowSize={7}
+        initialNumToRender={listPerf.initialNumToRender}
+        maxToRenderPerBatch={listPerf.maxToRenderPerBatch}
+        windowSize={listPerf.windowSize}
         removeClippedSubviews
         renderItem={({ item }) => (
           <TVFocusable

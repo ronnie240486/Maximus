@@ -18,6 +18,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
 import { clearSession, loadSession, getXtream } from '@/src/state/session';
+import { getXtreamCacheStats } from '@/src/lib/xtream';
 import { xtream } from '@/src/lib/xtream';
 import { storage } from '@/src/utils/storage';
 import { clearHomeCache } from '@/src/state/home-cache';
@@ -365,6 +366,17 @@ export default function SettingsScreen() {
           } as Row,
         ]
       : []),
+    {
+      id: 'cache-stats',
+      title: 'Cache desta sessão',
+      subtitle: (() => {
+        const s = getXtreamCacheStats();
+        const total = s.hits + s.misses;
+        if (total === 0) return 'Ainda sem dados nessa sessão';
+        return `${Math.round(s.hitRate * 100)}% das chamadas vieram do cache (${s.hits} de ${total})`;
+      })(),
+      icon: <Ionicons name="speedometer-outline" size={20} color={colors.accentCyan} />,
+    },
     {
       id: 'update',
       title: checkingUpdate ? 'Verificando...' : 'Verificar atualização',

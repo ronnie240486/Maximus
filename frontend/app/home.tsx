@@ -38,6 +38,12 @@ import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import ClockWeather from '@/src/components/ClockWeather';
 import TVFocusable from '@/src/components/TVFocusable';
 import { useIsTV } from '@/src/hooks/useIsTV';
+import NetInfo from '@react-native-community/netinfo';
+import { getListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+
+// Calculado uma vez só (não é hook, é função pura) — todas as fileiras da
+// Home reaproveitam o mesmo resultado em vez de recalcular a cada uma.
+const homeRowListPerf = getListPerfProps(8);
 import {
   xtream,
   parsePlaylistUrl,
@@ -111,6 +117,17 @@ export default function HomeScreen() {
   // pesava na sensação de navegação lenta, principalmente em TV box com
   // rede mais fraca.
   const lastFocusCheckRef = React.useRef(0);
+
+  useEffect(() => {
+    // Banner discreto de "sem internet" — a tela já usa cache (stale-
+    // while-revalidate) quando a rede falha, então isso não muda o
+    // comportamento, só avisa visualmente o que já está acontecendo (por
+    // que os dados podem estar desatualizados agora).
+    const unsub = NetInfo.addEventListener((state) => {
+      setIsOffline(state.isConnected === false);
+    });
+    return unsub;
+  }, []);
   // Keyed slots instead of a flat array so each section can be filled in
   // independently as its own fetch resolves, without waiting on the others.
   const [slots, setSlots] = useState<{
@@ -131,6 +148,7 @@ export default function HomeScreen() {
   const [featured, setFeatured] = useState<FeaturedEntry[]>([]);
   const [featuredFavIds, setFeaturedFavIds] = useState<Set<string>>(new Set());
   const [bg, setBg] = useState<string | undefined>();
+  const [isOffline, setIsOffline] = useState(false);
   // Se a URL da imagem de fundo do painel vier preenchida mas FALHAR ao
   // carregar (link assinado vencido, servidor de imagem fora do ar, etc.),
   // sem isso a tela ficava sem fundo nenhum — nunca caía pro padrão porque
@@ -722,6 +740,12 @@ export default function HomeScreen() {
     >
       <View style={[styles.overlay, !(bg && !bgFailed) && styles.overlayLight]} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        {isOffline && (
+          <View style={styles.offlineBanner} testID="offline-banner">
+            <Ionicons name="cloud-offline-outline" size={14} color={colors.black} />
+            <Text style={styles.offlineBannerText}>Sem internet — mostrando o que já tinha salvo</Text>
+          </View>
+        )}
         <View style={{ flex: 1, flexDirection: isLandscape ? 'row' : 'column' }}>
           {isLandscape && (
             <ScrollView
@@ -1027,9 +1051,9 @@ function SectionRow({
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
         showsHorizontalScrollIndicator={false}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={5}
+        initialNumToRender={homeRowListPerf.initialNumToRender}
+        maxToRenderPerBatch={homeRowListPerf.maxToRenderPerBatch}
+        windowSize={homeRowListPerf.windowSize}
         removeClippedSubviews
         renderItem={({ item, index }) => (
           <TVFocusable
@@ -1099,6 +1123,15 @@ function EmptyHome({ errorCode, onRetry }: { errorCode: string | null; onRetry: 
 const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.black },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.accentCyan,
+    paddingVertical: 4,
+  },
+  offlineBannerText: { color: colors.black, fontSize: 11, fontWeight: '700' },
   overlayLight: { backgroundColor: 'rgba(0,0,0,0.15)' },
   safe: { flex: 1 },
   bottomNav: {
