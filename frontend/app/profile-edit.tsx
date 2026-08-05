@@ -8,6 +8,7 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -82,7 +83,16 @@ export default function EditProfileScreen() {
   const onSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const updated = await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId, isKids }); const newId = selectedId || updated[updated.length - 1]?.id; if (newId) setActiveProfileId(newId);
+    try {
+      const updated = await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId, isKids });
+      const newId = selectedId || updated[updated.length - 1]?.id;
+      if (newId) setActiveProfileId(newId);
+      Alert.alert('DEBUG', 'Perfil salvo! ID: ' + newId + ' | Total perfis: ' + updated.length);
+    } catch (e) {
+      Alert.alert('ERRO ao salvar perfil', String(e));
+      setSaving(false);
+      return;
+    }
     setSaving(false);
     router.back();
   };
