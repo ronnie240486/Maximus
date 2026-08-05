@@ -9,18 +9,22 @@ const KEY = 'profiles_v1';
 export type Profile = { id: string; name: string; avatar_id: string; isKids?: boolean };
 
 export async function loadProfiles(): Promise<Profile[]> {
-  const raw = await storage.getItem<string>(KEY, '');
+  const raw = await storage.getItem<Profile[]>(KEY, []);
   if (!raw) return [];
-  try {
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? (list as Profile[]) : [];
-  } catch {
-    return [];
+  if (Array.isArray(raw)) return raw as Profile[];
+  if (typeof raw === 'string') {
+    try {
+      const list = JSON.parse(raw);
+      return Array.isArray(list) ? (list as Profile[]) : [];
+    } catch {
+      return [];
+    }
   }
+  return [];
 }
 
 async function persist(profiles: Profile[]): Promise<void> {
-  await storage.setItem(KEY, JSON.stringify(profiles));
+  await storage.setItem(KEY, profiles);
 }
 
 export async function upsertProfile(

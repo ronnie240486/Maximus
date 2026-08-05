@@ -87,8 +87,6 @@ export default function EditProfileScreen() {
       const updated = await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId, isKids });
       const newId = selectedId || updated[updated.length - 1]?.id;
       if (newId) setActiveProfileId(newId);
-      const reread = await loadProfiles();
-      Alert.alert('DEBUG', 'Memoria: ' + updated.length + ' | Relido storage: ' + reread.length);
     } catch (e) {
       Alert.alert('ERRO ao salvar perfil', String(e));
       setSaving(false);

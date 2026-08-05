@@ -47,7 +47,6 @@ export default function ProfileSelectionScreen() {
     if (mySeq !== loadSeq.current) return;
     setMac(m);
     setProfiles(list);
-    Alert.alert('DEBUG profiles.tsx', 'list.length=' + list.length + ' cachedSession.status=' + (cachedSession?.status ?? 'null'));
 
     // Sessão de teste: não existe no painel principal, então perguntar pra
     // ele sempre voltaria "não autorizado" e sobrescreveria a sessão de
