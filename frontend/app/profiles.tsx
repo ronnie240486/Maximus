@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,13 +34,16 @@ export default function ProfileSelectionScreen() {
     setBgFailed(false);
   }, [bg]);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const mySeq = ++loadSeq.current;
     setLoading(true);
     const [m, list, cachedSession] = await Promise.all([
       getDeviceMac(),
       loadProfiles(),
       loadSession(),
     ]);
+    if (mySeq !== loadSeq.current) return;
     setMac(m);
     setProfiles(list);
 
