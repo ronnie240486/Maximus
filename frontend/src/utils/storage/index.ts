@@ -80,7 +80,7 @@ export class Storage extends StorageBase {
       return true;
     } catch (e) {
       this.warn("setItem", key, e);
-      return false;
+      throw e;
     }
   }
 

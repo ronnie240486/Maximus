@@ -95,6 +95,7 @@ export default function ProfileSelectionScreen() {
   };
 
   const addProfile = () => router.push('/profile-edit');
+  const pularDev = () => router.push({ pathname: '/home', params: { profileId: 'default', profileName: 'Dev' } });
   const goManage = () => {
     if (profiles.length === 0) return addProfile();
     router.push({ pathname: '/profile-edit', params: { manage: '1' } });
