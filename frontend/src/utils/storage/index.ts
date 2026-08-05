@@ -35,7 +35,13 @@ import { MMKV } from "react-native-mmkv";
 
 import { AssertNoExtras, StorageBase, StorageItemValue } from "./storage-base";
 
-const mmkv = new MMKV({ id: "maximus-kv" });
+let _mmkv: MMKV | null = null;
+function getMmkv(): MMKV {
+  if (!_mmkv) {
+    _mmkv = new MMKV({ id: "maximus-kv" });
+  }
+  return _mmkv;
+}
 
 export class Storage extends StorageBase {
   // General KV — backed by MMKV, com respaldo de leitura no AsyncStorage
@@ -45,13 +51,13 @@ export class Storage extends StorageBase {
     fallback: Fallback,
   ): Promise<Fallback | null> {
     try {
-      let raw = mmkv.getString(key) ?? null;
+      let raw = getMmkv().getString(key) ?? null;
       if (raw === null) {
         const legacy = await AsyncStorage.getItem(key);
         if (legacy !== null) {
           raw = legacy;
           try {
-            mmkv.set(key, legacy);
+            getMmkv().set(key, legacy);
           } catch {
             // Falha ao copiar pro MMKV não é motivo pra falhar a leitura —
             // só significa que essa chave tenta migrar de novo na próxima.
@@ -70,7 +76,7 @@ export class Storage extends StorageBase {
     value: Value,
   ): Promise<boolean> {
     try {
-      mmkv.set(key, JSON.stringify(value));
+      getMmkv().set(key, JSON.stringify(value));
       return true;
     } catch (e) {
       this.warn("setItem", key, e);
@@ -80,7 +86,7 @@ export class Storage extends StorageBase {
 
   async removeItem(key: string): Promise<boolean> {
     try {
-      mmkv.delete(key);
+      getMmkv().delete(key);
       // Remove do AsyncStorage antigo também, se ainda existir lá — sem
       // isso, uma leitura futura poderia "ressuscitar" um valor apagado
       // (o respaldo de leitura acima acharia ele de novo no AsyncStorage).
