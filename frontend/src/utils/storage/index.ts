@@ -44,6 +44,7 @@ function getMmkv(): MMKV {
 }
 
 export class Storage extends StorageBase {
+  public lastError: unknown = null;
   // General KV — backed by MMKV, com respaldo de leitura no AsyncStorage
   // antigo (ver nota de migração acima).
   async getItem<Fallback extends StorageItemValue>(
@@ -80,6 +81,7 @@ export class Storage extends StorageBase {
       return true;
     } catch (e) {
       this.warn("setItem", key, e);
+      this.lastError = e;
       return false;
     }
   }
