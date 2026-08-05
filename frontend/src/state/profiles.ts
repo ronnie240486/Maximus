@@ -24,7 +24,10 @@ export async function loadProfiles(): Promise<Profile[]> {
 }
 
 async function persist(profiles: Profile[]): Promise<void> {
-  await storage.setItem(KEY, profiles);
+  const ok = await storage.setItem(KEY, profiles);
+  if (!ok) {
+    throw new Error('Falha ao salvar perfil no armazenamento local (setItem retornou false)');
+  }
 }
 
 export async function upsertProfile(
