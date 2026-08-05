@@ -1,3 +1,4 @@
+import { setActiveProfileId } from '@/src/state/active-profile';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -81,7 +82,7 @@ export default function EditProfileScreen() {
   const onSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId, isKids });
+    const updated = await upsertProfile({ id: selectedId, name: name.trim(), avatar_id: avatarId, isKids }); const newId = selectedId || updated[updated.length - 1]?.id; if (newId) setActiveProfileId(newId);
     setSaving(false);
     router.back();
   };
