@@ -24,7 +24,6 @@ const PAGE_SIZE = 30;
 // estrutura de dados (arriscado, pode quebrar sem aviso), abrimos o
 // portal OFICIAL de cada um dentro do próprio app (mesmo padrão que
 // trailer.tsx já usa pro YouTube).
-//
 // Só São Paulo tem uma fonte confirmada funcionando no momento em que
 // isso foi escrito — Rio de Janeiro descontinuou o portal antigo (o
 // endereço atual redireciona pro app COR.Rio, que não dá pra embutir) e
