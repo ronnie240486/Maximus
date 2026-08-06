@@ -31,14 +31,14 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { MMKV } from "react-native-mmkv";
+import { createMMKV, type MMKV } from "react-native-mmkv";
 
 import { AssertNoExtras, StorageBase, StorageItemValue } from "./storage-base";
 
 let _mmkv: MMKV | null = null;
 function getMmkv(): MMKV {
   if (!_mmkv) {
-    _mmkv = new MMKV({ id: "maximus-kv" });
+    _mmkv = createMMKV({ id: "maximus-kv" });
   }
   return _mmkv;
 }
