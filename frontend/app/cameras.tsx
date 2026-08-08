@@ -195,5 +195,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-CAMDETAILS_EOF
-grep -n "^export default" app/camera-details.tsx
