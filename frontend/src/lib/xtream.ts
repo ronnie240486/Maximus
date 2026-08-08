@@ -395,10 +395,25 @@ export type XtreamEpgListing = {
 
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
 
+// Memoiza por string de entrada — a MESMA tela de EPG re-renderiza várias
+// vezes sem o texto ter mudado (marcar lembrete, timeline recalculando,
+// etc), e sem isso cada re-render refazia o decode inteiro (loop
+// caractere-a-caractere + decodeURIComponent) de TODOS os títulos/
+// descrições visíveis, do zero, toda vez. Capado em tamanho pra não
+// crescer sem limite numa sessão longa — o "conjunto de trabalho" real
+// (títulos de EPG visíveis nas telas abertas) é sempre pequeno, então um
+// teto generoso nunca deveria expulsar algo que ainda está em uso.
+const EPG_DECODE_CACHE_MAX = 500;
+const epgDecodeCache = new Map<string, string>();
+
 /** Decodes the base64 text Xtream sends for EPG title/description — no
  * `atob`/Buffer dependency needed, works the same on native and web. */
 export function decodeEpgText(input?: string): string {
   if (!input) return '';
+  const cached = epgDecodeCache.get(input);
+  if (cached !== undefined) return cached;
+
+  let result: string;
   try {
     let str = input.replace(/[^A-Za-z0-9+/=]/g, '');
     let output = '';
@@ -415,15 +430,24 @@ export function decodeEpgText(input?: string): string {
       if (enc4 !== 64 && enc4 !== -1) output += String.fromCharCode(chr3);
     }
     // Xtream text is UTF-8 encoded before base64 — decode the byte string properly.
-    return decodeURIComponent(
+    result = decodeURIComponent(
       output
         .split('')
         .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
         .join('')
     );
   } catch {
-    return input;
+    result = input;
   }
+
+  // Se já estourou o teto, tira a entrada mais antiga (primeira inserida
+  // — Map do JS preserva ordem de inserção) antes de adicionar a nova.
+  if (epgDecodeCache.size >= EPG_DECODE_CACHE_MAX) {
+    const oldestKey = epgDecodeCache.keys().next().value;
+    if (oldestKey !== undefined) epgDecodeCache.delete(oldestKey);
+  }
+  epgDecodeCache.set(input, result);
+  return result;
 }
 
 export function liveStreamUrl(c: XtreamCreds, streamId: number, ext: 'ts' | 'm3u8' = 'm3u8'): string {
