@@ -1,4 +1,5 @@
 import * as Device from 'expo-device';
+import { Platform } from 'react-native';
 
 // TV boxes baratas costumam ter 1-2GB de RAM total (contra 4-8GB+ de um
 // celular médio) — abaixo desse limite, listas grandes com muita
@@ -7,22 +8,88 @@ import * as Device from 'expo-device';
 // vez só, direto no module scope.
 const LOW_END_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // 2GB
 
+// MAS: RAM alta não quer dizer processador rápido. É comum TV box barata
+// vir com "bastante RAM" (4GB+, número que ajuda a vender) só que com um
+// chip de processador antigo/fraco por baixo — nesse caso, o gargalo real
+// é CPU, não memória, e o critério de RAM sozinho classificaria (errado)
+// esse aparelho como "normal", deixando de aplicar as otimizações que ele
+// mais precisa.
+//
+// Pra pegar esse caso, faz um teste rápido e real de velocidade de CPU na
+// abertura do app: roda uma quantidade fixa de contas (sem I/O, sem
+// esperar rede/disco) e mede quanto tempo levou. Processador rápido
+// termina isso em poucos milissegundos; processador fraco demora bem
+// mais — o número em si aparece na tela de Diagnóstico, pra dar pra
+// calibrar o limiar certo com dados reais de aparelhos de verdade, em vez
+// de eu ter que adivinhar sem poder testar numa TV box específica.
+const CPU_BENCHMARK_ITERATIONS = 3_000_000;
+// Ponto de partida conservador — ajustável depois de ver números reais
+// de TV boxes reportados na tela de Diagnóstico.
+const CPU_BENCHMARK_SLOW_THRESHOLD_MS = 40;
+
+function benchmarkCpuMs(): number {
+  const start = Date.now();
+  let x = 0;
+  for (let i = 0; i < CPU_BENCHMARK_ITERATIONS; i++) {
+    x += Math.sqrt(i) % 7;
+  }
+  // Só pra o resultado do loop não ser "otimizado embora" por engano por
+  // algum motor JS mais agressivo — nunca chega a logar de verdade.
+  if (x === -1) console.log(x);
+  return Date.now() - start;
+}
+
+// Alguns TV box ainda são 32-bit (armeabi-v7a) mesmo em 2026 — geralmente
+// sinal de chip mais antigo/mais fraco, já que fabricantes de chip novo
+// quase sempre saem direto em 64-bit hoje em dia.
+function is32BitOnly(): boolean {
+  try {
+    const archs = Device.supportedCpuArchitectures || [];
+    return archs.length > 0 && !archs.some((a) => a.includes('64'));
+  } catch {
+    return false;
+  }
+}
+
+export const cpuBenchmarkMs = Platform.OS === 'web' ? 0 : benchmarkCpuMs();
+
 const isLowEndDevice = (() => {
   try {
     const mem = Device.totalMemory;
-    return typeof mem === 'number' && mem > 0 && mem < LOW_END_THRESHOLD_BYTES;
+    const weakByRam = typeof mem === 'number' && mem > 0 && mem < LOW_END_THRESHOLD_BYTES;
+    const weakByCpu = cpuBenchmarkMs > CPU_BENCHMARK_SLOW_THRESHOLD_MS;
+    const weakByArch = is32BitOnly();
+    return weakByRam || weakByCpu || weakByArch;
   } catch {
     return false;
   }
 })();
 
 /**
- * true se o aparelho tem RAM baixa (TV box mais fraca) — usado pra reduzir
- * o quanto as listas grandes renderizam de uma vez (initialNumToRender,
- * windowSize etc). Em aparelhos com RAM normal/alta, não muda nada.
+ * true se o aparelho for considerado fraco — por RAM baixa, CPU lenta no
+ * benchmark, ou arquitetura só 32-bit (qualquer um dos três já classifica
+ * como fraco). Usado pra reduzir renderização simultânea e desligar
+ * prefetches em segundo plano que competiriam por CPU.
  */
 export function useIsLowEndDevice(): boolean {
   return isLowEndDevice;
+}
+
+/** Detalhes crus da detecção — usado na tela de Diagnóstico pra mostrar
+ * os números reais do aparelho, e permitir calibrar os limiares certos
+ * com dados de TV box de verdade (sem isso, teria que adivinhar às
+ * cegas, sem poder testar no aparelho da pessoa). */
+export function getDeviceCapabilityInfo() {
+  return {
+    isLowEndDevice,
+    totalMemoryBytes: Device.totalMemory,
+    cpuBenchmarkMs,
+    cpuBenchmarkThresholdMs: CPU_BENCHMARK_SLOW_THRESHOLD_MS,
+    is32BitOnly: is32BitOnly(),
+    supportedCpuArchitectures: Device.supportedCpuArchitectures,
+    modelName: Device.modelName,
+    osVersion: Device.osVersion,
+  };
 }
 
 /**

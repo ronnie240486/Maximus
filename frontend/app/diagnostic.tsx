@@ -10,6 +10,7 @@ import { checkMac } from '@/src/api/client';
 import { parsePlaylistUrl, xtream } from '@/src/lib/xtream';
 import { getSession, loadSession } from '@/src/state/session';
 import { getSessionLog, clearSessionLog } from '@/src/state/debug-log';
+import { getDeviceCapabilityInfo } from '@/src/hooks/useIsLowEndDevice';
 import TVFocusable from '@/src/components/TVFocusable';
 
 type CheckState = 'checking' | 'ok' | 'off';
@@ -29,9 +30,15 @@ export default function BackendDiagScreen() {
 
   const onViewLogs = useCallback(async () => {
     const logs = await getSessionLog();
+    const cap = getDeviceCapabilityInfo();
+    const ramGb = cap.totalMemoryBytes ? (cap.totalMemoryBytes / (1024 * 1024 * 1024)).toFixed(1) : '?';
+    const deviceInfo =
+      `Aparelho: ${cap.modelName || '?'} (Android ${cap.osVersion || '?'})\n` +
+      `RAM: ${ramGb}GB | CPU bench: ${cap.cpuBenchmarkMs}ms (limite: ${cap.cpuBenchmarkThresholdMs}ms) | ` +
+      `${cap.is32BitOnly ? '32-bit' : '64-bit'} | Classificado como: ${cap.isLowEndDevice ? 'FRACO' : 'normal'}`;
     Alert.alert(
       'Logs de depuração',
-      logs.length ? logs.join('\n') : 'Nenhum log ainda — cria um teste ou navega pelo app primeiro.',
+      `${deviceInfo}\n\n${logs.length ? logs.join('\n') : 'Nenhum log ainda — cria um teste ou navega pelo app primeiro.'}`,
       [
         { text: 'Limpar', onPress: () => clearSessionLog(), style: 'destructive' },
         { text: 'Fechar', style: 'cancel' },
