@@ -1,0 +1,47 @@
+# .github/workflows/buildforge-worker.yml
+# Um worker de build da BuildForge rodando no GitHub Actions (grátis).
+# O runner do GitHub já tem JDK + Android SDK + Flutter, então nada precisa ser instalado.
+#
+# PASSOS:
+#   1. No seu repositório GitHub, crie o arquivo .github/workflows/buildforge-worker.yml
+#      com este conteúdo.
+#   2. Em Settings > Secrets and variables > Actions, crie o secret BUILDFORGE_TOKEN
+#      com o valor do token do worker.
+#   3. Rode "Actions > BuildForge Worker > Run workflow" (ou por agendamento).
+#      Enquanto o job roda (~ até 20 min), ele reivindica e compila seus builds reais.
+
+name: BuildForge Worker
+
+on:
+  workflow_dispatch:      # rodar manualmente
+  schedule:
+    - cron: "*/15 * * * *"  # (opcional) acorda a cada 15 min para pegar jobs
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Flutter (opcional)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+        continue-on-error: true
+
+      - name: Baixar agente BuildForge
+        run: curl -fsSL "https://3000-iizudq8jfgco8fqo34jol.e2b.app/api/worker/script" -o buildforge-worker.js
+
+      - name: Rodar worker (drena a fila e sai)
+        env:
+          BUILDFORGE_SERVER: https://3000-iizudq8jfgco8fqo34jol.e2b.app
+          BUILDFORGE_TOKEN: ${{ secrets.BUILDFORGE_TOKEN }}
+        run: node buildforge-worker.js --server "$BUILDFORGE_SERVER" --token "$BUILDFORGE_TOKEN" --once
