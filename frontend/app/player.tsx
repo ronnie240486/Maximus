@@ -75,6 +75,7 @@ export default function PlayerScreen() {
   // tela, etc) — o algoritmo espacial padrão do Android TV não prioriza
   // isso sozinho, mesmo com esses botões já sendo focáveis.
   const topBarRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const videoViewRef = useRef<React.ElementRef<typeof VideoView>>(null);
   const [topBarHandle, setTopBarHandle] = useState<number | undefined>();
   useEffect(() => {
     if (!isTV) return;
@@ -406,6 +407,7 @@ export default function PlayerScreen() {
   return (
     <View style={styles.root} testID="player-root">
       <VideoView
+        ref={videoViewRef}
         player={player}
         style={StyleSheet.absoluteFill}
         contentFit={resizeMode}
@@ -472,6 +474,22 @@ export default function PlayerScreen() {
                 </TVFocusable>
                 <TVFocusable onPress={openInExternalPlayer} style={styles.topBtn} testID="player-external">
                   <MaterialCommunityIcons name="open-in-new" size={18} color={colors.white} />
+                </TVFocusable>
+                <TVFocusable
+                  onPress={() => {
+                    // Picture-in-Picture é mais um recurso de celular/tablet
+                    // (janela flutuante sobre outros apps) — em TV box, que
+                    // já roda o app em tela cheia sem "outros apps" por
+                    // cima, pode não ter efeito visível, mas não atrapalha
+                    // nada tentar. Se o aparelho não suportar, só ignora.
+                    try {
+                      videoViewRef.current?.startPictureInPicture();
+                    } catch {}
+                  }}
+                  style={styles.topBtn}
+                  testID="player-pip"
+                >
+                  <MaterialCommunityIcons name="picture-in-picture-bottom-right" size={18} color={colors.white} />
                 </TVFocusable>
               </View>
             </View>
