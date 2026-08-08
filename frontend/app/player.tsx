@@ -75,16 +75,18 @@ export default function PlayerScreen() {
   // tela, etc) — o algoritmo espacial padrão do Android TV não prioriza
   // isso sozinho, mesmo com esses botões já sendo focáveis.
   const topBarRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const channelGridBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const resizeBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const fullscreenBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const externalBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const pipBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
   const videoViewRef = useRef<React.ElementRef<typeof VideoView>>(null);
   const [topBarHandle, setTopBarHandle] = useState<number | undefined>();
-  useEffect(() => {
-    if (!isTV) return;
-    const t = setTimeout(() => {
-      const handle = findNodeHandle(topBarRef.current);
-      if (handle) setTopBarHandle(handle);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [isTV]);
+  const [channelGridHandle, setChannelGridHandle] = useState<number | undefined>();
+  const [resizeHandle, setResizeHandle] = useState<number | undefined>();
+  const [fullscreenHandle, setFullscreenHandle] = useState<number | undefined>();
+  const [externalHandle, setExternalHandle] = useState<number | undefined>();
+  const [pipHandle, setPipHandle] = useState<number | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(true);
   const [showControls, setShowControls] = useState(true);
@@ -104,6 +106,29 @@ export default function PlayerScreen() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLive = String(params.id || '').startsWith('live-');
+
+  useEffect(() => {
+    if (!isTV) return;
+    const t = setTimeout(() => {
+      const handle = findNodeHandle(topBarRef.current);
+      if (handle) setTopBarHandle(handle);
+      // Resolve os handles dos demais botões da barra de topo pra poder
+      // encadear nextFocusLeft/Right entre eles — sem isso, o algoritmo
+      // espacial padrão do Android TV não navega de forma confiável por
+      // essa fileira de ícones pequenos e próximos uns dos outros.
+      const gridHandle = findNodeHandle(channelGridBtnRef.current);
+      if (gridHandle) setChannelGridHandle(gridHandle);
+      const rHandle = findNodeHandle(resizeBtnRef.current);
+      if (rHandle) setResizeHandle(rHandle);
+      const fHandle = findNodeHandle(fullscreenBtnRef.current);
+      if (fHandle) setFullscreenHandle(fHandle);
+      const eHandle = findNodeHandle(externalBtnRef.current);
+      if (eHandle) setExternalHandle(eHandle);
+      const pHandle = findNodeHandle(pipBtnRef.current);
+      if (pHandle) setPipHandle(pHandle);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [isTV, isLive]);
 
   // Holds whichever channel is actually playing right now — starts as the
   // one we navigated in with, but switching from the in-player grid updates
@@ -452,30 +477,67 @@ export default function PlayerScreen() {
 
           <SafeAreaView style={styles.safe} edges={['top', 'bottom']} pointerEvents="box-none">
             <View style={styles.topBar} pointerEvents="box-none">
-              <TVFocusable ref={topBarRef} onPress={() => router.back()} hitSlop={12} style={styles.topBtn} testID="player-back">
+              <TVFocusable
+                ref={topBarRef}
+                onPress={() => router.back()}
+                hitSlop={12}
+                style={styles.topBtn}
+                testID="player-back"
+                nextFocusRight={isLive ? channelGridHandle : resizeHandle}
+              >
                 <Ionicons name="chevron-back" size={22} color={colors.white} />
               </TVFocusable>
               <Text style={styles.topTitle} numberOfLines={1}>{channelName}</Text>
               <View style={styles.topActions}>
                 {isLive && (
-                  <TVFocusable onPress={openChannelGrid} style={styles.topBtn} testID="player-channel-grid">
+                  <TVFocusable
+                    ref={channelGridBtnRef}
+                    onPress={openChannelGrid}
+                    style={styles.topBtn}
+                    testID="player-channel-grid"
+                    nextFocusLeft={topBarHandle}
+                    nextFocusRight={resizeHandle}
+                  >
                     <Ionicons name="grid" size={18} color={colors.white} />
                   </TVFocusable>
                 )}
-                <TVFocusable onPress={cycleResizeMode} style={styles.topBtn} testID="player-resize-mode">
+                <TVFocusable
+                  ref={resizeBtnRef}
+                  onPress={cycleResizeMode}
+                  style={styles.topBtn}
+                  testID="player-resize-mode"
+                  nextFocusLeft={isLive ? channelGridHandle : topBarHandle}
+                  nextFocusRight={fullscreenHandle}
+                >
                   <MaterialIcons name={resizeModeIcon as any} size={18} color={colors.white} />
                 </TVFocusable>
-                <TVFocusable onPress={toggleFullscreen} style={styles.topBtn} testID="player-fullscreen">
+                <TVFocusable
+                  ref={fullscreenBtnRef}
+                  onPress={toggleFullscreen}
+                  style={styles.topBtn}
+                  testID="player-fullscreen"
+                  nextFocusLeft={resizeHandle}
+                  nextFocusRight={externalHandle}
+                >
                   <MaterialCommunityIcons
                     name={isLandscape ? 'fullscreen-exit' : 'fullscreen'}
                     size={18}
                     color={colors.white}
                   />
                 </TVFocusable>
-                <TVFocusable onPress={openInExternalPlayer} style={styles.topBtn} testID="player-external">
+                <TVFocusable
+                  ref={externalBtnRef}
+                  onPress={openInExternalPlayer}
+                  style={styles.topBtn}
+                  testID="player-external"
+                  nextFocusLeft={fullscreenHandle}
+                  nextFocusRight={pipHandle}
+                >
                   <MaterialCommunityIcons name="open-in-new" size={18} color={colors.white} />
                 </TVFocusable>
                 <TVFocusable
+                  ref={pipBtnRef}
+                  nextFocusLeft={externalHandle}
                   onPress={() => {
                     // Picture-in-Picture é mais um recurso de celular/tablet
                     // (janela flutuante sobre outros apps) — em TV box, que
