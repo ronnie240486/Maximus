@@ -13,6 +13,7 @@ export type XtreamCreds = {
 };
 
 import { Platform } from 'react-native';
+import { storage } from '@/src/utils/storage';
 
 // Some Xtream servers hide behind Cloudflare and reject datacenter IPs; from
 // a residential mobile connection (Expo Go / APK) they respond normally, so
@@ -56,26 +57,31 @@ export function parsePlaylistUrl(url: string): XtreamCreds | null {
 // cap every call so a single slow endpoint can't block the whole screen.
 const DEFAULT_TIMEOUT_MS = 9000;
 
-// Cache em memória (só dura enquanto o app está aberto, não salva em disco)
+// Cache em memória (instantâneo dentro da mesma sessão) + persistência em
+// disco via MMKV pras listas GRANDES que raramente mudam (categorias,
+// canais/filmes/séries) — sem isso, cada abertura do app (cold start)
+// começava do zero e precisava buscar tudo de novo na rede antes de
+// mostrar qualquer coisa. Com persistência, a Home/Filmes/Séries/Canais
+// pintam quase instantaneamente a partir do disco enquanto uma busca nova
+// acontece por trás (stale-while-revalidate), e só ficam "velhas" de
+// verdade depois de 15 minutos.
+//
+// EPG ("o que está passando agora") e detalhes de item avulso (info de
+// filme/série específico) ficam só em memória — mudam com mais frequência
+// e persistir cada um criaria um monte de chaves em disco à toa.
+//
 // + eliminação de chamadas concorrentes idênticas. Sem isso, era comum a
 // MESMA lista gigante (ex: get_vod_streams com milhares de itens) ser
 // buscada 2-3 vezes ao mesmo tempo quando telas diferentes pedem os mesmos
 // dados quase juntas (ex: a Home carrega "Filmes em alta" enquanto a
 // pessoa já está entrando na tela de Filmes, que pede a lista completa).
-//
-// TTL curto por ação: listas grandes que raramente mudam (categorias,
-// canais/filmes/séries) ficam em cache por 2 minutos; qualquer coisa
-// sensível a tempo real (autenticação — pode trazer aviso de pagamento
-// atualizado — e EPG "o que está passando agora") nunca fica em cache de
-// verdade, só ganha a eliminação de chamada duplicada (dedupe), que é
-// sempre segura independente da ação.
 const CACHEABLE_TTL_MS: Record<string, number> = {
-  get_live_categories: 120_000,
-  get_vod_categories: 120_000,
-  get_series_categories: 120_000,
-  get_live_streams: 120_000,
-  get_vod_streams: 120_000,
-  get_series: 120_000,
+  get_live_categories: 900_000,
+  get_vod_categories: 900_000,
+  get_series_categories: 900_000,
+  get_live_streams: 900_000,
+  get_vod_streams: 900_000,
+  get_series: 900_000,
   get_series_info: 120_000,
   get_vod_info: 120_000,
   // TTL bem mais curto que o resto — é "o que está passando agora", não
@@ -85,6 +91,19 @@ const CACHEABLE_TTL_MS: Record<string, number> = {
   // um instante depois, dobrando o trabalho à toa.
   get_short_epg: 45_000,
 };
+
+// Só essas ações (listas grandes, "raramente mudam") persistem em disco.
+// get_series_info/get_vod_info/get_short_epg ficam de fora de propósito
+// (ver comentário acima).
+const DISK_PERSIST_ACTIONS = new Set([
+  'get_live_categories',
+  'get_vod_categories',
+  'get_series_categories',
+  'get_live_streams',
+  'get_vod_streams',
+  'get_series',
+]);
+const DISK_CACHE_PREFIX = 'xtream_disk_cache_v1:';
 
 type CacheEntry = { value: unknown; expiresAt: number };
 const xtreamCache = new Map<string, CacheEntry>();
@@ -97,6 +116,31 @@ let cacheMisses = 0;
 export function getXtreamCacheStats(): { hits: number; misses: number; hitRate: number } {
   const total = cacheHits + cacheMisses;
   return { hits: cacheHits, misses: cacheMisses, hitRate: total > 0 ? cacheHits / total : 0 };
+}
+
+// Disco (MMKV) só entra pras ações em DISK_PERSIST_ACTIONS — ver
+// comentário acima de CACHEABLE_TTL_MS. Segue o mesmo padrão do resto do
+// app pra guardar objeto: JSON.stringify manual antes de passar pro
+// storage (que faz seu próprio JSON.stringify por cima, então a leitura
+// precisa desfazer os dois passos na ordem inversa).
+async function readDiskCache(cacheKey: string): Promise<CacheEntry | null> {
+  try {
+    const raw = await storage.getItem<string>(DISK_CACHE_PREFIX + cacheKey, '');
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as CacheEntry;
+    if (!entry || typeof entry.expiresAt !== 'number' || entry.expiresAt <= Date.now()) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function writeDiskCache(cacheKey: string, entry: CacheEntry): void {
+  // Fire-and-forget: a escrita em disco não deve atrasar quem está
+  // esperando a resposta da rede, e uma falha aqui não é motivo pra
+  // quebrar nada (a próxima chamada só volta a bater na rede, que já
+  // funcionava assim antes desta persistência existir).
+  storage.setItem(DISK_CACHE_PREFIX + cacheKey, JSON.stringify(entry)).catch(() => {});
 }
 
 async function xtreamGet<T>(
@@ -115,11 +159,23 @@ async function xtreamGet<T>(
   const cacheKey = url; // já inclui server+credenciais+ação+parâmetros
 
   const ttl = CACHEABLE_TTL_MS[action] || 0;
+  const persistToDisk = DISK_PERSIST_ACTIONS.has(action);
   if (ttl > 0) {
     const cached = xtreamCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       cacheHits++;
       return cached.value as T;
+    }
+    // Miss em memória (cold start, provavelmente) — antes de ir pra rede,
+    // tenta o disco. Se achar algo ainda válido, usa e já repovoa a
+    // memória (próximas chamadas na mesma sessão nem passam por aqui).
+    if (persistToDisk) {
+      const fromDisk = await readDiskCache(cacheKey);
+      if (fromDisk) {
+        cacheHits++;
+        xtreamCache.set(cacheKey, fromDisk);
+        return fromDisk.value as T;
+      }
     }
     cacheMisses++;
   }
@@ -154,7 +210,11 @@ async function xtreamGet<T>(
         }
         lastError = null;
         const json = (await res.json()) as T;
-        if (ttl > 0) xtreamCache.set(cacheKey, { value: json, expiresAt: Date.now() + ttl });
+        if (ttl > 0) {
+          const entry: CacheEntry = { value: json, expiresAt: Date.now() + ttl };
+          xtreamCache.set(cacheKey, entry);
+          if (persistToDisk) writeDiskCache(cacheKey, entry);
+        }
         return json;
       } catch (e: any) {
         lastError = e?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
