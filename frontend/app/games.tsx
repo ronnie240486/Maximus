@@ -16,7 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
-import { xtream, XtreamLive } from '@/src/lib/xtream';
+import { xtream, XtreamLive, liveStreamUrl } from '@/src/lib/xtream';
 import {
   loadGameReminders,
   toggleGameReminder,
@@ -111,6 +111,19 @@ function findMatchingChannel(e: GameEvent, channels: XtreamLive[]): XtreamLive |
     const n = normalizeText(c.name);
     return words.some((w) => n.includes(w));
   });
+}
+
+/** Muitos painéis nomeiam os canais de "jogos do dia" como "[15:45] Time A x
+ * Time B" — separa o horário (se tiver) do resto do nome, pra exibir de
+ * forma mais organizada. Se o canal não seguir esse padrão, devolve o nome
+ * inteiro como "resto" e nenhum horário — nunca quebra, só perde a
+ * formatação bonitinha. */
+function parseGameChannelName(name: string): { time: string | null; rest: string } {
+  const match = name.match(/^\[?(\d{1,2}:\d{2})\]?\s*[-–—]?\s*(.*)$/);
+  if (match && match[2]) {
+    return { time: match[1], rest: match[2] };
+  }
+  return { time: null, rest: name };
 }
 
 export default function GamesScreen() {
@@ -231,6 +244,20 @@ export default function GamesScreen() {
     }, [router])
   );
 
+  const openGameChannel = (s: XtreamLive) => {
+    const creds = getXtream();
+    if (!creds) return;
+    router.push({
+      pathname: '/player',
+      params: {
+        id: `live-${s.stream_id}`,
+        name: s.name,
+        stream: liveStreamUrl(creds, s.stream_id, 'm3u8'),
+        logo: s.stream_icon || '',
+      },
+    });
+  };
+
   const onToggleReminder = async (event: GameEvent) => {
     const epoch = eventEpoch(event);
     if (!epoch) return;
@@ -285,6 +312,37 @@ export default function GamesScreen() {
           })}
         </ScrollView>
       </View>
+
+      {sportsResolved && sportsChannels.length > 0 && (
+        <View style={styles.panelGamesSection}>
+          <Text style={styles.panelGamesTitle}>
+            {sportsCategory ? `No seu painel: ${sportsCategory}` : 'Jogos do seu painel'}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.panelGamesRow}>
+            {sportsChannels.map((ch) => {
+              const { time, rest } = parseGameChannelName(ch.name);
+              return (
+                <TVFocusable
+                  key={ch.stream_id}
+                  onPress={() => openGameChannel(ch)}
+                  style={styles.panelGameCard}
+                  testID={`games-panel-channel-${ch.stream_id}`}
+                >
+                  <View style={styles.panelGameThumb}>
+                    {ch.stream_icon ? (
+                      <Image source={{ uri: ch.stream_icon }} style={styles.panelGameThumbImg} contentFit="contain" />
+                    ) : (
+                      <Ionicons name="football" size={22} color={colors.textMuted} />
+                    )}
+                  </View>
+                  {!!time && <Text style={styles.panelGameTime}>{time}</Text>}
+                  <Text style={styles.panelGameName} numberOfLines={2}>{rest}</Text>
+                </TVFocusable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {showLoading ? (
         <View style={styles.center}>
@@ -423,6 +481,28 @@ const styles = StyleSheet.create({
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '800' },
   chipRow: { height: 56, justifyContent: 'center' },
   chipRowInner: { gap: 8, paddingHorizontal: spacing.md, alignItems: 'center' },
+  panelGamesSection: { paddingBottom: spacing.sm },
+  panelGamesTitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: spacing.md,
+    marginBottom: 8,
+  },
+  panelGamesRow: { gap: 10, paddingHorizontal: spacing.md },
+  panelGameCard: { width: 100 },
+  panelGameThumb: {
+    width: 100,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: colors.darkSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  panelGameThumbImg: { width: '80%', height: '80%' },
+  panelGameTime: { color: colors.accentCyan, fontSize: 11, fontWeight: '800', marginTop: 4 },
+  panelGameName: { color: colors.white, fontSize: 11, fontWeight: '600', marginTop: 2 },
   chip: {
     height: 36,
     paddingHorizontal: 16,
