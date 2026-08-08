@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, ScrollView, Linking, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, ScrollView, TextInput, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,21 +19,6 @@ import TVFocusable from '@/src/components/TVFocusable';
 const ALL_KEY = '__all__';
 const PAGE_SIZE = 30;
 
-// Câmeras de trânsito por estado — cada órgão publica do seu jeito, sem
-// API pública documentada, então em vez de tentar "adivinhar" uma
-// estrutura de dados (arriscado, pode quebrar sem aviso), abrimos o
-// portal OFICIAL de cada um dentro do próprio app (mesmo padrão que
-// trailer.tsx já usa pro YouTube).
-// Só São Paulo tem uma fonte confirmada funcionando no momento em que
-// isso foi escrito — Rio de Janeiro descontinuou o portal antigo (o
-// endereço atual redireciona pro app COR.Rio, que não dá pra embutir) e
-// Minas Gerais (BHTrans) desativou de vez o serviço de câmeras ao vivo.
-const TRAFFIC_SOURCES: { id: string; name: string; url: string | null; note?: string }[] = [
-  { id: 'sp', name: 'São Paulo (CET-SP)', url: 'https://cameras.cetsp.com.br/' },
-  { id: 'rj', name: 'Rio de Janeiro', url: null, note: 'Portal oficial fora do ar no momento — a Prefeitura direciona pro app COR.Rio, que não dá pra abrir aqui dentro.' },
-  { id: 'mg', name: 'Minas Gerais (BHTrans)', url: null, note: 'A BHTrans desativou o serviço de câmeras de trânsito ao vivo.' },
-];
-
 export default function CamerasScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
@@ -43,7 +28,6 @@ export default function CamerasScreen() {
   const gridWidth = width;
   const itemWidth = (gridWidth - spacing.md * 2 - itemGap * (numColumns - 1)) / numColumns;
 
-  const [tab, setTab] = useState<'webcams' | 'traffic'>('webcams');
   const [configured] = useState(hasWebcamsApiKey());
   const [categories, setCategories] = useState<WebcamCategory[]>([]);
   const [selectedCat, setSelectedCat] = useState(ALL_KEY);
@@ -117,47 +101,17 @@ export default function CamerasScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Câmeras ao vivo — Brasil</Text>
-        <View style={{ width: 24 }} />
+        <Pressable
+          onPress={() => router.push('/world-cameras')}
+          hitSlop={16}
+          style={styles.backBtn}
+          testID="cameras-open-world"
+        >
+          <Ionicons name="earth" size={22} color={colors.accentCyan} />
+        </Pressable>
       </View>
 
-      <View style={styles.modeRow}>
-        <TVFocusable
-          onPress={() => setTab('webcams')}
-          style={[styles.modeBtn, tab === 'webcams' && styles.modeBtnActive]}
-          testID="cameras-mode-webcams"
-        >
-          <Text style={[styles.modeBtnText, tab === 'webcams' && styles.modeBtnTextActive]}>Paisagens / Praias</Text>
-        </TVFocusable>
-        <TVFocusable
-          onPress={() => setTab('traffic')}
-          style={[styles.modeBtn, tab === 'traffic' && styles.modeBtnActive]}
-          testID="cameras-mode-traffic"
-        >
-          <Text style={[styles.modeBtnText, tab === 'traffic' && styles.modeBtnTextActive]}>Trânsito</Text>
-        </TVFocusable>
-      </View>
-
-      {tab === 'traffic' ? (
-        <View style={{ padding: spacing.md, gap: spacing.md }}>
-          {TRAFFIC_SOURCES.map((s) => (
-            <View key={s.id} style={styles.trafficCard}>
-              <Text style={styles.trafficName}>{s.name}</Text>
-              {s.url ? (
-                <TVFocusable
-                  onPress={() => Linking.openURL(s.url!)}
-                  style={styles.trafficBtn}
-                  testID={`traffic-${s.id}`}
-                >
-                  <Ionicons name="open-outline" size={16} color={colors.black} />
-                  <Text style={styles.trafficBtnText}>Abrir portal oficial</Text>
-                </TVFocusable>
-              ) : (
-                <Text style={styles.trafficNote}>{s.note}</Text>
-              )}
-            </View>
-          ))}
-        </View>
-      ) : !configured ? (
+      {!configured ? (
         <View style={styles.emptyWrap}>
           <Ionicons name="videocam-off-outline" size={40} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>Câmeras ainda não configuradas</Text>
@@ -285,17 +239,6 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { flex: 1, color: colors.white, fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  modeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.md, marginBottom: spacing.sm },
-  modeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.darkSurfaceAlt,
-    alignItems: 'center',
-  },
-  modeBtnActive: { backgroundColor: colors.accentCyan },
-  modeBtnText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
-  modeBtnTextActive: { color: colors.black },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -308,25 +251,6 @@ const styles = StyleSheet.create({
     height: 40,
   },
   searchInput: { flex: 1, color: colors.white, fontSize: 13 },
-  trafficCard: {
-    backgroundColor: colors.darkSurfaceAlt,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: 8,
-  },
-  trafficName: { color: colors.white, fontSize: 15, fontWeight: '800' },
-  trafficNote: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
-  trafficBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.accentCyan,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-  },
-  trafficBtnText: { color: colors.black, fontSize: 12, fontWeight: '800' },
   tabsScroll: { flexGrow: 0, marginBottom: spacing.sm },
   tabsRow: { gap: 8, paddingHorizontal: spacing.md },
   tab: {
