@@ -43,7 +43,7 @@ import ClockWeather from '@/src/components/ClockWeather';
 import TVFocusable from '@/src/components/TVFocusable';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import NetInfo from '@react-native-community/netinfo';
-import { getListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { getListPerfProps, useIsLowEndDevice } from '@/src/hooks/useIsLowEndDevice';
 
 // Calculado uma vez só (não é hook, é função pura) — todas as fileiras da
 // Home reaproveitam o mesmo resultado em vez de recalcular a cada uma.
@@ -280,6 +280,8 @@ export default function HomeScreen() {
       };
     }, [router])
   );
+
+  const isLowEndDevice = useIsLowEndDevice();
 
   const load = useCallback(async () => {
     const [m, session, cache, featuredCache] = await Promise.all([
@@ -537,27 +539,37 @@ export default function HomeScreen() {
     // nelas, o cache já está quente e abre instantâneo, em vez de esperar
     // a rede do zero. Silencioso: se falhar, a tela de Filmes/Séries
     // busca do zero normalmente quando abrir, sem problema nenhum.
-    (async () => {
-      try {
-        const [movieCats, movieStreams] = await Promise.all([
-          xtream.vodCategories(creds),
-          xtream.vodStreams(creds),
-        ]);
-        if (movieCats || movieStreams) {
-          await saveListCache('movies', movieCats || [], movieStreams || []);
-        }
-      } catch {}
-      try {
-        const [seriesCats, seriesStreams] = await Promise.all([
-          xtream.seriesCategories(creds),
-          xtream.seriesList(creds),
-        ]);
-        if (seriesCats || seriesStreams) {
-          await saveListCache('series', seriesCats || [], seriesStreams || []);
-        }
-      } catch {}
-    })();
-  }, []);
+    //
+    // EXCETO em TV box fraca: processar essas listas inteiras (potencial-
+    // mente milhares de itens — parse de JSON, gravação em disco) rouba
+    // CPU justo no momento em que a pessoa provavelmente já está
+    // navegando pela Home recém-carregada com o controle remoto. Nesses
+    // aparelhos, é melhor Filmes/Séries buscarem do zero quando abrirem
+    // (um pouco mais lento pra abrir) do que deixar a Home travando os
+    // comandos do D-pad agora.
+    if (!isLowEndDevice) {
+      (async () => {
+        try {
+          const [movieCats, movieStreams] = await Promise.all([
+            xtream.vodCategories(creds),
+            xtream.vodStreams(creds),
+          ]);
+          if (movieCats || movieStreams) {
+            await saveListCache('movies', movieCats || [], movieStreams || []);
+          }
+        } catch {}
+        try {
+          const [seriesCats, seriesStreams] = await Promise.all([
+            xtream.seriesCategories(creds),
+            xtream.seriesList(creds),
+          ]);
+          if (seriesCats || seriesStreams) {
+            await saveListCache('series', seriesCats || [], seriesStreams || []);
+          }
+        } catch {}
+      })();
+    }
+  }, [isLowEndDevice]);
 
   useEffect(() => {
     load();

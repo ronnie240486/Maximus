@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Image } from 'expo-image';
 
+import { useIsLowEndDevice } from '@/src/hooks/useIsLowEndDevice';
+
 // Enquanto a pessoa rola a lista, pré-carrega os pôsteres que estão logo
 // ABAIXO da área visível (ainda não apareceram na tela) — quando eles
 // finalmente entrarem na tela, a imagem já está no cache (memória+disco)
@@ -13,6 +15,14 @@ export function useListImagePrefetch<T>(
   getUrl: (item: T) => string | undefined,
   aheadCount = 20
 ) {
+  // Em TV box fraca, o prefetch acontece EXATAMENTE durante o momento em
+  // que a pessoa está navegando com o D-pad (é disparado pelo próprio
+  // scroll) — competir por CPU/rede bem ali é pior do que ajudar, porque
+  // rouba processamento justo da hora que precisa responder rápido ao
+  // controle remoto. Em aparelho fraco, prefere ficar quieto: sem
+  // prefetch nenhum (as imagens ainda carregam normal quando aparecem na
+  // tela, só perde o "já pronto antes de chegar" — troca aceitável).
+  const isLowEndDevice = useIsLowEndDevice();
   // Ref em vez de depender direto de `data` no useCallback — evita que a
   // IDENTIDADE da função onViewableItemsChanged mude a cada render (o
   // FlashList v2 se beneficia de props estáveis; ver docs do Shopify).
@@ -29,6 +39,7 @@ export function useListImagePrefetch<T>(
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+      if (isLowEndDevice) return;
       const indices = viewableItems
         .map((v) => v.index)
         .filter((i): i is number => typeof i === 'number');
@@ -46,7 +57,7 @@ export function useListImagePrefetch<T>(
         Image.prefetch(nextUrls, 'memory-disk').catch(() => {});
       }
     },
-    [aheadCount, getUrl]
+    [aheadCount, getUrl, isLowEndDevice]
   );
 
   // Objeto estável (criado uma vez) — o FlashList/FlatList não suporta

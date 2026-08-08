@@ -26,7 +26,7 @@ import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
-import { getFlashListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { getFlashListPerfProps, useIsLowEndDevice } from '@/src/hooks/useIsLowEndDevice';
 import { useListImagePrefetch } from '@/src/hooks/useListImagePrefetch';
 import TVFocusable from '@/src/components/TVFocusable';
 import TVChannelPreview from '@/src/components/TVChannelPreview';
@@ -130,6 +130,8 @@ export default function ChannelsScreen() {
     });
   };
 
+  const isLowEndDevice = useIsLowEndDevice();
+
   const load = useCallback(async () => {
     // Paint the cached list instantly (if we have one) instead of a blank
     // spinner, then refresh in the background — same idea as the Home screen.
@@ -171,9 +173,15 @@ export default function ChannelsScreen() {
       // canais, o EPG já está pronto (ou quase), sem esperar a rede na
       // hora. Silencioso: se falhar, a tela busca normalmente quando
       // precisar de verdade.
-      Promise.all(list.slice(0, 15).map((c) => xtream.shortEpg(creds, c.stream_id, 1).catch(() => null)));
+      //
+      // Pulado em TV box fraca (mesmo raciocínio do prefetch da Home): 15
+      // requisições paralelas competem por CPU/rede exatamente quando a
+      // tela de Canais acabou de abrir e a pessoa já está navegando.
+      if (!isLowEndDevice) {
+        Promise.all(list.slice(0, 15).map((c) => xtream.shortEpg(creds, c.stream_id, 1).catch(() => null)));
+      }
     }
-  }, []);
+  }, [isLowEndDevice]);
 
   useEffect(() => {
     load();
@@ -288,6 +296,7 @@ export default function ChannelsScreen() {
   // realmente carrega.
   const onFocusChannel = useCallback((item: XtreamLive) => {
     setFocusedChannel(item);
+    if (isLowEndDevice) return;
 
     // Pre-buffer leve: se o D-pad ficar parado 500ms num canal, busca o
     // manifesto (.m3u8) dele em background — sem player nenhum, só uma
@@ -297,7 +306,9 @@ export default function ChannelsScreen() {
     // pra começar a tocar) já foi feita. Deliberadamente NÃO cria um
     // VideoPlayer escondido pra isso — instanciar player de vídeo de
     // verdade só pra bufferizar é pesado, e faria o oposto do que
-    // queremos numa TV box já fraca.
+    // queremos numa TV box já fraca. Em device já detectado como fraco,
+    // nem essa versão leve roda — qualquer trabalho extra de JS/rede
+    // compete com a responsividade do D-pad, que é mais importante.
     if (focusPrefetchTimer.current) clearTimeout(focusPrefetchTimer.current);
     focusPrefetchTimer.current = setTimeout(() => {
       const creds = getXtream();
@@ -305,7 +316,7 @@ export default function ChannelsScreen() {
       const url = liveStreamUrl(creds, item.stream_id, 'm3u8');
       fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } }).catch(() => {});
     }, 500);
-  }, []);
+  }, [isLowEndDevice]);
 
   // 1º clique num canal: só carrega o preview (mini player), não abre
   // tela cheia ainda. 2º clique no MESMO canal (que já está em preview):
