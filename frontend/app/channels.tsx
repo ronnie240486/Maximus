@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Pressable,
   ActivityIndicator,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   Modal,
   useWindowDimensions,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -26,7 +26,7 @@ import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
-import { getListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { getFlashListPerfProps } from '@/src/hooks/useIsLowEndDevice';
 import TVFocusable from '@/src/components/TVFocusable';
 import TVChannelPreview from '@/src/components/TVChannelPreview';
 
@@ -81,8 +81,8 @@ const ChannelRow = React.memo(function ChannelRow({
 export default function ChannelsScreen() {
   const router = useRouter();
   const isTV = useIsTV();
-  const listPerf = getListPerfProps(20);
-  const gridListPerf = getListPerfProps(12);
+  const flashListPerf = getFlashListPerfProps();
+  const gridFlashListPerf = getFlashListPerfProps();
   const params = useLocalSearchParams<{ initialQuery?: string; initialCategory?: string }>();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -443,19 +443,13 @@ export default function ChannelsScreen() {
             ) : filtered.length === 0 ? (
               <Empty errorCode={loadError} onRetry={load} />
             ) : (
-              <FlatList
+              <FlashList
                 data={filtered}
                 keyExtractor={(c) => String(c.stream_id)}
-                initialNumToRender={listPerf.initialNumToRender}
-                maxToRenderPerBatch={listPerf.maxToRenderPerBatch}
-                windowSize={listPerf.windowSize}
-                removeClippedSubviews
-                // Altura da linha é fixa (56px, ver styles.tvRow) — dizer
-                // isso de antemão evita o React Native ter que MEDIR cada
-                // item na hora de rolar/pular pra um índice, o que pesa
-                // mais em processador fraco (comum em TV box). Essencial
-                // pra rolagem suave com D-pad em listas longas.
-                getItemLayout={(_, index) => ({ length: 56, offset: 56 * index, index })}
+                {...flashListPerf}
+                // FlashList mede/recicla sozinho — não precisa mais dizer
+                // a altura da linha de antemão (getItemLayout, que era
+                // essencial no FlatList antigo, some daqui).
                 renderItem={({ item, index }) => (
                   <ChannelRow
                     item={item}
@@ -513,7 +507,7 @@ export default function ChannelsScreen() {
           ) : filtered.length === 0 ? (
             <Empty errorCode={loadError} onRetry={load} />
           ) : (
-        <FlatList
+        <FlashList
           key={numColumns}
           style={{ flex: 1 }}
           data={filtered}
@@ -521,10 +515,7 @@ export default function ChannelsScreen() {
           numColumns={numColumns}
           columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
           contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.sm }}
-          initialNumToRender={gridListPerf.initialNumToRender}
-          maxToRenderPerBatch={gridListPerf.maxToRenderPerBatch}
-          windowSize={gridListPerf.windowSize}
-          removeClippedSubviews
+          {...gridFlashListPerf}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => openPlayer(item)}

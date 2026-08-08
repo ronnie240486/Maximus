@@ -28,7 +28,9 @@ export function useIsLowEndDevice(): boolean {
 /**
  * Ajusta os parâmetros de virtualização de uma FlatList conforme a força
  * do aparelho — menos itens de cada vez em TV box fraca, mantém o padrão
- * em aparelhos normais.
+ * em aparelhos normais. Usado pelas listas que continuam em FlatList
+ * (ex: a linha de seções da Home). Para Movies/Series/Channels, que usam
+ * FlashList, ver getFlashListPerfProps abaixo.
  */
 export function getListPerfProps(baseInitialNumToRender: number) {
   if (isLowEndDevice) {
@@ -43,4 +45,16 @@ export function getListPerfProps(baseInitialNumToRender: number) {
     maxToRenderPerBatch: baseInitialNumToRender,
     windowSize: 7,
   };
+}
+
+/**
+ * Equivalente a getListPerfProps, mas pro FlashList (que não usa
+ * initialNumToRender/maxToRenderPerBatch/windowSize do FlatList — o
+ * parâmetro que controla quanto ele renderiza além da área visível é o
+ * drawDistance). Valor menor = menos itens montados de uma vez = menos
+ * CPU/memória gasta em TV box fraca; maior = rolagem mais "generosa" mas
+ * mais pesada. `undefined` deixa o FlashList usar o próprio padrão.
+ */
+export function getFlashListPerfProps() {
+  return isLowEndDevice ? { drawDistance: 120 } : {};
 }

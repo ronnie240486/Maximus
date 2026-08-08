@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Pressable,
   ActivityIndicator,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   useWindowDimensions,
   Modal,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -26,7 +26,7 @@ import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
-import { getListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { getFlashListPerfProps } from '@/src/hooks/useIsLowEndDevice';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const ALL = 'Todos';
@@ -38,7 +38,7 @@ const SIDE_COL_WIDTH_TV = 230;
 export default function MoviesScreen() {
   const router = useRouter();
   const isTV = useIsTV();
-  const listPerf = getListPerfProps(15);
+  const flashListPerf = getFlashListPerfProps();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const numColumns = isLandscape ? 6 : 3;
@@ -232,7 +232,7 @@ export default function MoviesScreen() {
         <Text style={styles.emptyTitle}>Nenhum filme encontrado</Text>
       </View>
     ) : (
-      <FlatList
+      <FlashList
         key={numColumns}
         style={{ flex: 1 }}
         data={filtered}
@@ -240,10 +240,7 @@ export default function MoviesScreen() {
         numColumns={numColumns}
         columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.md }}
-        initialNumToRender={listPerf.initialNumToRender}
-        maxToRenderPerBatch={listPerf.maxToRenderPerBatch}
-        windowSize={listPerf.windowSize}
-        removeClippedSubviews
+        {...flashListPerf}
         renderItem={({ item }) => (
           <TVFocusable
             onPress={() => openMovie(item)}
