@@ -83,15 +83,24 @@ export default function RootLayout() {
     })();
   }, []);
 
+  const ready = (loaded || !!error) && integrityOk !== null;
+
+  useEffect(() => {
+    // Corrigido: antes essa chamada ficava direto no corpo do componente
+    // (fora de useEffect) e disparava de novo a CADA renderização do
+    // RootLayout — inclusive durante navegação normal entre telas, já
+    // que ele envolve toda a Stack. Uma chamada nativa real repetida
+    // sem parar é pesado o bastante pra travar a navegação inteira numa
+    // TV box fraca, e explica o ícone "piscando" (a splash sendo
+    // escondida/tentada esconder de novo sem necessidade). Com
+    // useEffect + dependência em `ready`, isso roda no máximo UMA vez —
+    // exatamente quando `ready` passa de false pra true.
+    if (!ready) return;
+    SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+
   if (!loaded && !error) return null;
   if (integrityOk === null) return null;
-
-  // Chegou até aqui: ou vamos renderizar a Home de verdade, ou a tela de
-  // bloqueio de integridade — dos dois jeitos, já tem algo pra mostrar.
-  // Esconde a splash nativa só agora (fire-and-forget: nunca deve
-  // travar a renderização se, por algum motivo raro, já tiver sido
-  // escondida antes).
-  SplashScreen.hideAsync().catch(() => {});
 
   if (!integrityOk) {
     // Pacote diferente do esperado — sinal de que o APK foi clonado e
