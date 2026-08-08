@@ -34,8 +34,8 @@ export default function BackendDiagScreen() {
     const ramGb = cap.totalMemoryBytes ? (cap.totalMemoryBytes / (1024 * 1024 * 1024)).toFixed(1) : '?';
     const deviceInfo =
       `Aparelho: ${cap.modelName || '?'} (Android ${cap.osVersion || '?'})\n` +
-      `RAM: ${ramGb}GB | CPU bench: ${cap.cpuBenchmarkMs}ms (limite: ${cap.cpuBenchmarkThresholdMs}ms) | ` +
-      `${cap.is32BitOnly ? '32-bit' : '64-bit'} | Classificado como: ${cap.isLowEndDevice ? 'FRACO' : 'normal'}`;
+      `RAM: ${ramGb}GB | CPU bench: ${cap.cpuBenchmarkMs}ms (rápido ≤${cap.cpuFastMaxMs}ms, lento ≥${cap.cpuSlowMinMs}ms) | ` +
+      `${cap.is32BitOnly ? '32-bit' : '64-bit'} | Nível: ${cap.devicePerfTier.toUpperCase()}`;
     Alert.alert(
       'Logs de depuração',
       `${deviceInfo}\n\n${logs.length ? logs.join('\n') : 'Nenhum log ainda — cria um teste ou navega pelo app primeiro.'}`,

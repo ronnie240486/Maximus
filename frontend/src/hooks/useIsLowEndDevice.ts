@@ -1,31 +1,31 @@
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
-// TV boxes baratas costumam ter 1-2GB de RAM total (contra 4-8GB+ de um
-// celular médio) — abaixo desse limite, listas grandes com muita
-// renderização simultânea pesam mais. `Device.totalMemory` é síncrono
-// (não precisa de useEffect/useState), então isso pode ser calculado uma
-// vez só, direto no module scope.
-const LOW_END_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // 2GB
+export type DevicePerfTier = 'low' | 'mid' | 'high';
 
-// MAS: RAM alta não quer dizer processador rápido. É comum TV box barata
-// vir com "bastante RAM" (4GB+, número que ajuda a vender) só que com um
-// chip de processador antigo/fraco por baixo — nesse caso, o gargalo real
-// é CPU, não memória, e o critério de RAM sozinho classificaria (errado)
-// esse aparelho como "normal", deixando de aplicar as otimizações que ele
-// mais precisa.
+// TV boxes baratas costumam ter 1-2GB de RAM total (contra 4-8GB+ de um
+// celular médio). `Device.totalMemory` é síncrono (não precisa de
+// useEffect/useState), então isso pode ser calculado uma vez só, direto
+// no module scope.
+const LOW_RAM_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // 2GB
+
+// RAM alta não quer dizer processador rápido — é comum TV box vir com
+// "bastante RAM" (número que ajuda a vender) só que com um chip antigo/
+// fraco por baixo. Pra pegar esse caso, faz um teste rápido e real de
+// velocidade de CPU na abertura do app: roda uma quantidade fixa de
+// contas (sem I/O) e mede quanto tempo levou.
 //
-// Pra pegar esse caso, faz um teste rápido e real de velocidade de CPU na
-// abertura do app: roda uma quantidade fixa de contas (sem I/O, sem
-// esperar rede/disco) e mede quanto tempo levou. Processador rápido
-// termina isso em poucos milissegundos; processador fraco demora bem
-// mais — o número em si aparece na tela de Diagnóstico, pra dar pra
-// calibrar o limiar certo com dados reais de aparelhos de verdade, em vez
-// de eu ter que adivinhar sem poder testar numa TV box específica.
+// IMPORTANTE — isto é um PONTO DE PARTIDA, não uma base calibrada: eu
+// (Claude) não tenho acesso a nenhuma TV box física pra testar e ajustar
+// esses números com dados reais. Por isso o sistema é em NÍVEIS (não um
+// corte único fraco/normal) — um limiar um pouco errado empurra o
+// aparelho pro nível vizinho, não faz ele pular de um extremo pro outro.
+// A forma certa de calibrar de verdade é rodar esse benchmark em vários
+// aparelhos reais (ver Diagnóstico > Logs de depuração) e ajustar os
+// números abaixo com base no que aparecer.
 const CPU_BENCHMARK_ITERATIONS = 3_000_000;
-// Ponto de partida conservador — ajustável depois de ver números reais
-// de TV boxes reportados na tela de Diagnóstico.
-const CPU_BENCHMARK_SLOW_THRESHOLD_MS = 40;
+const CPU_FAST_MAX_MS = 25; // abaixo disso: CPU rápida
+const CPU_SLOW_MIN_MS = 60; // acima disso: CPU lenta (entre os dois: médio)
 
 function benchmarkCpuMs(): number {
   const start = Date.now();
@@ -39,9 +39,8 @@ function benchmarkCpuMs(): number {
   return Date.now() - start;
 }
 
-// Alguns TV box ainda são 32-bit (armeabi-v7a) mesmo em 2026 — geralmente
-// sinal de chip mais antigo/mais fraco, já que fabricantes de chip novo
-// quase sempre saem direto em 64-bit hoje em dia.
+// Alguns TV box ainda são 32-bit (armeabi-v7a) — geralmente sinal de
+// chip mais antigo/mais fraco.
 function is32BitOnly(): boolean {
   try {
     const archs = Device.supportedCpuArchitectures || [];
@@ -53,26 +52,43 @@ function is32BitOnly(): boolean {
 
 export const cpuBenchmarkMs = Platform.OS === 'web' ? 0 : benchmarkCpuMs();
 
-const isLowEndDevice = (() => {
+const TIER_ORDER: DevicePerfTier[] = ['low', 'mid', 'high'];
+function degradeTier(tier: DevicePerfTier): DevicePerfTier {
+  const idx = TIER_ORDER.indexOf(tier);
+  return TIER_ORDER[Math.max(0, idx - 1)];
+}
+
+const devicePerfTier: DevicePerfTier = (() => {
   try {
+    let tier: DevicePerfTier = cpuBenchmarkMs <= CPU_FAST_MAX_MS ? 'high' : cpuBenchmarkMs >= CPU_SLOW_MIN_MS ? 'low' : 'mid';
+
     const mem = Device.totalMemory;
-    const weakByRam = typeof mem === 'number' && mem > 0 && mem < LOW_END_THRESHOLD_BYTES;
-    const weakByCpu = cpuBenchmarkMs > CPU_BENCHMARK_SLOW_THRESHOLD_MS;
-    const weakByArch = is32BitOnly();
-    return weakByRam || weakByCpu || weakByArch;
+    const weakByRam = typeof mem === 'number' && mem > 0 && mem < LOW_RAM_THRESHOLD_BYTES;
+    if (weakByRam) tier = degradeTier(tier);
+
+    if (is32BitOnly()) tier = degradeTier(tier);
+
+    return tier;
   } catch {
-    return false;
+    return 'high';
   }
 })();
 
+/** Nível de desempenho do aparelho — 'low' (fraco), 'mid' (intermediário)
+ * ou 'high' (normal/forte). Prefira isso a `useIsLowEndDevice` quando o
+ * ajuste puder ser gradual em vez de tudo-ou-nada. */
+export function useDevicePerfTier(): DevicePerfTier {
+  return devicePerfTier;
+}
+
 /**
- * true se o aparelho for considerado fraco — por RAM baixa, CPU lenta no
- * benchmark, ou arquitetura só 32-bit (qualquer um dos três já classifica
- * como fraco). Usado pra reduzir renderização simultânea e desligar
- * prefetches em segundo plano que competiriam por CPU.
+ * true só no nível MAIS fraco ('low') — usado pelas otimizações mais
+ * agressivas (desligar prefetch em segundo plano por completo), que só
+ * fazem sentido no pior caso. Aparelhos 'mid' continuam recebendo ajuste
+ * (via getListPerfProps/getFlashListPerfProps), só não o mais extremo.
  */
 export function useIsLowEndDevice(): boolean {
-  return isLowEndDevice;
+  return devicePerfTier === 'low';
 }
 
 /** Detalhes crus da detecção — usado na tela de Diagnóstico pra mostrar
@@ -81,10 +97,11 @@ export function useIsLowEndDevice(): boolean {
  * cegas, sem poder testar no aparelho da pessoa). */
 export function getDeviceCapabilityInfo() {
   return {
-    isLowEndDevice,
+    devicePerfTier,
     totalMemoryBytes: Device.totalMemory,
     cpuBenchmarkMs,
-    cpuBenchmarkThresholdMs: CPU_BENCHMARK_SLOW_THRESHOLD_MS,
+    cpuFastMaxMs: CPU_FAST_MAX_MS,
+    cpuSlowMinMs: CPU_SLOW_MIN_MS,
     is32BitOnly: is32BitOnly(),
     supportedCpuArchitectures: Device.supportedCpuArchitectures,
     modelName: Device.modelName,
@@ -93,18 +110,25 @@ export function getDeviceCapabilityInfo() {
 }
 
 /**
- * Ajusta os parâmetros de virtualização de uma FlatList conforme a força
- * do aparelho — menos itens de cada vez em TV box fraca, mantém o padrão
- * em aparelhos normais. Usado pelas listas que continuam em FlatList
- * (ex: a linha de seções da Home). Para Movies/Series/Channels, que usam
- * FlashList, ver getFlashListPerfProps abaixo.
+ * Ajusta os parâmetros de virtualização de uma FlatList conforme o nível
+ * do aparelho — menos itens de cada vez em aparelho fraco, um meio-termo
+ * em intermediário, mantém o padrão em aparelho forte. Usado pelas listas
+ * que continuam em FlatList (ex: a linha de seções da Home). Para Movies/
+ * Series/Channels, que usam FlashList, ver getFlashListPerfProps abaixo.
  */
 export function getListPerfProps(baseInitialNumToRender: number) {
-  if (isLowEndDevice) {
+  if (devicePerfTier === 'low') {
     return {
       initialNumToRender: Math.max(6, Math.round(baseInitialNumToRender / 2)),
       maxToRenderPerBatch: Math.max(6, Math.round(baseInitialNumToRender / 2)),
       windowSize: 4,
+    };
+  }
+  if (devicePerfTier === 'mid') {
+    return {
+      initialNumToRender: Math.max(8, Math.round(baseInitialNumToRender * 0.75)),
+      maxToRenderPerBatch: Math.max(8, Math.round(baseInitialNumToRender * 0.75)),
+      windowSize: 5,
     };
   }
   return {
@@ -119,9 +143,11 @@ export function getListPerfProps(baseInitialNumToRender: number) {
  * initialNumToRender/maxToRenderPerBatch/windowSize do FlatList — o
  * parâmetro que controla quanto ele renderiza além da área visível é o
  * drawDistance). Valor menor = menos itens montados de uma vez = menos
- * CPU/memória gasta em TV box fraca; maior = rolagem mais "generosa" mas
- * mais pesada. `undefined` deixa o FlashList usar o próprio padrão.
+ * CPU/memória gasta; maior = rolagem mais "generosa" mas mais pesada.
+ * `undefined` deixa o FlashList usar o próprio padrão.
  */
 export function getFlashListPerfProps() {
-  return isLowEndDevice ? { drawDistance: 120 } : {};
+  if (devicePerfTier === 'low') return { drawDistance: 120 };
+  if (devicePerfTier === 'mid') return { drawDistance: 200 };
+  return {};
 }
