@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
+import * as SplashScreen from "expo-splash-screen";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { LogBox, StatusBar, View, Text, StyleSheet } from "react-native";
@@ -10,6 +11,16 @@ import { verifyAppIntegrity } from "@/src/lib/integrity";
 import { storage } from "@/src/utils/storage";
 
 LogBox.ignoreAllLogs(true);
+
+// Mantém a splash nativa visível (a imagem/cor configurada em app.json,
+// desenhada pelo SISTEMA antes de qualquer JS rodar) até sabermos que dá
+// pra mostrar alguma coisa de verdade — fontes de ícone carregadas e a
+// checagem de integridade concluída. Sem isso, a splash nativa some
+// assim que o JS começa a executar, mas o RootLayout ainda retorna
+// `null` enquanto essas duas coisas resolvem — nesse intervalo (1-2s) a
+// tela fica preta/vazia antes da Home aparecer, dando sensação de
+// travamento. Precisa ser chamado ANTES do componente montar.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
@@ -74,6 +85,13 @@ export default function RootLayout() {
 
   if (!loaded && !error) return null;
   if (integrityOk === null) return null;
+
+  // Chegou até aqui: ou vamos renderizar a Home de verdade, ou a tela de
+  // bloqueio de integridade — dos dois jeitos, já tem algo pra mostrar.
+  // Esconde a splash nativa só agora (fire-and-forget: nunca deve
+  // travar a renderização se, por algum motivo raro, já tiver sido
+  // escondida antes).
+  SplashScreen.hideAsync().catch(() => {});
 
   if (!integrityOk) {
     // Pacote diferente do esperado — sinal de que o APK foi clonado e

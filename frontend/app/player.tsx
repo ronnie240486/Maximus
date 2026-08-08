@@ -96,6 +96,11 @@ export default function PlayerScreen() {
   // tentar de novo em loop se o .ts também falhar — ver o listener de
   // erro do player mais abaixo.
   const tsFallbackTriedFor = useRef<string | null>(null);
+  // Reconexão automática: quantas vezes já tentamos religar sozinho pro
+  // stream ATUAL, sem a pessoa precisar fazer nada. Zera toda vez que o
+  // stream muda (troca de canal/filme).
+  const reconnectAttempts = useRef(0);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLive = String(params.id || '').startsWith('live-');
 
@@ -190,6 +195,13 @@ export default function PlayerScreen() {
     current.stream ? { uri: current.stream, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } } : '',
     (p) => {
       p.loop = false;
+      // Buffer maior que o padrão (que gira em torno de ~15-20s) — IPTV
+      // costuma rodar em conexões mais instáveis que streaming normal
+      // (Wi-Fi de TV box, servidor do painel compartilhado, etc). Com
+      // mais segundos bufferizados à frente, uma queda de rede breve não
+      // interrompe a reprodução; o custo é só um pouco mais de RAM/dados
+      // baixados com antecedência, o que compensa bem pra live/VOD.
+      p.bufferOptions = { preferredForwardBufferDuration: 45 };
       p.play();
     }
   );
@@ -228,6 +240,38 @@ export default function PlayerScreen() {
   }, [scheduleHide]);
 
   useEffect(() => {
+    // Zera o contador de reconexão sempre que o stream muda (troca de
+    // canal/filme) — cada stream novo merece suas próprias 3 tentativas.
+    reconnectAttempts.current = 0;
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+
+    // Tenta religar sozinho até 3 vezes (com atraso crescente: 1s, 2s,
+    // 3s) antes de finalmente mostrar erro pra pessoa. Cobre quedas
+    // passageiras de rede/servidor no MEIO da reprodução — sem isso, uma
+    // instabilidade de 2-3 segundos já derrubava o vídeo com uma tela de
+    // erro, obrigando a pessoa a sair e entrar no canal de novo na mão.
+    const attemptReconnect = () => {
+      if (!current.stream) return;
+      reconnectAttempts.current += 1;
+      if (reconnectAttempts.current > 3) {
+        setError('Não foi possível reproduzir esta transmissão.');
+        return;
+      }
+      const delay = reconnectAttempts.current * 1000;
+      reconnectTimer.current = setTimeout(() => {
+        player
+          .replaceAsync({
+            uri: current.stream!,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
+          })
+          .then(() => player.play())
+          .catch(() => attemptReconnect());
+      }, delay);
+    };
+
     const statusSub = player.addListener('statusChange', (s) => {
       setBuffering(s.status === 'loading');
       if (s.status === 'error') {
@@ -235,7 +279,7 @@ export default function PlayerScreen() {
         // o formato HLS (.m3u8) pros canais ao vivo, só o .ts direto —
         // antes de mostrar erro pro usuário, tenta trocar pra .ts uma
         // vez. Se isso também falhar (ou já não for um canal .m3u8),
-        // mostra o erro normalmente.
+        // cai pra reconexão automática genérica abaixo.
         const canFallback =
           isLive &&
           !!current.stream &&
@@ -250,13 +294,18 @@ export default function PlayerScreen() {
               headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' },
             })
             .then(() => player.play())
-            .catch(() => setError('Não foi possível reproduzir esta transmissão.'));
+            .catch(() => attemptReconnect());
           return;
         }
-        setError('Não foi possível reproduzir esta transmissão.');
-      } else {
-        setError(null);
+        attemptReconnect();
+        return;
       }
+      // Qualquer status que não seja erro (voltou a carregar/tocar
+      // normal) significa que, se estávamos tentando reconectar, deu
+      // certo — zera o contador pra próxima queda ter as 3 tentativas
+      // completas de novo, em vez de continuar de onde parou.
+      reconnectAttempts.current = 0;
+      setError(null);
     });
     const playingSub = player.addListener('playingChange', (e) => {
       setPlaying(e.isPlaying);
@@ -264,6 +313,7 @@ export default function PlayerScreen() {
     return () => {
       statusSub.remove();
       playingSub.remove();
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
     };
   }, [player, isLive, current.stream]);
 

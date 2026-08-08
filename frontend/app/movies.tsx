@@ -17,6 +17,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
+import { posterImageProps } from '@/src/lib/image-placeholder';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamMovie } from '@/src/lib/xtream';
@@ -250,7 +251,7 @@ export default function MoviesScreen() {
           >
             <View style={styles.posterCard}>
               {item.stream_icon ? (
-                <Image source={{ uri: item.stream_icon }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" />
+                <Image source={{ uri: item.stream_icon }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" {...posterImageProps} />
               ) : (
                 <MaterialCommunityIcons name="movie-open" size={30} color={colors.textMuted} />
               )}

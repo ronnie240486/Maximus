@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -102,6 +102,12 @@ export default function ChannelsScreen() {
   // Destaque visual da linha (instantâneo) — separado do preview de vídeo
   // em si, que é mais pesado e usa debounce (ver onFocusChannel abaixo).
   const [focusedChannel, setFocusedChannel] = useState<XtreamLive | null>(null);
+  const focusPrefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (focusPrefetchTimer.current) clearTimeout(focusPrefetchTimer.current);
+    };
+  }, []);
   const { modal: parentalModal, guard } = useParentalGate();
 
   useFocusEffect(
@@ -278,6 +284,23 @@ export default function ChannelsScreen() {
   // realmente carrega.
   const onFocusChannel = useCallback((item: XtreamLive) => {
     setFocusedChannel(item);
+
+    // Pre-buffer leve: se o D-pad ficar parado 500ms num canal, busca o
+    // manifesto (.m3u8) dele em background — sem player nenhum, só uma
+    // requisição de rede que "esquenta" DNS/TCP/TLS com o servidor e
+    // deixa o manifesto pronto no cache HTTP. Quando a pessoa realmente
+    // abrir o canal, essa etapa (que costuma ser boa parte do atraso
+    // pra começar a tocar) já foi feita. Deliberadamente NÃO cria um
+    // VideoPlayer escondido pra isso — instanciar player de vídeo de
+    // verdade só pra bufferizar é pesado, e faria o oposto do que
+    // queremos numa TV box já fraca.
+    if (focusPrefetchTimer.current) clearTimeout(focusPrefetchTimer.current);
+    focusPrefetchTimer.current = setTimeout(() => {
+      const creds = getXtream();
+      if (!creds) return;
+      const url = liveStreamUrl(creds, item.stream_id, 'm3u8');
+      fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } }).catch(() => {});
+    }, 500);
   }, []);
 
   // 1º clique num canal: só carrega o preview (mini player), não abre

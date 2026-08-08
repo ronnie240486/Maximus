@@ -131,6 +131,73 @@ async def iptv_proxy(url: str, request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Image resize proxy (pôsteres/capas)
+# ---------------------------------------------------------------------------
+# Os pôsteres do painel Xtream costumam vir em resolução bem maior do que
+# o card na tela realmente mostra (comum ver 1000x1500px pra um card de
+# ~90px de largura) — isso desperdiça banda e memória, especialmente em
+# TV box com processador/RAM fraca. Esse endpoint baixa a imagem original,
+# redimensiona com Pillow, e devolve já no tamanho pedido.
+#
+# IMPORTANTE (segurança do app, não deste endpoint): o app SEMPRE tem
+# fallback pra URL original se esse endpoint falhar ou não responder (ver
+# src/lib/image-proxy.ts, componente ProxiedImage) — se o backend cair ou
+# não estiver implantado, os pôsteres continuam carregando normalmente,
+# só sem o redimensionamento. Esse endpoint nunca é uma dependência dura.
+from io import BytesIO
+from PIL import Image as PILImage
+
+
+@api_router.get("/image-proxy")
+async def image_proxy(url: str, w: int = 300):
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="Invalid scheme.")
+    if not _is_host_allowed(parsed.hostname or ""):
+        raise HTTPException(status_code=403, detail=f"Host not allowed: {parsed.hostname}")
+
+    # Limite de sanidade — nada na UI pede pôster maior que isso; evita
+    # abuso do parâmetro `w` pra forçar processamento caro à toa.
+    target_width = max(32, min(w, 800))
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as http:
+            upstream = await http.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1"},
+            )
+        if not upstream.is_success:
+            raise HTTPException(status_code=502, detail="Upstream image fetch failed.")
+
+        img = PILImage.open(BytesIO(upstream.content))
+        img = img.convert("RGB")  # JPEG não suporta alpha/paleta
+        if img.width > target_width:
+            ratio = target_width / img.width
+            target_height = max(1, round(img.height * ratio))
+            img = img.resize((target_width, target_height), PILImage.LANCZOS)
+
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=80, optimize=True)
+        out.seek(0)
+
+        return Response(
+            content=out.read(),
+            media_type="image/jpeg",
+            # Cache de 7 dias — pôster de filme/série não muda depois de
+            # publicado, sem necessidade de revalidar toda hora.
+            headers={"Cache-Control": "public, max-age=604800"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Qualquer falha (imagem corrompida, timeout, formato inesperado)
+        # vira 502 — o cliente já sabe cair pra URL original nesse caso.
+        raise HTTPException(status_code=502, detail=f"Image proxy error: {e}") from e
+
+
+# ---------------------------------------------------------------------------
 # Teste automático (chatbot de geração de teste)
 # ---------------------------------------------------------------------------
 # A URL real do gerador de teste (sigmab.pro) muda de tempos em tempos, então

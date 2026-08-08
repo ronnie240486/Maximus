@@ -17,6 +17,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
+import { posterImageProps } from '@/src/lib/image-placeholder';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamSeries } from '@/src/lib/xtream';
@@ -237,7 +238,7 @@ export default function SeriesScreen() {
           >
             <View style={styles.posterCard}>
               {item.cover ? (
-                <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" />
+                <Image source={{ uri: item.cover }} style={styles.posterImg} contentFit="cover" cachePolicy="memory-disk" {...posterImageProps} />
               ) : (
                 <Ionicons name="film" size={30} color={colors.textMuted} />
               )}
