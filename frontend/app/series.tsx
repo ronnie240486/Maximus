@@ -28,6 +28,7 @@ import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import { getFlashListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { useListImagePrefetch } from '@/src/hooks/useListImagePrefetch';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const ALL = 'Todos';
@@ -164,6 +165,11 @@ export default function SeriesScreen() {
     return nonFavFiltered;
   }, [selectedCat, favoriteIds, visibleSeries, nonFavFiltered, sortItems]);
 
+  const { onViewableItemsChanged, viewabilityConfig } = useListImagePrefetch(
+    filtered,
+    (s: XtreamSeries) => s.cover
+  );
+
   const openSeries = (s: XtreamSeries) => {
     const categoryName = categories.find((c) => c.category_id === s.category_id)?.category_name;
     guard(categoryName, () => {
@@ -229,6 +235,8 @@ export default function SeriesScreen() {
         columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.md }}
         {...flashListPerf}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         renderItem={({ item }) => (
           <TVFocusable
             style={[styles.poster, { width: itemWidth }]}

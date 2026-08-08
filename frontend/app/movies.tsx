@@ -28,6 +28,7 @@ import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import { getFlashListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { useListImagePrefetch } from '@/src/hooks/useListImagePrefetch';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const ALL = 'Todos';
@@ -177,6 +178,11 @@ export default function MoviesScreen() {
     return nonFavFiltered;
   }, [selectedCat, favoriteIds, visibleMovies, nonFavFiltered, sortItems]);
 
+  const { onViewableItemsChanged, viewabilityConfig } = useListImagePrefetch(
+    filtered,
+    (m: XtreamMovie) => m.stream_icon
+  );
+
   const openMovie = (m: XtreamMovie) => {
     const categoryName = categories.find((c) => c.category_id === m.category_id)?.category_name;
     guard(categoryName, () => {
@@ -242,6 +248,8 @@ export default function MoviesScreen() {
         columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.md }}
         {...flashListPerf}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         renderItem={({ item }) => (
           <TVFocusable
             onPress={() => openMovie(item)}

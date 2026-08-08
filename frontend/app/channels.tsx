@@ -27,6 +27,7 @@ import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadFavorites, toggleFavorite } from '@/src/state/favorites';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import { getFlashListPerfProps } from '@/src/hooks/useIsLowEndDevice';
+import { useListImagePrefetch } from '@/src/hooks/useListImagePrefetch';
 import TVFocusable from '@/src/components/TVFocusable';
 import TVChannelPreview from '@/src/components/TVChannelPreview';
 
@@ -253,6 +254,9 @@ export default function ChannelsScreen() {
     }
     return nonFavFiltered;
   }, [selectedCat, favoriteIds, visibleStreams, nonFavFiltered]);
+
+  const { onViewableItemsChanged: onGridViewableItemsChanged, viewabilityConfig: gridViewabilityConfig } =
+    useListImagePrefetch(filtered, (c: XtreamLive) => c.stream_icon);
 
   // Ao trocar de categoria (ou filtro), só ATUALIZA O DESTAQUE do primeiro
   // canal da nova lista — nunca carrega vídeo nenhum sozinho. Antes disso
@@ -539,6 +543,8 @@ export default function ChannelsScreen() {
           columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
           contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.sm }}
           {...gridFlashListPerf}
+          onViewableItemsChanged={onGridViewableItemsChanged}
+          viewabilityConfig={gridViewabilityConfig}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => openPlayer(item)}
