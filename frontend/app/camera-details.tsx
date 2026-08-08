@@ -41,6 +41,20 @@ export default function CameraDetailsScreen() {
     load();
   }, [load]);
 
+  // Sem player ao vivo de verdade (bem comum — a API da Windy é baseada em
+  // imagem periódica pra boa parte do catálogo, não streaming contínuo),
+  // a imagem ficaria travada pra sempre na mesma foto durante a visita.
+  // Busca de novo a cada 3 minutos pra trazer uma imagem mais recente —
+  // não é "ao vivo" de verdade, mas deixa de parecer uma câmera morta.
+  const hasLiveEmbed = !!webcam?.player?.live?.embed;
+  useEffect(() => {
+    if (hasLiveEmbed || loading || error) return;
+    const interval = setInterval(() => {
+      load();
+    }, 3 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [hasLiveEmbed, loading, error, load]);
+
   const onRefresh = () => {
     setRefreshing(true);
     load();
@@ -115,7 +129,7 @@ export default function CameraDetailsScreen() {
 
           {!embedUrl && previewUrl && (
             <Text style={styles.hintText}>
-              Esta câmera não possui player ao vivo — exibindo a última imagem disponível.
+              Esta câmera não possui player ao vivo — exibindo a última imagem disponível (atualiza sozinha a cada poucos minutos).
             </Text>
           )}
         </ScrollView>
