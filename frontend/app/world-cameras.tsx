@@ -7,27 +7,35 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
 
-// Países listados no menu oficial do site "Câmeras do Mundo"
-// (en.camerasdomundo.com). Cada um abre a página de câmeras daquele
-// país dentro de um WebView, mesmo padrão que já usamos para trailers
-// do YouTube e para o portal de trânsito do CET-SP.
+// O site "Câmeras do Mundo" (camerasdomundo.com) foi descartado como fonte
+// — o player deles está quebrado até no site oficial (fora do nosso app),
+// só o link "canal do YouTube" funciona. Em vez de depender de um player
+// de terceiro instável, cada país abre uma BUSCA no YouTube por câmeras
+// ao vivo — o YouTube é a mesma base que já usamos (e sabemos que
+// funciona bem) pros trailers. Sem link fixo pra vídeo nenhum (esses
+// mudam/saem do ar o tempo todo) — a pessoa escolhe, dentro da busca,
+// qual câmera ao vivo daquele país quer ver.
+function youtubeSearchUrl(query: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
 const COUNTRIES: { id: string; name: string; flag: string; url: string }[] = [
-  { id: 'brazil', name: 'Brasil', flag: '🇧🇷', url: 'https://en.camerasdomundo.com/brazil/' },
-  { id: 'usa', name: 'Estados Unidos', flag: '🇺🇸', url: 'https://en.camerasdomundo.com/usa/' },
-  { id: 'japan', name: 'Japão', flag: '🇯🇵', url: 'https://en.camerasdomundo.com/live-cams/japan/' },
-  { id: 'canada', name: 'Canadá', flag: '🇨🇦', url: 'https://en.camerasdomundo.com/canada/' },
-  { id: 'spain', name: 'Espanha', flag: '🇪🇸', url: 'https://en.camerasdomundo.com/spain/' },
-  { id: 'turkey', name: 'Turquia', flag: '🇹🇷', url: 'https://en.camerasdomundo.com/turkey/' },
-  { id: 'thailand', name: 'Tailândia', flag: '🇹🇭', url: 'https://en.camerasdomundo.com/live-cams/thailand/' },
-  { id: 'singapore', name: 'Singapura', flag: '🇸🇬', url: 'https://en.camerasdomundo.com/singapore/' },
-  { id: 'philippines', name: 'Filipinas', flag: '🇵🇭', url: 'https://en.camerasdomundo.com/philippines/' },
-  { id: 'taiwan', name: 'Taiwan', flag: '🇹🇼', url: 'https://en.camerasdomundo.com/taiwan/' },
-  { id: 'israel', name: 'Israel', flag: '🇮🇱', url: 'https://en.camerasdomundo.com/live-cams/israel/' },
-  { id: 'lebanon', name: 'Líbano', flag: '🇱🇧', url: 'https://en.camerasdomundo.com/live-cams/lebanon/' },
-  { id: 'iran', name: 'Irã', flag: '🇮🇷', url: 'https://en.camerasdomundo.com/live-cams/iran/' },
-  { id: 'palestine', name: 'Palestina', flag: '🇵🇸', url: 'https://en.camerasdomundo.com/live-cams/palestine/' },
-  { id: 'virgin-islands', name: 'Ilhas Virgens', flag: '🇻🇬', url: 'https://en.camerasdomundo.com/virgin-islands/' },
-  { id: 'all', name: 'Ver todas', flag: '🌎', url: 'https://en.camerasdomundo.com/live-cams/' },
+  { id: 'brazil', name: 'Brasil', flag: '🇧🇷', url: youtubeSearchUrl('câmera ao vivo Brasil live cam') },
+  { id: 'usa', name: 'Estados Unidos', flag: '🇺🇸', url: youtubeSearchUrl('USA live cam 24/7') },
+  { id: 'japan', name: 'Japão', flag: '🇯🇵', url: youtubeSearchUrl('Japan live cam 24/7') },
+  { id: 'canada', name: 'Canadá', flag: '🇨🇦', url: youtubeSearchUrl('Canada live cam 24/7') },
+  { id: 'spain', name: 'Espanha', flag: '🇪🇸', url: youtubeSearchUrl('Spain live cam 24/7') },
+  { id: 'turkey', name: 'Turquia', flag: '🇹🇷', url: youtubeSearchUrl('Turkey live cam 24/7') },
+  { id: 'thailand', name: 'Tailândia', flag: '🇹🇭', url: youtubeSearchUrl('Thailand live cam 24/7') },
+  { id: 'singapore', name: 'Singapura', flag: '🇸🇬', url: youtubeSearchUrl('Singapore live cam 24/7') },
+  { id: 'philippines', name: 'Filipinas', flag: '🇵🇭', url: youtubeSearchUrl('Philippines live cam 24/7') },
+  { id: 'taiwan', name: 'Taiwan', flag: '🇹🇼', url: youtubeSearchUrl('Taiwan live cam 24/7') },
+  { id: 'israel', name: 'Israel', flag: '🇮🇱', url: youtubeSearchUrl('Israel live cam 24/7') },
+  { id: 'lebanon', name: 'Líbano', flag: '🇱🇧', url: youtubeSearchUrl('Lebanon live cam 24/7') },
+  { id: 'iran', name: 'Irã', flag: '🇮🇷', url: youtubeSearchUrl('Iran live cam 24/7') },
+  { id: 'palestine', name: 'Palestina', flag: '🇵🇸', url: youtubeSearchUrl('Palestine live cam 24/7') },
+  { id: 'virgin-islands', name: 'Ilhas Virgens', flag: '🇻🇬', url: youtubeSearchUrl('Virgin Islands live cam 24/7') },
+  { id: 'all', name: 'Ver todas', flag: '🌎', url: youtubeSearchUrl('live cam 24/7 world') },
 ];
 
 export default function WorldCamerasScreen() {
