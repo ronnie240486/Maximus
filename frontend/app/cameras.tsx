@@ -152,6 +152,7 @@ export default function CamerasScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              removeClippedSubviews={false}
               contentContainerStyle={styles.tabsRow}
               style={styles.tabsScroll}
             >
@@ -255,12 +256,14 @@ const styles = StyleSheet.create({
   tabsRow: { gap: 8, paddingHorizontal: spacing.md },
   tab: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 16,
     backgroundColor: colors.darkSurfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabActive: { backgroundColor: colors.accentCyan },
-  tabText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
+  tabText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', lineHeight: 16, includeFontPadding: false },
   tabTextActive: { color: colors.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, gap: 10 },
