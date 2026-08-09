@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,8 +46,15 @@ const COUNTRIES: { id: string; name: string; flag: string; url: string }[] = [
 export default function WorldCamerasScreen() {
   const router = useRouter();
 
-  const openCountry = (name: string, url: string) => {
-    router.push({ pathname: '/world-camera-view', params: { title: name, url } });
+  // Depois de 3 tentativas diferentes de fazer o YouTube tocar direito
+  // DENTRO do WebView do nosso app (todas com algum problema — vídeo só
+  // com som, tela travada carregando, piscando sem abrir), a forma
+  // confiável é abrir no navegador/app do YouTube do próprio celular.
+  // Sai do nosso app pra assistir, mas garante que funciona de verdade —
+  // quem toca o vídeo passa a ser o YouTube de verdade, não uma
+  // simulação nossa dele.
+  const openCountry = (url: string) => {
+    Linking.openURL(url).catch(() => {});
   };
 
   return (
@@ -70,12 +77,13 @@ export default function WorldCamerasScreen() {
         columnWrapperStyle={styles.row}
         renderItem={({ item }) => (
           <TVFocusable
-            onPress={() => openCountry(item.name, item.url)}
+            onPress={() => openCountry(item.url)}
             style={styles.card}
             testID={`world-country-${item.id}`}
           >
             <Text style={styles.flag}>{item.flag}</Text>
             <Text style={styles.countryName}>{item.name}</Text>
+            <Ionicons name="open-outline" size={14} color={colors.textMuted} />
           </TVFocusable>
         )}
       />
