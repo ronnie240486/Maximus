@@ -126,6 +126,27 @@ function parseGameChannelName(name: string): { time: string | null; rest: string
   return { time: null, rest: name };
 }
 
+/** Detecta o esporte pelo nome do canal e devolve um ícone + cor pra
+ * deixar os cards mais vivos e organizados visualmente — como o painel só
+ * fornece o mesmo ícone genérico "JOGOS" pra todos os canais dessa
+ * categoria (sem brasão de time de verdade), isso é o que dá pra fazer
+ * de forma confiável sem depender de uma busca de time (que a TheSportsDB
+ * também restringe bastante no plano grátis — só funciona pra um time de
+ * exemplo fixo, não pra qualquer time real).
+ */
+function detectSportVisual(channelName: string): { icon: string; color: string } {
+  const n = normalizeText(channelName);
+  if (/(nba|basquete|basketball)/.test(n)) return { icon: 'basketball', color: '#F97316' };
+  if (/(nfl|futebol americano|super bowl)/.test(n)) return { icon: 'football', color: '#8B5CF6' };
+  if (/(f1|formula ?1|nascar|automobilismo|motorsport|corrida)/.test(n)) return { icon: 'flag-checkered', color: '#EF4444' };
+  if (/(ufc|mma|boxe|boxing|luta)/.test(n)) return { icon: 'boxing-glove', color: '#DC2626' };
+  if (/(volei|volleyball|nbb|handebol)/.test(n)) return { icon: 'volleyball', color: '#3B82F6' };
+  if (/(nhl|hoquei|hockey)/.test(n)) return { icon: 'hockey-sticks', color: '#06B6D4' };
+  // Padrão: futebol (esmagadora maioria dos canais de "jogos do dia" em
+  // painel brasileiro é futebol mesmo).
+  return { icon: 'soccer', color: '#22C55E' };
+}
+
 export default function GamesScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -155,18 +176,67 @@ export default function GamesScreen() {
       setSportsResolved(true);
       return;
     }
+    // Palavras-chave mais amplas — antes só pegava categoria com "jogo"/
+    // "esporte"/"sport"/"game" no nome, então uma categoria separada
+    // chamada só "NBA" (sem nenhuma dessas palavras) nunca era
+    // encontrada, mesmo que o painel tivesse canal de NBA de verdade.
+    const SPORT_CATEGORY_KEYWORDS = [
+      'jogo',
+      'esporte',
+      'sport',
+      'game',
+      'nba',
+      'nfl',
+      'nhl',
+      'mlb',
+      'basquete',
+      'basketball',
+      'futebol americano',
+      'volei',
+      'vôlei',
+      'volleyball',
+      'mma',
+      'ufc',
+      'formula 1',
+      'formula1',
+      ' f1 ',
+      'nascar',
+      'automobilismo',
+      'motorsport',
+      'luta',
+      'boxe',
+      'boxing',
+    ];
     xtream.liveCategories(creds).then(async (cats) => {
-      const match = cats?.find((c) => {
+      // Antes: cats?.find(...) — pegava só a PRIMEIRA categoria que
+      // batesse, então se o painel tivesse "Canais | Jogos do Dia" E uma
+      // categoria separada "NBA", só uma das duas era usada (a outra
+      // simplesmente desaparecia da tela de Jogos, mesmo tendo canal de
+      // verdade lá dentro). Agora junta canais de TODAS as categorias que
+      // baterem.
+      const matches = (cats || []).filter((c) => {
         const n = normalize(c.category_name);
-        return n.includes('jogo') || n.includes('esporte') || n.includes('sport') || n.includes('game');
+        return SPORT_CATEGORY_KEYWORDS.some((kw) => n.includes(kw));
       });
-      if (!match) {
+      if (matches.length === 0) {
         setSportsResolved(true);
         return;
       }
-      setSportsCategory(match.category_name);
-      const channels = await xtream.liveStreams(creds, match.category_id);
-      if (channels) setSportsChannels(channels);
+      setSportsCategory(matches.length === 1 ? matches[0].category_name : `${matches.length} categorias de esporte`);
+      const perCategory = await Promise.all(
+        matches.map((c) => xtream.liveStreams(creds, c.category_id).catch(() => null))
+      );
+      const combined: XtreamLive[] = [];
+      const seenIds = new Set<number>();
+      for (const list of perCategory) {
+        for (const ch of list || []) {
+          if (!seenIds.has(ch.stream_id)) {
+            seenIds.add(ch.stream_id);
+            combined.push(ch);
+          }
+        }
+      }
+      setSportsChannels(combined);
       setSportsResolved(true);
     });
   }, []);
@@ -321,6 +391,7 @@ export default function GamesScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.panelGamesRow}>
             {sportsChannels.map((ch) => {
               const { time, rest } = parseGameChannelName(ch.name);
+              const visual = detectSportVisual(ch.name);
               return (
                 <TVFocusable
                   key={ch.stream_id}
@@ -328,14 +399,17 @@ export default function GamesScreen() {
                   style={styles.panelGameCard}
                   testID={`games-panel-channel-${ch.stream_id}`}
                 >
-                  <View style={styles.panelGameThumb}>
+                  <View style={[styles.panelGameThumb, { borderColor: visual.color }]}>
                     {ch.stream_icon ? (
                       <Image source={{ uri: ch.stream_icon }} style={styles.panelGameThumbImg} contentFit="contain" />
                     ) : (
-                      <Ionicons name="football" size={22} color={colors.textMuted} />
+                      <MaterialCommunityIcons name={visual.icon as any} size={26} color={visual.color} />
                     )}
+                    <View style={[styles.panelGameSportBadge, { backgroundColor: visual.color }]}>
+                      <MaterialCommunityIcons name={visual.icon as any} size={11} color={colors.white} />
+                    </View>
                   </View>
-                  {!!time && <Text style={styles.panelGameTime}>{time}</Text>}
+                  {!!time && <Text style={[styles.panelGameTime, { color: visual.color }]}>{time}</Text>}
                   <Text style={styles.panelGameName} numberOfLines={2}>{rest}</Text>
                 </TVFocusable>
               );
@@ -495,13 +569,24 @@ const styles = StyleSheet.create({
     width: 100,
     height: 60,
     borderRadius: 8,
+    borderWidth: 2,
     backgroundColor: colors.darkSurface,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   panelGameThumbImg: { width: '80%', height: '80%' },
-  panelGameTime: { color: colors.accentCyan, fontSize: 11, fontWeight: '800', marginTop: 4 },
+  panelGameSportBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  panelGameTime: { fontSize: 11, fontWeight: '800', marginTop: 4 },
   panelGameName: { color: colors.white, fontSize: 11, fontWeight: '600', marginTop: 2 },
   chip: {
     height: 36,
