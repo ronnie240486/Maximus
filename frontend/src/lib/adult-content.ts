@@ -2,6 +2,13 @@
 // content purely by category naming convention. We match common keywords
 // (PT-BR and EN) case/accent-insensitively against the category name.
 
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, ''); // strip accents
+}
+
 const ADULT_KEYWORDS = [
   'adulto',
   'adultos',
@@ -14,19 +21,6 @@ const ADULT_KEYWORDS = [
   'erotic',
   'erótico',
 ];
-
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, ''); // strip accents
-}
-
-export function isAdultCategoryName(categoryName?: string | null): boolean {
-  if (!categoryName) return false;
-  const n = normalize(categoryName);
-  return ADULT_KEYWORDS.some((kw) => n.includes(normalize(kw)));
-}
 
 // Palavras que costumam aparecer em categorias feitas pra criança de
 // verdade. Perfil infantil não é só "sem conteúdo adulto" — é só
@@ -58,12 +52,6 @@ const KIDS_KEYWORDS = [
   'bebes',
   'juvenil',
 ];
-
-export function isKidsCategoryName(categoryName?: string | null): boolean {
-  if (!categoryName) return false;
-  const n = normalize(categoryName);
-  return KIDS_KEYWORDS.some((kw) => n.includes(normalize(kw)));
-}
 
 // Muitos painéis organizam Filmes/Séries por PLATAFORMA (Netflix, Amazon,
 // Disney+...) em vez de por gênero/público — nesse caso, dentro de uma
@@ -170,10 +158,54 @@ const KIDS_TITLE_KEYWORDS = [
   'mundo bita',
 ];
 
+// FIX DE PERFORMANCE IMPORTANTE: antes, cada palavra-chave era normalizada
+// DE NOVO (toLowerCase + normalize NFD + regex) a cada comparação — ou
+// seja, pra CADA filme/série checado contra as ~94 palavras de
+// KIDS_TITLE_KEYWORDS, rodava até 94 normalizações redundantes das MESMAS
+// palavras estáticas, que nunca mudam. Num catálogo com milhares de
+// itens (comum em painel IPTV), isso virava centenas de milhares de
+// operações de Unicode síncronas na hora de abrir Filmes/Séries com
+// perfil infantil — pesado o bastante pra travar (e até derrubar) o app
+// numa TV box com processador fraco. Normalizando as listas UMA VEZ SÓ,
+// aqui embaixo, elimina praticamente todo esse trabalho redundante.
+const NORMALIZED_ADULT_KEYWORDS = ADULT_KEYWORDS.map(normalize);
+const NORMALIZED_KIDS_KEYWORDS = KIDS_KEYWORDS.map(normalize);
+const NORMALIZED_KIDS_TITLE_KEYWORDS = KIDS_TITLE_KEYWORDS.map(normalize);
+
+export function isAdultCategoryName(categoryName?: string | null): boolean {
+  if (!categoryName) return false;
+  const n = normalize(categoryName);
+  return NORMALIZED_ADULT_KEYWORDS.some((kw) => n.includes(kw));
+}
+
+export function isKidsCategoryName(categoryName?: string | null): boolean {
+  if (!categoryName) return false;
+  const n = normalize(categoryName);
+  return NORMALIZED_KIDS_KEYWORDS.some((kw) => n.includes(kw));
+}
+
+// Cache por título — se o mesmo catálogo for filtrado mais de uma vez na
+// mesma sessão (ex: pull-to-refresh), títulos repetidos não recalculam
+// do zero. Capado em tamanho pelo mesmo motivo do cache de EPG (ver
+// decodeEpgText em xtream.ts): conjunto de trabalho real é sempre
+// pequeno-médio, um teto generoso nunca deveria expulsar algo em uso.
+const KIDS_TITLE_CACHE_MAX = 2000;
+const kidsTitleCache = new Map<string, boolean>();
+
 export function isKidsTitle(name?: string | null): boolean {
   if (!name) return false;
+  const cached = kidsTitleCache.get(name);
+  if (cached !== undefined) return cached;
+
   const n = normalize(name);
-  return KIDS_TITLE_KEYWORDS.some((kw) => n.includes(normalize(kw)));
+  const result = NORMALIZED_KIDS_TITLE_KEYWORDS.some((kw) => n.includes(kw));
+
+  if (kidsTitleCache.size >= KIDS_TITLE_CACHE_MAX) {
+    const oldestKey = kidsTitleCache.keys().next().value;
+    if (oldestKey !== undefined) kidsTitleCache.delete(oldestKey);
+  }
+  kidsTitleCache.set(name, result);
+  return result;
 }
 
 // Usados pelas telas de conteúdo (Canais, Filmes, Séries) quando o perfil

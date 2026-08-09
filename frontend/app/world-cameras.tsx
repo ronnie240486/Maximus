@@ -16,7 +16,12 @@ import TVFocusable from '@/src/components/TVFocusable';
 // mudam/saem do ar o tempo todo) — a pessoa escolhe, dentro da busca,
 // qual câmera ao vivo daquele país quer ver.
 function youtubeSearchUrl(query: string): string {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  // sp=EgJAAQ%3D%3D é o filtro oficial do YouTube pra "Ao vivo" — sem
+  // ele, a busca misturava vídeos gravados/antigos junto com as
+  // transmissões de verdade, e um vídeo gravado que já terminou (ou é
+  // só um trecho de áudio) dava a impressão de "câmera com defeito, só
+  // sai som" quando na real só não era uma câmera ao vivo mesmo.
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgJAAQ%3D%3D`;
 }
 
 const COUNTRIES: { id: string; name: string; flag: string; url: string }[] = [
