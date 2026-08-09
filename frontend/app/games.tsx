@@ -1,15 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,103 +11,47 @@ import {
   loadGameReminders,
   toggleGameReminder,
   popDueReminders,
-  GameReminder,
 } from '@/src/state/game-reminders';
 import TVFocusable from '@/src/components/TVFocusable';
-
-// TheSportsDB's shared free demo key — documented as the public, no-signup
-// key for the free tier (https://www.thesportsdb.com/documentation). Limited
-// results on the free tier, but no account/credentials needed from the person
-// using the app.
-const SPORTSDB_KEY = '123';
-
-type SportDef = {
-  key: string;
-  label: string;
-  sportsdbSport: string; // valor do parâmetro `s` na TheSportsDB
-};
-
-// Esportes com jogo casado a um canal de TV (por isso ficam aqui, junto
-// com o botão de assistir e o lembrete) — os que não têm canal (beisebol,
-// tênis, vôlei, MMA) ficam na tela separada "Placar".
-const SPORTS: SportDef[] = [
-  { key: 'soccer', label: 'Futebol', sportsdbSport: 'Soccer' },
-  { key: 'basketball', label: 'Basquete', sportsdbSport: 'Basketball' },
-  { key: 'nfl', label: 'Futebol Americano', sportsdbSport: 'American_Football' },
-  { key: 'motorsport', label: 'Automobilismo', sportsdbSport: 'Motorsport' },
-  { key: 'fighting', label: 'Lutas', sportsdbSport: 'Fighting' },
-];
-const DAYS_AHEAD = 4; // today + next 3 days — keeps free-tier calls reasonable
-
-type GameEvent = {
-  idEvent: string;
-  strEvent: string;
-  strLeague?: string;
-  strLeagueBadge?: string;
-  strHomeTeam?: string;
-  strAwayTeam?: string;
-  strHomeTeamBadge?: string;
-  strAwayTeamBadge?: string;
-  strTime?: string;
-  dateEvent?: string;
-  intHomeScore?: string | null;
-  intAwayScore?: string | null;
-  strStatus?: string | null;
-  strSport?: string;
-};
-
-function isoDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function dayLabel(dateStr: string): string {
-  const today = isoDate(new Date());
-  const tomorrow = isoDate(new Date(Date.now() + 86400000));
-  if (dateStr === today) return 'HOJE';
-  if (dateStr === tomorrow) return 'AMANHÃ';
-  const d = new Date(`${dateStr}T00:00:00`);
-  const weekday = d.toLocaleDateString('pt-BR', { weekday: 'short' });
-  return `${weekday.toUpperCase()} ${d.getDate()}/${d.getMonth() + 1}`;
-}
-
-/** Best-effort epoch for a game's kickoff — TheSportsDB times are documented as UTC. */
-function eventEpoch(e: GameEvent): number | null {
-  if (!e.dateEvent) return null;
-  const time = e.strTime || '00:00:00';
-  const t = Date.parse(`${e.dateEvent}T${time}Z`);
-  return isNaN(t) ? null : t;
-}
 
 function normalizeText(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-/**
- * Best-effort match of "which channel could plausibly show this game" — the
- * free sports API returns games from leagues/countries the person's actual
- * channel lineup has no coverage for, which is just noise. We don't have a
- * real game→channel mapping, so this compares significant words from the
- * league name and both team names against the channel names in the
- * person's sports category, and returns the first channel that overlaps.
- */
-function findMatchingChannel(e: GameEvent, channels: XtreamLive[]): XtreamLive | undefined {
-  const words = [e.strLeague, e.strHomeTeam, e.strAwayTeam]
-    .filter(Boolean)
-    .flatMap((s) => normalizeText(s as string).split(/\s+/))
-    .filter((w) => w.length >= 4);
-  if (words.length === 0) return undefined;
-  return channels.find((c) => {
-    const n = normalizeText(c.name);
-    return words.some((w) => n.includes(w));
-  });
-}
+/** Categorias do painel que costumam ter os jogos do dia — bem mais amplo
+ * que só "jogo"/"esporte" pra pegar categorias tipo "NBA" ou "F1" mesmo
+ * quando nomeadas só pelo esporte, sem a palavra "jogos" no meio. */
+const SPORT_CATEGORY_KEYWORDS = [
+  'jogo',
+  'esporte',
+  'sport',
+  'game',
+  'nba',
+  'nfl',
+  'nhl',
+  'mlb',
+  'basquete',
+  'basketball',
+  'futebol americano',
+  'volei',
+  'vôlei',
+  'volleyball',
+  'mma',
+  'ufc',
+  'formula 1',
+  'formula1',
+  ' f1 ',
+  'nascar',
+  'automobilismo',
+  'motorsport',
+  'luta',
+  'boxe',
+  'boxing',
+];
 
 /** Muitos painéis nomeiam os canais de "jogos do dia" como "[15:45] Time A x
- * Time B" — separa o horário (se tiver) do resto do nome, pra exibir de
- * forma mais organizada. Se o canal não seguir esse padrão, devolve o nome
- * inteiro como "resto" e nenhum horário — nunca quebra, só perde a
- * formatação bonitinha. */
+ * Time B" — separa o horário (se tiver) do resto do nome. Nunca quebra,
+ * só perde a formatação bonitinha se o canal não seguir esse padrão. */
 function parseGameChannelName(name: string): { time: string | null; rest: string } {
   const match = name.match(/^\[?(\d{1,2}:\d{2})\]?\s*[-–—]?\s*(.*)$/);
   if (match && match[2]) {
@@ -126,14 +60,21 @@ function parseGameChannelName(name: string): { time: string | null; rest: string
   return { time: null, rest: name };
 }
 
-/** Detecta o esporte pelo nome do canal e devolve um ícone + cor pra
- * deixar os cards mais vivos e organizados visualmente — como o painel só
- * fornece o mesmo ícone genérico "JOGOS" pra todos os canais dessa
- * categoria (sem brasão de time de verdade), isso é o que dá pra fazer
- * de forma confiável sem depender de uma busca de time (que a TheSportsDB
- * também restringe bastante no plano grátis — só funciona pra um time de
- * exemplo fixo, não pra qualquer time real).
- */
+/** Tenta separar "Time A x Time B" / "Time A vs Time B" em duas partes,
+ * pra mostrar empilhado (igual Placar). Se não der pra separar, devolve
+ * só a primeira parte com a segunda vazia. */
+function splitTeams(rest: string): [string, string] {
+  const m = rest.split(/\s+(?:x|vs\.?)\s+/i);
+  if (m.length === 2) return [m[0].trim(), m[1].trim()];
+  return [rest.trim(), ''];
+}
+
+/** Detecta o esporte pelo nome do canal e devolve um ícone + cor — o
+ * painel só fornece o mesmo ícone genérico "JOGOS" pra todos os canais
+ * dessa categoria (sem brasão de time de verdade), e uma busca de time
+ * real na TheSportsDB não é confiável no plano grátis (só funciona pra
+ * um time de exemplo fixo). Isso é o que dá pra fazer de forma
+ * consistente sem depender de API externa nenhuma. */
 function detectSportVisual(channelName: string): { icon: string; color: string } {
   const n = normalizeText(channelName);
   if (/(nba|basquete|basketball)/.test(n)) return { icon: 'basketball', color: '#F97316' };
@@ -142,87 +83,49 @@ function detectSportVisual(channelName: string): { icon: string; color: string }
   if (/(ufc|mma|boxe|boxing|luta)/.test(n)) return { icon: 'boxing-glove', color: '#DC2626' };
   if (/(volei|volleyball|nbb|handebol)/.test(n)) return { icon: 'volleyball', color: '#3B82F6' };
   if (/(nhl|hoquei|hockey)/.test(n)) return { icon: 'hockey-sticks', color: '#06B6D4' };
-  // Padrão: futebol (esmagadora maioria dos canais de "jogos do dia" em
-  // painel brasileiro é futebol mesmo).
   return { icon: 'soccer', color: '#22C55E' };
+}
+
+/** Constrói um epoch de hoje na hora "HH:MM" — os canais de "jogos do dia"
+ * do painel são sempre do dia de hoje (é o que o nome da categoria já
+ * diz), então não tem data separada pra extrair, só o horário. */
+function todayAtTime(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d.getTime();
 }
 
 export default function GamesScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [rawEvents, setRawEvents] = useState<GameEvent[]>([]);
-  const [sport, setSport] = useState<string>('soccer');
-  const [error, setError] = useState<string | null>(null);
-  const [scheduledIds, setScheduledIds] = useState<Set<string>>(new Set());
-  // Looked up once from the person's own channel categories — if their panel
-  // has a folder like "Jogos do dia" / "Esportes" / "Sports", "Assistir"
-  // jumps straight into it instead of a generic name search.
   const [sportsCategory, setSportsCategory] = useState<string | null>(null);
-  // Canais dentro dessa categoria — guardamos o objeto completo (não só o
-  // nome) porque agora "Assistir" pode abrir direto no canal certo, em vez
-  // de só filtrar a lista.
   const [sportsChannels, setSportsChannels] = useState<XtreamLive[]>([]);
-  // Só true depois que já sabemos se existe (ou não) uma categoria de
-  // esportes no painel — antes disso não mostramos nenhum jogo, pra evitar
-  // o efeito de "aparece um monte e depois alguns somem" quando o filtro
-  // chega atrasado.
-  const [sportsResolved, setSportsResolved] = useState(false);
+  const [scheduledIds, setScheduledIds] = useState<Set<string>>(new Set());
 
-  const normalize = normalizeText;
-
-  useEffect(() => {
+  const load = useCallback(async () => {
+    setLoading(true);
     const creds = getXtream();
     if (!creds) {
-      setSportsResolved(true);
+      setLoading(false);
       return;
     }
-    // Palavras-chave mais amplas — antes só pegava categoria com "jogo"/
-    // "esporte"/"sport"/"game" no nome, então uma categoria separada
-    // chamada só "NBA" (sem nenhuma dessas palavras) nunca era
-    // encontrada, mesmo que o painel tivesse canal de NBA de verdade.
-    const SPORT_CATEGORY_KEYWORDS = [
-      'jogo',
-      'esporte',
-      'sport',
-      'game',
-      'nba',
-      'nfl',
-      'nhl',
-      'mlb',
-      'basquete',
-      'basketball',
-      'futebol americano',
-      'volei',
-      'vôlei',
-      'volleyball',
-      'mma',
-      'ufc',
-      'formula 1',
-      'formula1',
-      ' f1 ',
-      'nascar',
-      'automobilismo',
-      'motorsport',
-      'luta',
-      'boxe',
-      'boxing',
-    ];
-    xtream.liveCategories(creds).then(async (cats) => {
-      // Antes: cats?.find(...) — pegava só a PRIMEIRA categoria que
-      // batesse, então se o painel tivesse "Canais | Jogos do Dia" E uma
-      // categoria separada "NBA", só uma das duas era usada (a outra
-      // simplesmente desaparecia da tela de Jogos, mesmo tendo canal de
-      // verdade lá dentro). Agora junta canais de TODAS as categorias que
-      // baterem.
+    try {
+      const cats = await xtream.liveCategories(creds);
+      // Junta canais de TODAS as categorias que parecerem esporte — antes
+      // pegava só a primeira, então uma categoria separada tipo "NBA"
+      // (além de "Canais | Jogos do Dia") nunca aparecia.
       const matches = (cats || []).filter((c) => {
-        const n = normalize(c.category_name);
+        const n = normalizeText(c.category_name);
         return SPORT_CATEGORY_KEYWORDS.some((kw) => n.includes(kw));
       });
       if (matches.length === 0) {
-        setSportsResolved(true);
+        setSportsCategory(null);
+        setSportsChannels([]);
+        setLoading(false);
         return;
       }
-      setSportsCategory(matches.length === 1 ? matches[0].category_name : `${matches.length} categorias de esporte`);
+      setSportsCategory(matches.length === 1 ? matches[0].category_name : `${matches.length} categorias`);
       const perCategory = await Promise.all(
         matches.map((c) => xtream.liveStreams(creds, c.category_id).catch(() => null))
       );
@@ -237,81 +140,34 @@ export default function GamesScreen() {
         }
       }
       setSportsChannels(combined);
-      setSportsResolved(true);
-    });
-  }, []);
-
-  // Busca os jogos UMA vez por esporte selecionado — antes isso dependia
-  // de sportsChannels também, então assim que a lista de canais chegava
-  // (podia ser alguns segundos depois), a tela toda recarregava de novo e
-  // "piscava" trocando os jogos na cara da pessoa. Agora busca só uma vez;
-  // o filtro por canal é aplicado depois, silenciosamente, sem re-buscar.
-  const load = useCallback(async (s: string) => {
-    setLoading(true);
-    setError(null);
-    const def = SPORTS.find((sp) => sp.key === s);
-    if (!def) {
-      setRawEvents([]);
+    } finally {
       setLoading(false);
-      return;
     }
-    try {
-      const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => isoDate(new Date(Date.now() + i * 86400000)));
-      const results = await Promise.all(
-        dates.map(async (date) => {
-          const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${date}&s=${encodeURIComponent(def.sportsdbSport)}`;
-          const res = await fetch(url);
-          if (!res.ok) return [];
-          const json = await res.json();
-          const list: GameEvent[] = json?.events || [];
-          return list.map((e) => ({ ...e, dateEvent: e.dateEvent || date }));
-        })
-      );
-      const merged = results
-        .flat()
-        .filter((e) => e.intHomeScore == null && e.intAwayScore == null)
-        .sort((a, b) => (eventEpoch(a) || 0) - (eventEpoch(b) || 0));
-      setRawEvents(merged);
-    } catch (e) {
-      setRawEvents([]);
-      setError('Não foi possível carregar os jogos agora. Verifique sua conexão.');
-    }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
-    load(sport);
-  }, [load, sport]);
+    load();
+  }, [load]);
 
-  // Filtro por canal disponível — recalcula só a lista exibida, sem tocar
-  // no loading nem refazer a busca na API.
-  // Só mostra jogo que a gente encontrou canal correspondente — mas só
-  // depois que a checagem de canais (sportsResolved) já terminou, senão
-  // mostraria tudo sem filtro por um instante e depois encolheria de
-  // repente quando o filtro chegasse (foi isso que parecia jogos "sumindo").
-  const events = useMemo(() => {
-    if (sportsChannels.length === 0) return rawEvents;
-    return rawEvents.filter((e) => !!findMatchingChannel(e, sportsChannels));
-  }, [rawEvents, sportsChannels]);
-
-  const showLoading = loading || !sportsResolved;
+  useEffect(() => {
+    loadGameReminders().then((list) => setScheduledIds(new Set(list.map((r) => r.id))));
+  }, []);
 
   useFocusEffect(
-    React.useCallback(() => {
-      loadGameReminders().then((list) => setScheduledIds(new Set(list.map((r) => r.id))));
+    useCallback(() => {
+      let cancelled = false;
       popDueReminders().then((due) => {
-        due.forEach((r) => {
-          Alert.alert(
-            'Hora do jogo!',
-            `${r.name} está começando agora. Quer abrir a lista de canais pra encontrar a transmissão?`,
-            [
-              { text: 'Agora não', style: 'cancel' },
-              { text: 'Abrir canais', onPress: () => router.push({ pathname: '/channels', params: sportsCategory ? { initialCategory: sportsCategory } : { initialQuery: r.league || '' } }) },
-            ]
-          );
-        });
+        if (cancelled || due.length === 0) return;
+        const first = due[0];
+        Alert.alert(
+          'Começando agora',
+          due.length === 1 ? first.name : `${first.name} e mais ${due.length - 1} jogo(s) começando agora.`
+        );
       });
-    }, [router])
+      return () => {
+        cancelled = true;
+      };
+    }, [])
   );
 
   const openGameChannel = (s: XtreamLive) => {
@@ -328,217 +184,106 @@ export default function GamesScreen() {
     });
   };
 
-  const onToggleReminder = async (event: GameEvent) => {
-    const epoch = eventEpoch(event);
-    if (!epoch) return;
+  const onToggleReminder = async (ch: XtreamLive) => {
+    const { time, rest } = parseGameChannelName(ch.name);
+    const id = `panel-${ch.stream_id}`;
     const nowScheduled = await toggleGameReminder({
-      id: event.idEvent,
-      name: event.strEvent || `${event.strHomeTeam} vs ${event.strAwayTeam}`,
-      league: event.strLeague,
-      startsAt: epoch,
+      id,
+      name: rest,
+      startsAt: time ? todayAtTime(time) : Date.now(),
     });
     setScheduledIds((prev) => {
       const next = new Set(prev);
-      if (nowScheduled) next.add(event.idEvent);
-      else next.delete(event.idEvent);
+      if (nowScheduled) next.add(id);
+      else next.delete(id);
       return next;
     });
-    Alert.alert(
-      nowScheduled ? 'Jogo agendado' : 'Lembrete removido',
-      nowScheduled
-        ? 'Vamos te avisar quando o jogo estiver começando (com o app aberto).'
-        : undefined
-    );
   };
+
+  const sorted = useMemo(() => {
+    return [...sportsChannels].sort((a, b) => {
+      const ta = parseGameChannelName(a.name).time;
+      const tb = parseGameChannelName(b.name).time;
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return ta.localeCompare(tb);
+    });
+  }, [sportsChannels]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={16} style={styles.backBtn} testID="games-back">
+        <TVFocusable onPress={() => router.back()} style={styles.backBtn} testID="games-back">
           <Ionicons name="chevron-back" size={24} color={colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Jogos</Text>
-        <Pressable onPress={() => load(sport)} hitSlop={16} testID="games-refresh">
-          <Ionicons name="refresh" size={22} color={colors.accentCyan} />
-        </Pressable>
+        </TVFocusable>
+        <Text style={styles.headerTitle}>Jogos do Dia</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.chipRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowInner}>
-          {SPORTS.map((s) => {
-            const active = s.key === sport;
-            return (
-              <TVFocusable
-                key={s.key}
-                onPress={() => setSport(s.key)}
-                style={[styles.chip, active && styles.chipActive]}
-                testID={`games-chip-${s.key}`}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {s.label}
-                </Text>
-              </TVFocusable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {sportsResolved && sportsChannels.length > 0 && (
-        <View style={styles.panelGamesSection}>
-          <Text style={styles.panelGamesTitle}>
-            {sportsCategory ? `No seu painel: ${sportsCategory}` : 'Jogos do seu painel'}
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.panelGamesRow}>
-            {sportsChannels.map((ch) => {
-              const { time, rest } = parseGameChannelName(ch.name);
-              const visual = detectSportVisual(ch.name);
-              return (
-                <TVFocusable
-                  key={ch.stream_id}
-                  onPress={() => openGameChannel(ch)}
-                  style={styles.panelGameCard}
-                  testID={`games-panel-channel-${ch.stream_id}`}
-                >
-                  <View style={[styles.panelGameThumb, { borderColor: visual.color }]}>
-                    {ch.stream_icon ? (
-                      <Image source={{ uri: ch.stream_icon }} style={styles.panelGameThumbImg} contentFit="contain" />
-                    ) : (
-                      <MaterialCommunityIcons name={visual.icon as any} size={26} color={visual.color} />
-                    )}
-                    <View style={[styles.panelGameSportBadge, { backgroundColor: visual.color }]}>
-                      <MaterialCommunityIcons name={visual.icon as any} size={11} color={colors.white} />
-                    </View>
-                  </View>
-                  {!!time && <Text style={[styles.panelGameTime, { color: visual.color }]}>{time}</Text>}
-                  <Text style={styles.panelGameName} numberOfLines={2}>{rest}</Text>
-                </TVFocusable>
-              );
-            })}
-          </ScrollView>
-        </View>
+      {sportsCategory && (
+        <Text style={styles.subtitle} numberOfLines={1}>
+          Direto do seu painel: {sportsCategory}
+        </Text>
       )}
 
-      {showLoading ? (
+      {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accentCyan} />
+          <ActivityIndicator color={colors.accentCyan} size="large" />
         </View>
-      ) : error ? (
-        <View style={styles.center} testID="games-error">
-          <MaterialCommunityIcons name="wifi-off" size={44} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>{error}</Text>
-          <Pressable onPress={() => load(sport)} style={styles.retryBtn}>
-            <Ionicons name="refresh" size={14} color={colors.accentCyan} />
-            <Text style={styles.retryText}>TENTAR NOVAMENTE</Text>
-          </Pressable>
-        </View>
-      ) : events.length === 0 ? (
-        <View style={styles.center} testID="games-empty">
-          <MaterialCommunityIcons name="soccer-field" size={44} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Nenhum jogo com canal disponível agora</Text>
-          <Text style={styles.emptySub}>Tenta outra modalidade acima ou confere de novo mais tarde.</Text>
+      ) : sorted.length === 0 ? (
+        <View style={styles.center}>
+          <Ionicons name="football-outline" size={40} color={colors.textMuted} />
+          <Text style={styles.emptyText}>
+            Seu painel não tem uma categoria de jogos do dia configurada — nada pra mostrar aqui.
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={events}
-          keyExtractor={(e) => e.idEvent}
-          contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}
-          renderItem={({ item }) => {
-            const match = findMatchingChannel(item, sportsChannels);
+          data={sorted}
+          keyExtractor={(ch) => String(ch.stream_id)}
+          contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}
+          renderItem={({ item: ch }) => {
+            const { time, rest } = parseGameChannelName(ch.name);
+            const [teamA, teamB] = splitTeams(rest);
+            const visual = detectSportVisual(ch.name);
+            const reminderId = `panel-${ch.stream_id}`;
+            const scheduled = scheduledIds.has(reminderId);
             return (
-              <GameRow
-                event={item}
-                scheduled={scheduledIds.has(item.idEvent)}
-                onWatch={() => {
-                  if (match) {
-                    router.push({
-                      pathname: '/channel-details',
-                      params: {
-                        id: String(match.stream_id),
-                        name: match.name,
-                        cover: match.stream_icon || '',
-                        categoryName: sportsCategory || '',
-                      },
-                    });
-                  } else {
-                    router.push({
-                      pathname: '/channels',
-                      params: sportsCategory
-                        ? { initialCategory: sportsCategory }
-                        : { initialQuery: item.strLeague || '' },
-                    });
-                  }
-                }}
-                onToggleReminder={() => onToggleReminder(item)}
-              />
+              <TVFocusable
+                onPress={() => openGameChannel(ch)}
+                style={styles.row}
+                testID={`games-row-${ch.stream_id}`}
+              >
+                <View style={[styles.sportBadge, { backgroundColor: visual.color }]}>
+                  <MaterialCommunityIcons name={visual.icon as any} size={18} color={colors.white} />
+                </View>
+
+                <View style={styles.teamsCol}>
+                  <Text style={styles.teamName} numberOfLines={1}>{teamA}</Text>
+                  {!!teamB && <Text style={styles.teamName} numberOfLines={1}>{teamB}</Text>}
+                </View>
+
+                <Text style={styles.timeText}>{time || '--:--'}</Text>
+
+                <TVFocusable
+                  onPress={() => onToggleReminder(ch)}
+                  style={styles.bellBtn}
+                  testID={`games-reminder-${ch.stream_id}`}
+                  hitSlop={10}
+                >
+                  <Ionicons
+                    name={scheduled ? 'notifications' : 'notifications-outline'}
+                    size={18}
+                    color={scheduled ? colors.accentCyan : colors.textMuted}
+                  />
+                </TVFocusable>
+              </TVFocusable>
             );
           }}
         />
       )}
     </SafeAreaView>
-  );
-}
-
-function GameRow({
-  event,
-  scheduled,
-  onWatch,
-  onToggleReminder,
-}: {
-  event: GameEvent;
-  scheduled: boolean;
-  onWatch: () => void;
-  onToggleReminder: () => void;
-}) {
-  const hasScore = event.intHomeScore != null && event.intAwayScore != null;
-  return (
-    <View style={styles.gameCard} testID={`game-${event.idEvent}`}>
-      <View style={styles.leagueRow}>
-        {!!event.strLeagueBadge && (
-          <Image source={{ uri: event.strLeagueBadge }} style={styles.leagueBadge} contentFit="contain" />
-        )}
-        <Text style={styles.leagueName} numberOfLines={1}>{event.strLeague || 'Jogo'}</Text>
-        <Text style={styles.dayText}>{event.dateEvent ? dayLabel(event.dateEvent) : ''}</Text>
-        <Text style={styles.timeText}>{event.strTime?.slice(0, 5) || '--:--'}</Text>
-      </View>
-      <View style={styles.teamsRow}>
-        <TeamBlock name={event.strHomeTeam} badge={event.strHomeTeamBadge} />
-        <View style={styles.scoreBlock}>
-          {hasScore ? (
-            <Text style={styles.scoreText}>{event.intHomeScore} - {event.intAwayScore}</Text>
-          ) : (
-            <Text style={styles.vsText}>VS</Text>
-          )}
-        </View>
-        <TeamBlock name={event.strAwayTeam} badge={event.strAwayTeamBadge} align="right" />
-      </View>
-      <View style={styles.actionsRow}>
-        <TVFocusable onPress={onWatch} style={styles.watchBtn} testID={`game-watch-${event.idEvent}`}>
-          <Ionicons name="play" size={13} color={colors.black} />
-          <Text style={styles.watchText}>ASSISTIR</Text>
-        </TVFocusable>
-        <TVFocusable onPress={onToggleReminder} style={styles.scheduleBtn} testID={`game-schedule-${event.idEvent}`}>
-          <Ionicons name={scheduled ? 'notifications' : 'notifications-outline'} size={15} color={scheduled ? colors.accentCyan : colors.textSecondary} />
-          <Text style={[styles.scheduleText, scheduled && { color: colors.accentCyan }]}>
-            {scheduled ? 'AGENDADO' : 'AGENDAR'}
-          </Text>
-        </TVFocusable>
-      </View>
-    </View>
-  );
-}
-
-function TeamBlock({ name, badge, align }: { name?: string; badge?: string; align?: 'right' }) {
-  return (
-    <View style={[styles.teamBlock, align === 'right' && { alignItems: 'flex-end' }]}>
-      <View style={styles.teamBadgeWrap}>
-        {badge ? (
-          <Image source={{ uri: badge }} style={styles.teamBadge} contentFit="contain" />
-        ) : (
-          <Ionicons name="shield-outline" size={20} color={colors.textMuted} />
-        )}
-      </View>
-      <Text style={styles.teamName} numberOfLines={2}>{name || '—'}</Text>
-    </View>
   );
 }
 
@@ -553,129 +298,32 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '800' },
-  chipRow: { height: 56, justifyContent: 'center' },
-  chipRowInner: { gap: 8, paddingHorizontal: spacing.md, alignItems: 'center' },
-  panelGamesSection: { paddingBottom: spacing.sm },
-  panelGamesTitle: {
+  subtitle: {
     color: colors.textSecondary,
     fontSize: 12,
-    fontWeight: '700',
     paddingHorizontal: spacing.md,
-    marginBottom: 8,
+    paddingBottom: spacing.sm,
   },
-  panelGamesRow: { gap: 10, paddingHorizontal: spacing.md },
-  panelGameCard: { width: 100 },
-  panelGameThumb: {
-    width: 100,
-    height: 60,
-    borderRadius: 8,
-    borderWidth: 2,
-    backgroundColor: colors.darkSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  panelGameThumbImg: { width: '80%', height: '80%' },
-  panelGameSportBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  panelGameTime: { fontSize: 11, fontWeight: '800', marginTop: 4 },
-  panelGameName: { color: colors.white, fontSize: 11, fontWeight: '600', marginTop: 2 },
-  chip: {
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: colors.darkSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.darkSurfaceAlt,
-    flexShrink: 0,
-  },
-  chipActive: { borderColor: colors.accentCyan, backgroundColor: 'rgba(76,232,240,0.10)' },
-  chipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
-  chipTextActive: { color: colors.accentCyan },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 6 },
-  emptyTitle: { color: colors.white, fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 8 },
-  emptySub: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
-  retryBtn: {
-    marginTop: 12,
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: spacing.xl },
+  emptyText: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.accentCyan,
-  },
-  retryText: { color: colors.accentCyan, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
-  gameCard: {
+    gap: 12,
     backgroundColor: colors.darkSurface,
     borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  leagueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  leagueBadge: { width: 16, height: 16 },
-  leagueName: { flex: 1, color: colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  channelBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.accentCyan,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  channelBadgeText: { color: colors.black, fontSize: 8, fontWeight: '900' },
-  dayText: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginRight: 8 },
-  timeText: { color: colors.accentCyan, fontSize: 11, fontWeight: '800' },
-  teamsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  teamBlock: { flex: 1, alignItems: 'flex-start', gap: 6 },
-  teamBadgeWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
+  sportBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
   },
-  teamBadge: { width: '100%', height: '100%' },
-  teamName: { color: colors.white, fontSize: 12, fontWeight: '700', maxWidth: 100 },
-  scoreBlock: { paddingHorizontal: spacing.sm, alignItems: 'center' },
-  scoreText: { color: colors.white, fontSize: 16, fontWeight: '900' },
-  vsText: { color: colors.textMuted, fontSize: 13, fontWeight: '800' },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: 4 },
-  watchBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: colors.accentCyan,
-    borderRadius: 8,
-    paddingVertical: 8,
-  },
-  watchText: { color: colors.black, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  scheduleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderRadius: 8,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.darkSurfaceAlt,
-  },
-  scheduleText: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  teamsCol: { flex: 1, gap: 4 },
+  teamName: { color: colors.white, fontSize: 14, fontWeight: '700' },
+  timeText: { color: colors.accentCyan, fontSize: 14, fontWeight: '800' },
+  bellBtn: { padding: 6 },
 });

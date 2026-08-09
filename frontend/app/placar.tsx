@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
+import { getXtream } from '@/src/state/session';
+import { xtream } from '@/src/lib/xtream';
 
 // Esportes que a TheSportsDB (usada em "Jogos do dia") não cobre bem no
 // tier gratuito, e por isso não têm um canal pra casar/assistir dentro do
@@ -39,6 +41,28 @@ const SPORTS: SportDef[] = [
   { key: 'indycar', label: 'IndyCar', source: 'espn', espnPath: 'racing/irl' },
 ];
 const DAYS_AHEAD = 4;
+
+// Pra cada esporte daqui de cima, que palavra procurar nas categorias de
+// canais AO VIVO do painel — se achar, mostra um botão "Assistir ao vivo"
+// que leva direto pra essa categoria em Canais. Não tenta adivinhar QUAL
+// canal exato passa QUAL jogo específico (isso seria arriscado e
+// poderia levar pro canal errado) — só confirma que existe uma categoria
+// de canais daquele esporte no painel da pessoa, e deixa ela escolher lá
+// dentro.
+const SPORT_CHANNEL_KEYWORDS: Record<string, string[]> = {
+  baseball: ['beisebol', 'baseball', 'mlb'],
+  tennis: ['tenis', 'tênis', 'tennis', 'atp', 'wta'],
+  nfl: ['nfl', 'futebol americano'],
+  volleyball: ['volei', 'vôlei', 'volleyball'],
+  mma: ['mma', 'ufc', 'luta', 'boxe', 'boxing'],
+  basketball: ['nba', 'basquete', 'basketball'],
+  wnba: ['wnba'],
+  hockey: ['nhl', 'hoquei', 'hóquei', 'hockey'],
+  golf: ['golfe', 'golf'],
+  f1: ['f1', 'formula 1', 'formula1'],
+  nascar: ['nascar'],
+  indycar: ['indycar', 'indy car'],
+};
 
 type ScoreEvent = {
   id: string;
@@ -117,6 +141,27 @@ export default function PlacarScreen() {
   const [events, setEvents] = useState<ScoreEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Categoria de canal AO VIVO do painel que bate com cada esporte (se
+  // existir) — usado só pro botão "Assistir ao vivo" aparecer quando faz
+  // sentido, nunca pra tentar casar um jogo específico com um canal.
+  const [sportChannelCategory, setSportChannelCategory] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const creds = getXtream();
+    if (!creds) return;
+    xtream.liveCategories(creds).then((cats) => {
+      if (!cats) return;
+      const found: Record<string, string> = {};
+      for (const [sportKey, keywords] of Object.entries(SPORT_CHANNEL_KEYWORDS)) {
+        const match = cats.find((c) => {
+          const n = c.category_name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          return keywords.some((kw) => n.includes(kw));
+        });
+        if (match) found[sportKey] = match.category_name;
+      }
+      setSportChannelCategory(found);
+    });
+  }, []);
 
   const load = useCallback(async (s: string) => {
     setLoading(true);
@@ -194,7 +239,20 @@ export default function PlacarScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </TVFocusable>
         <Text style={styles.headerTitle}>Placar</Text>
-        <View style={{ width: 24 }} />
+        {sportChannelCategory[sport] ? (
+          <TVFocusable
+            onPress={() =>
+              router.push({ pathname: '/channels', params: { initialCategory: sportChannelCategory[sport] } })
+            }
+            style={styles.watchBtn}
+            testID="placar-watch-live"
+          >
+            <Ionicons name="play-circle" size={16} color={colors.black} />
+            <Text style={styles.watchBtnText}>Assistir</Text>
+          </TVFocusable>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
       </View>
 
       <View style={styles.chipRow}>
@@ -295,6 +353,16 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '800' },
+  watchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.accentCyan,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  watchBtnText: { color: colors.black, fontSize: 12, fontWeight: '800' },
   chipRow: { paddingBottom: spacing.sm },
   chipRowInner: { paddingHorizontal: spacing.md, gap: spacing.sm },
   chip: {
