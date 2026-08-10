@@ -32,7 +32,7 @@ import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, cle
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
-import { logSessionEvent } from '@/src/state/debug-log';
+import { logSessionEvent, logSessionEventFast } from '@/src/state/debug-log';
 import { popDueProgramReminders, ProgramReminder } from '@/src/state/program-reminders';
 import ProgramReminderPopup from '@/src/components/ProgramReminderPopup';
 import { isAdultCategoryName, filterToKidsItems } from '@/src/lib/adult-content';
@@ -763,6 +763,17 @@ export default function HomeScreen() {
                   <TVFocusable
                     key={it.key}
                     ref={it.key === 'home' ? homeNavRef : undefined}
+                    onFocus={() => {
+                      // Diagnóstico de lentidão na sidebar: registra o
+                      // instante em que o React terminou de processar o
+                      // evento de foco (onFocus chega DEPOIS do foco já
+                      // ter mudado no nível do sistema — se o intervalo
+                      // entre um item e o próximo, no Diagnóstico, for
+                      // muito maior que o tempo real que a pessoa levou
+                      // segurando o botão, é sinal de fila/atraso na JS
+                      // thread, não do controle em si).
+                      logSessionEventFast('sidebar-focus', it.key);
+                    }}
                     onPress={() => {
                       setActiveNav(it.key);
                       it.onPress?.();

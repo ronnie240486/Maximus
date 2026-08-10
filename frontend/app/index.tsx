@@ -27,6 +27,7 @@ import { parsePlaylistUrl, xtream, XtreamCreds } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
 import { clearHomeCache } from '@/src/state/home-cache';
 import { clearListCache } from '@/src/state/list-cache';
+import { logSessionEvent } from '@/src/state/debug-log';
 import { useIsTV } from '@/src/hooks/useIsTV';
 import { BUILD_STAMP, BUILD_SHORT } from '@/src/build-info';
 import TVFocusable from '@/src/components/TVFocusable';
@@ -104,9 +105,11 @@ export default function MacLoginScreen() {
   useEffect(() => {
     mountedRef.current = true;
     (async () => {
+      logSessionEvent('index-load', 'inicio (tela de ativacao)');
       const m = await getDeviceMac();
       if (!mountedRef.current) return;
       setMac(m);
+      logSessionEvent('index-load', 'mac obtido');
 
       // Best-effort: se falhar ou demorar, a tela funciona normal do
       // mesmo jeito, só sem essa frase.
@@ -120,6 +123,7 @@ export default function MacLoginScreen() {
       // de liberar — se o revendedor bloqueou a lista nesse meio tempo, o
       // app não pode continuar usando dados antigos salvos no celular.
       const cached = await loadSession();
+      logSessionEvent('index-load', `sessao local carregada (tinha sessao: ${!!cached?.authorized}, status: ${cached?.status || '-'})`);
       if (cached?.authorized) {
         if (cached.status === 'Teste') {
           // Sessão de teste: não existe no painel principal, então
@@ -128,13 +132,16 @@ export default function MacLoginScreen() {
           const expiresAt = cached.expire_date ? new Date(cached.expire_date) : null;
           const stillValid = expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() > Date.now();
           if (stillValid) {
+            logSessionEvent('index-load', 'teste local ainda valido, indo pra /welcome');
             router.replace('/welcome');
             return;
           }
           await clearSession();
           await clearHomeCache();
         } else {
+          logSessionEvent('index-load', 'checkMac (2a chamada, confirmando sessao salva): comecando');
           const fresh = await checkMac(m);
+          logSessionEvent('index-load', 'checkMac (2a chamada): terminou');
           if (!mountedRef.current) return;
           // Não basta "authorized: true" — o painel às vezes marca o MAC
           // como autorizado mesmo sem nenhuma lista cadastrada de verdade
@@ -143,6 +150,7 @@ export default function MacLoginScreen() {
           const hasUsablePlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
           if (fresh.authorized && hasUsablePlaylist) {
             await saveSession(fresh);
+            logSessionEvent('index-load', 'autorizado, indo pra /welcome');
             router.replace('/welcome');
             return;
           }
@@ -157,6 +165,7 @@ export default function MacLoginScreen() {
 
       // Chegou até aqui: ou nunca teve sessão, ou a sessão expirou/foi
       // bloqueada agora — é a hora certa de mostrar a tela de login.
+      logSessionEvent('index-load', 'mostrando tela de login (sem sessao valida)');
       setCheckingSession(false);
       runPoll(m);
     })();
