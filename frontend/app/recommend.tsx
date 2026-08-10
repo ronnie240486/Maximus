@@ -15,6 +15,7 @@ import { isActiveProfileKids } from '@/src/state/profiles';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadListCache } from '@/src/state/list-cache';
 import { GenreKey, GENRE_LABELS, filterByGenre, shuffleSample } from '@/src/lib/genre-detect';
+import { enrichGenresInBackground, getAllCachedGenres, isTmdbConfigured } from '@/src/lib/tmdb';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const SUGGESTION_COUNT = 20;
@@ -40,6 +41,9 @@ export default function RecommendScreen() {
   const [seriesPool, setSeriesPool] = useState<{ items: XtreamSeries[]; categories: XtreamCategory[] }>({ items: [], categories: [] });
   const [shownItems, setShownItems] = useState<SuggestionItem[]>([]);
   const [seed, setSeed] = useState(0);
+  const [tmdbCache, setTmdbCache] = useState<Record<string, { genres: GenreKey[] }>>({});
+  const [enriching, setEnriching] = useState(false);
+  const [enrichedCount, setEnrichedCount] = useState(0);
 
   useEffect(() => {
     isActiveProfileKids().then(setKidsMode);
@@ -85,6 +89,62 @@ export default function RecommendScreen() {
     load();
   }, [load]);
 
+  // Enriquecimento em segundo plano: manda os títulos do catálogo (que
+  // ainda não sabemos o gênero real) pro TMDb, aos poucos, sem travar a
+  // tela. Cada vez que um lote termina, atualiza o cache local — e como
+  // o cache é PERSISTENTE (fica salvo no aparelho), o catálogo vai
+  // ficando cada vez mais coberto a cada busca por voz feita, não só
+  // nessa sessão. Não faz nada se a chave do TMDb não estiver
+  // configurada (EXPO_PUBLIC_TMDB_API_KEY).
+  useEffect(() => {
+    if (loading || !isTmdbConfigured()) return;
+    let cancelled = false;
+    setEnriching(true);
+    setEnrichedCount(0);
+
+    const titles = [
+      ...moviePool.items.map((m) => ({ title: m.name, kind: 'movie' as const })),
+      ...seriesPool.items.map((s) => ({ title: s.name, kind: 'series' as const })),
+    ];
+
+    enrichGenresInBackground(titles, {
+      onBatchDone: () => {
+        if (cancelled) return;
+        setEnrichedCount((c) => c + 1);
+        getAllCachedGenres().then((all) => {
+          if (!cancelled) setTmdbCache(all);
+        });
+      },
+    }).finally(() => {
+      if (!cancelled) setEnriching(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, moviePool, seriesPool]);
+
+  // Combina o match rápido (categoria + títulos conhecidos, síncrono) com
+  // o que o TMDb já descobriu até agora (cache, cresce em segundo plano)
+  // — um título só precisa bater em UM dos dois métodos.
+  const matchWithTmdb = useCallback(
+    <T extends { name: string; category_id?: string }>(
+      items: T[],
+      categories: XtreamCategory[],
+      genreKey: GenreKey,
+      kind: 'movie' | 'series'
+    ): T[] => {
+      const fastMatches = new Set(filterByGenre(items, categories, genreKey));
+      const extra = items.filter((item) => {
+        if (fastMatches.has(item)) return false;
+        const cacheKey = `${kind}:${item.name.toLowerCase().trim()}`;
+        return (tmdbCache[cacheKey]?.genres || []).includes(genreKey);
+      });
+      return [...fastMatches, ...extra];
+    },
+    [tmdbCache]
+  );
+
   const pick = useCallback(() => {
     // Perfil infantil: nunca sugere fora da curadoria kids (mesma regra
     // das telas de Filmes/Séries). Perfil normal: sugere de tudo, só pede
@@ -95,8 +155,8 @@ export default function RecommendScreen() {
     const seriesCats = kidsMode ? filterToKidsCategories(seriesPool.categories) : seriesPool.categories;
     const seriesItemsBase = kidsMode ? filterToKidsItems(seriesPool.items, seriesPool.categories) : seriesPool.items;
 
-    const matchedMovies = genre ? filterByGenre(movieItems, movieCats, genre) : [];
-    const matchedSeries = genre ? filterByGenre(seriesItemsBase, seriesCats, genre) : [];
+    const matchedMovies = genre ? matchWithTmdb(movieItems, movieCats, genre, 'movie') : [];
+    const matchedSeries = genre ? matchWithTmdb(seriesItemsBase, seriesCats, genre, 'series') : [];
 
     // Mistura filme e série no resultado — metade de cada, mais ou menos
     // (se um dos dois tiver pouca coisa, completa com o outro).
@@ -117,7 +177,7 @@ export default function RecommendScreen() {
     }
 
     setShownItems(shuffleSample(combined, combined.length));
-  }, [genre, kidsMode, moviePool, seriesPool]);
+  }, [genre, kidsMode, moviePool, seriesPool, matchWithTmdb]);
 
   useEffect(() => {
     if (!loading) pick();
@@ -129,8 +189,8 @@ export default function RecommendScreen() {
     const seriesCats = kidsMode ? filterToKidsCategories(seriesPool.categories) : seriesPool.categories;
     const seriesItemsBase = kidsMode ? filterToKidsItems(seriesPool.items, seriesPool.categories) : seriesPool.items;
     if (!genre) return 0;
-    return filterByGenre(movieItems, movieCats, genre).length + filterByGenre(seriesItemsBase, seriesCats, genre).length;
-  }, [genre, kidsMode, moviePool, seriesPool]);
+    return matchWithTmdb(movieItems, movieCats, genre, 'movie').length + matchWithTmdb(seriesItemsBase, seriesCats, genre, 'series').length;
+  }, [genre, kidsMode, moviePool, seriesPool, matchWithTmdb]);
 
   const openItem = (item: SuggestionItem) => {
     const cats = item.kind === 'movie' ? moviePool.categories : seriesPool.categories;
@@ -166,6 +226,11 @@ export default function RecommendScreen() {
 
       {!!params.query && (
         <Text style={styles.querySubtitle} numberOfLines={1}>Baseado em: "{params.query}"</Text>
+      )}
+      {enriching && (
+        <Text style={styles.enrichingText}>
+          Melhorando sugestões com dados reais de gênero (TMDb) — pode ir mudando aos poucos...
+        </Text>
       )}
 
       {loading ? (
@@ -230,6 +295,13 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerTitle: { flex: 1, color: colors.white, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   querySubtitle: { color: colors.textSecondary, fontSize: 12, textAlign: 'center', paddingBottom: spacing.sm },
+  enrichingText: {
+    color: colors.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: spacing.xl },
   emptyText: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   card: { flex: 1, margin: 6, maxWidth: '31%' },
