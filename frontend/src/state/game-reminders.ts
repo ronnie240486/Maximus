@@ -67,6 +67,8 @@ export type GameReminder = {
   startsAt: number; // epoch ms
   notified: boolean;
   notificationId?: string; // id devolvido pelo agendamento, pra poder cancelar
+  streamId?: number; // stream_id do canal do painel - usado pra abrir o
+  // canal certo quando a pessoa tocar na notificação
 };
 
 const cache: Record<string, GameReminder[]> = {};
@@ -131,6 +133,11 @@ export async function toggleGameReminder(item: Omit<GameReminder, 'notified' | '
           content: {
             title: 'Hora do jogo! 🏆',
             body: `${item.name} está começando agora.`,
+            // streamId aqui é o que permite abrir o canal certo direto
+            // quando a pessoa tocar na notificação (ver o listener em
+            // _layout.tsx) — sem isso, tocar na notificação só abria o
+            // app na tela de sempre, sem saber qual jogo era.
+            data: { streamId: item.streamId },
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,

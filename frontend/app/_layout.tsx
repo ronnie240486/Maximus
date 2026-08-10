@@ -1,15 +1,18 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
 import * as SplashScreen from "expo-splash-screen";
+import * as Notifications from "expo-notifications";
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogBox, StatusBar, View, Text, StyleSheet } from "react-native";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { verifyAppIntegrity } from "@/src/lib/integrity";
 import { storage } from "@/src/utils/storage";
 import { logSessionEvent } from "@/src/state/debug-log";
+import { getXtream } from "@/src/state/session";
+import { xtream, liveStreamUrl } from "@/src/lib/xtream";
 
 LogBox.ignoreAllLogs(true);
 
@@ -24,6 +27,7 @@ LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
+  const router = useRouter();
   const [loaded, error] = useIconFonts();
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null);
 
@@ -96,6 +100,50 @@ export default function RootLayout() {
   }, []);
 
   const ready = (loaded || !!error) && integrityOk !== null;
+
+  useEffect(() => {
+    // Antes, a notificação de "hora do jogo" avisava direitinho, mas
+    // tocar nela só abria o app na tela de sempre — não tinha nada
+    // ligando o toque na notificação a abrir o canal certo. Isso
+    // resolve os dois casos possíveis: app já estava rodando (aberto em
+    // segundo plano) e app estava totalmente fechado (o toque na
+    // notificação é o que abre o app do zero).
+    const openStream = async (streamId: number | undefined) => {
+      if (!streamId) return;
+      const creds = getXtream();
+      if (!creds) return;
+      try {
+        const streams = await xtream.liveStreams(creds);
+        const ch = streams?.find((s) => s.stream_id === streamId);
+        router.push({
+          pathname: '/player',
+          params: {
+            id: `live-${streamId}`,
+            name: ch?.name || 'Jogo',
+            stream: liveStreamUrl(creds, streamId, 'm3u8'),
+            logo: ch?.stream_icon || '',
+          },
+        });
+      } catch {}
+    };
+
+    // Caso 1: app estava fechado, a pessoa tocou na notificação e isso
+    // é o que abriu o app agora — pega a última notificação que causou
+    // a abertura (se teve alguma).
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      const streamId = response?.notification.request.content.data?.streamId as number | undefined;
+      if (streamId) openStream(streamId);
+    });
+
+    // Caso 2: app já estava aberto (em primeiro ou segundo plano) e a
+    // pessoa tocou na notificação.
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const streamId = response.notification.request.content.data?.streamId as number | undefined;
+      if (streamId) openStream(streamId);
+    });
+
+    return () => sub.remove();
+  }, [router]);
 
   useEffect(() => {
     // Corrigido: antes essa chamada ficava direto no corpo do componente

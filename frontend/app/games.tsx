@@ -261,6 +261,7 @@ export default function GamesScreen() {
       id,
       name: rest,
       startsAt: time ? todayAtTime(time) : Date.now(),
+      streamId: ch.stream_id,
     });
     setScheduledIds((prev) => {
       const next = new Set(prev);
