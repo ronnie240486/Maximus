@@ -80,6 +80,7 @@ export default function PlayerScreen() {
   const fullscreenBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
   const externalBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
   const pipBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
+  const tracksBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
   const videoViewRef = useRef<React.ElementRef<typeof VideoView>>(null);
   const [topBarHandle, setTopBarHandle] = useState<number | undefined>();
   const [channelGridHandle, setChannelGridHandle] = useState<number | undefined>();
@@ -87,6 +88,8 @@ export default function PlayerScreen() {
   const [fullscreenHandle, setFullscreenHandle] = useState<number | undefined>();
   const [externalHandle, setExternalHandle] = useState<number | undefined>();
   const [pipHandle, setPipHandle] = useState<number | undefined>();
+  const [tracksHandle, setTracksHandle] = useState<number | undefined>();
+  const [showTracksModal, setShowTracksModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(true);
   const [showControls, setShowControls] = useState(true);
@@ -126,6 +129,8 @@ export default function PlayerScreen() {
       if (eHandle) setExternalHandle(eHandle);
       const pHandle = findNodeHandle(pipBtnRef.current);
       if (pHandle) setPipHandle(pHandle);
+      const trHandle = findNodeHandle(tracksBtnRef.current);
+      if (trHandle) setTracksHandle(trHandle);
     }, 300);
     return () => clearTimeout(t);
   }, [isTV, isLive]);
@@ -538,6 +543,7 @@ export default function PlayerScreen() {
                 <TVFocusable
                   ref={pipBtnRef}
                   nextFocusLeft={externalHandle}
+                  nextFocusRight={tracksHandle}
                   onPress={() => {
                     // Picture-in-Picture é mais um recurso de celular/tablet
                     // (janela flutuante sobre outros apps) — em TV box, que
@@ -552,6 +558,15 @@ export default function PlayerScreen() {
                   testID="player-pip"
                 >
                   <MaterialCommunityIcons name="picture-in-picture-bottom-right" size={18} color={colors.white} />
+                </TVFocusable>
+                <TVFocusable
+                  ref={tracksBtnRef}
+                  nextFocusLeft={pipHandle}
+                  onPress={() => setShowTracksModal(true)}
+                  style={styles.topBtn}
+                  testID="player-tracks"
+                >
+                  <MaterialCommunityIcons name="closed-caption-outline" size={18} color={colors.white} />
                 </TVFocusable>
               </View>
             </View>
@@ -747,6 +762,83 @@ export default function PlayerScreen() {
           </View>
         </Modal>
       )}
+
+      <Modal
+        visible={showTracksModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTracksModal(false)}
+      >
+        <Pressable style={styles.tracksBackdrop} onPress={() => setShowTracksModal(false)}>
+          <Pressable style={styles.tracksPanel} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.tracksTitle}>Áudio e legendas</Text>
+
+            <Text style={styles.tracksSectionLabel}>Áudio</Text>
+            {player.availableAudioTracks.length === 0 ? (
+              <Text style={styles.tracksEmpty}>Só uma faixa de áudio disponível.</Text>
+            ) : (
+              player.availableAudioTracks.map((t) => {
+                const active = player.audioTrack?.id === t.id;
+                return (
+                  <TVFocusable
+                    key={t.id}
+                    onPress={() => {
+                      player.audioTrack = t;
+                    }}
+                    style={[styles.tracksOption, active && styles.tracksOptionActive]}
+                    testID={`player-audio-track-${t.id}`}
+                  >
+                    <Text style={[styles.tracksOptionText, active && styles.tracksOptionTextActive]}>
+                      {t.label || t.language || t.id}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={16} color={colors.accentCyan} />}
+                  </TVFocusable>
+                );
+              })
+            )}
+
+            <Text style={styles.tracksSectionLabel}>Legenda</Text>
+            <TVFocusable
+              onPress={() => {
+                player.subtitleTrack = null;
+              }}
+              style={[styles.tracksOption, !player.subtitleTrack && styles.tracksOptionActive]}
+              testID="player-subtitle-off"
+            >
+              <Text style={[styles.tracksOptionText, !player.subtitleTrack && styles.tracksOptionTextActive]}>
+                Desligada
+              </Text>
+              {!player.subtitleTrack && <Ionicons name="checkmark" size={16} color={colors.accentCyan} />}
+            </TVFocusable>
+            {player.availableSubtitleTracks.length === 0 ? (
+              <Text style={styles.tracksEmpty}>Esse conteúdo não tem legenda disponível.</Text>
+            ) : (
+              player.availableSubtitleTracks.map((t) => {
+                const active = player.subtitleTrack?.id === t.id;
+                return (
+                  <TVFocusable
+                    key={t.id}
+                    onPress={() => {
+                      player.subtitleTrack = t;
+                    }}
+                    style={[styles.tracksOption, active && styles.tracksOptionActive]}
+                    testID={`player-subtitle-track-${t.id}`}
+                  >
+                    <Text style={[styles.tracksOptionText, active && styles.tracksOptionTextActive]}>
+                      {t.label || t.language || t.id}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={16} color={colors.accentCyan} />}
+                  </TVFocusable>
+                );
+              })
+            )}
+
+            <TVFocusable onPress={() => setShowTracksModal(false)} style={styles.tracksCloseBtn} testID="player-tracks-close">
+              <Text style={styles.tracksCloseBtnText}>Fechar</Text>
+            </TVFocusable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -995,4 +1087,48 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   gridRowLiveText: { color: colors.black, fontSize: 8, fontWeight: '900' },
+  tracksBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  tracksPanel: {
+    width: '100%',
+    maxWidth: 360,
+    maxHeight: '80%',
+    backgroundColor: colors.darkSurface,
+    borderRadius: 14,
+    padding: spacing.md,
+  },
+  tracksTitle: { color: colors.white, fontSize: 16, fontWeight: '800', marginBottom: 8 },
+  tracksSectionLabel: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  tracksEmpty: { color: colors.textMuted, fontSize: 12, paddingVertical: 6 },
+  tracksOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  tracksOptionActive: { backgroundColor: colors.darkSurfaceAlt },
+  tracksOptionText: { color: colors.textSecondary, fontSize: 14 },
+  tracksOptionTextActive: { color: colors.white, fontWeight: '700' },
+  tracksCloseBtn: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.accentCyan,
+    alignItems: 'center',
+  },
+  tracksCloseBtnText: { color: colors.black, fontWeight: '800' },
 });
