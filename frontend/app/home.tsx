@@ -32,6 +32,7 @@ import { loadHomeCache, saveHomeCache, loadFeaturedCache, saveFeaturedCache, cle
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { loadWatchHistory } from '@/src/state/watch-history';
 import { popDueReminders } from '@/src/state/game-reminders';
+import { logSessionEvent } from '@/src/state/debug-log';
 import { popDueProgramReminders, ProgramReminder } from '@/src/state/program-reminders';
 import ProgramReminderPopup from '@/src/components/ProgramReminderPopup';
 import { isAdultCategoryName, filterToKidsItems } from '@/src/lib/adult-content';
@@ -284,12 +285,14 @@ export default function HomeScreen() {
   const isLowEndDevice = useIsLowEndDevice();
 
   const load = useCallback(async () => {
+    logSessionEvent('home-load', 'inicio');
     const [m, session, cache, featuredCache] = await Promise.all([
       getDeviceMac(),
       loadSession(),
       loadHomeCache(),
       loadFeaturedCache(),
     ]);
+    logSessionEvent('home-load', `mac/sessao/cache local prontos (tinha cache: ${!!cache?.sections})`);
     setMac(m);
     setBg(session?.bg_url);
     setLogo(session?.logo_url);
@@ -329,7 +332,9 @@ export default function HomeScreen() {
     } else {
       // Confirma com o painel que o MAC continua autorizado. Se o revendedor
       // bloqueou o MAC de vez, não tem mais o que fazer aqui — desloga.
+      logSessionEvent('home-load', 'checkMac: comecando (chamada de rede pro painel de revenda)');
       const fresh = await checkMac(m);
+      logSessionEvent('home-load', `checkMac: terminou (${fresh.message})`);
       const isRealResponse = fresh.message !== 'Falha de conexão.';
       if (isRealResponse && !fresh.authorized) {
         await clearSession();
@@ -369,10 +374,12 @@ export default function HomeScreen() {
     // three have finished trying (so it doesn't flash "empty" between the
     // first section landing and the rest still being in flight).
     const kidsMode = await isActiveProfileKids();
+    logSessionEvent('home-load', 'comecando fetch paralelo de canais/filmes/series (rede pro painel)');
 
     let settled = 0;
     const maybeStopSpinner = (gotSomething: boolean) => {
       settled += 1;
+      if (settled >= 3) logSessionEvent('home-load', 'fetch paralelo: todos os 3 terminaram');
       if (gotSomething || settled >= 3) setLoading(false);
     };
 

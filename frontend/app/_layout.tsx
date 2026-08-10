@@ -9,8 +9,16 @@ import { LogBox, StatusBar, View, Text, StyleSheet } from "react-native";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { verifyAppIntegrity } from "@/src/lib/integrity";
 import { storage } from "@/src/utils/storage";
+import { logSessionEvent } from "@/src/state/debug-log";
 
 LogBox.ignoreAllLogs(true);
+
+// Marca o instante em que o bundle JS terminou de ser avaliado (o motor
+// já processou todo o código, RootLayout tá prestes a montar) — junto
+// com a marca de quando a splash é escondida (mais abaixo), dá pra ver
+// no Diagnóstico quanto tempo ficou só na "tela de sistema" antes do
+// nosso JS sequer começar a rodar, separado do resto.
+logSessionEvent('startup', 'bundle JS avaliado, RootLayout monta');
 
 // Mantém a splash nativa visível (a imagem/cor configurada em app.json,
 // desenhada pelo SISTEMA antes de qualquer JS rodar) até sabermos que dá
@@ -96,6 +104,7 @@ export default function RootLayout() {
     // useEffect + dependência em `ready`, isso roda no máximo UMA vez —
     // exatamente quando `ready` passa de false pra true.
     if (!ready) return;
+    logSessionEvent('startup', 'splash escondida, primeira tela real aparece');
     SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
 

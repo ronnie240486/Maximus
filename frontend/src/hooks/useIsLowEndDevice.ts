@@ -60,7 +60,15 @@ function degradeTier(tier: DevicePerfTier): DevicePerfTier {
 
 const devicePerfTier: DevicePerfTier = (() => {
   try {
-    let tier: DevicePerfTier = cpuBenchmarkMs <= CPU_FAST_MAX_MS ? 'high' : cpuBenchmarkMs >= CPU_SLOW_MIN_MS ? 'low' : 'mid';
+    // O benchmark de CPU (cpuBenchmarkMs, abaixo) roda cedo demais — antes
+    // do motor JS "esquentar" e competindo com todo o resto que carrega
+    // na abertura do app — e por isso dá números sem sentido mesmo em
+    // aparelhos rápidos de verdade (confirmado: celular topo de linha,
+    // 11GB RAM, deu 265ms, dez vezes acima do limite de "lento"). Não dá
+    // pra confiar nele pra CLASSIFICAR o aparelho — mantém só como
+    // número informativo no Diagnóstico. A classificação usa só RAM e
+    // arquitetura, que são sinais reais e confiáveis.
+    let tier: DevicePerfTier = 'high';
 
     const mem = Device.totalMemory;
     const weakByRam = typeof mem === 'number' && mem > 0 && mem < LOW_RAM_THRESHOLD_BYTES;
