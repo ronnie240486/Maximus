@@ -6,6 +6,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 
 import { colors } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
+import { detectVoiceGenre } from '@/src/lib/genre-detect';
 
 // Isolado da Home de propósito — importar 'expo-speech-recognition' no
 // topo do home.tsx fazia esse módulo (que registra listeners nativos de
@@ -25,9 +26,17 @@ export default function VoiceSearchButton() {
     if (!event.isFinal) return;
     const transcript = event.results[0]?.transcript?.trim();
     setListening(false);
-    if (transcript) {
-      router.push({ pathname: '/search', params: { q: transcript, voice: '1' } });
+    if (!transcript) return;
+
+    // "Quero assistir um filme de ação" — reconhece o gênero pedido e
+    // manda pra tela de sugestões (mistura filmes+séries daquele gênero),
+    // em vez de tratar como busca de título literal.
+    const genre = detectVoiceGenre(transcript);
+    if (genre) {
+      router.push({ pathname: '/recommend', params: { genre, query: transcript } });
+      return;
     }
+    router.push({ pathname: '/search', params: { q: transcript, voice: '1' } });
   });
   useSpeechRecognitionEvent('end', () => setListening(false));
   useSpeechRecognitionEvent('error', (event) => {
