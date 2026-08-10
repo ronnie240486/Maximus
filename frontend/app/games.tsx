@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { xtream, XtreamLive, liveStreamUrl } from '@/src/lib/xtream';
+import { getTeamLogoUrl } from '@/src/lib/team-logos';
 import {
   loadGameReminders,
   toggleGameReminder,
@@ -94,6 +96,74 @@ function todayAtTime(hhmm: string): number {
   const d = new Date();
   d.setHours(h || 0, m || 0, 0, 0);
   return d.getTime();
+}
+
+/** Ícone genérico do esporte por padrão; troca pelo escudo real assim que
+ * (e se) a busca na Wikipédia achar um time reconhecido — nunca mostra
+ * nada incerto, só troca quando tem certeza. */
+function TeamLogo({ teamName, fallbackIcon, fallbackColor }: { teamName: string; fallbackIcon: string; fallbackColor: string }) {
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getTeamLogoUrl(teamName).then((url) => {
+      if (!cancelled) setLogoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [teamName]);
+
+  if (logoUrl) {
+    return <Image source={{ uri: logoUrl }} style={styles.teamLogoImg} contentFit="contain" />;
+  }
+  return (
+    <View style={[styles.teamLogoFallback, { backgroundColor: fallbackColor }]}>
+      <MaterialCommunityIcons name={fallbackIcon as any} size={12} color={colors.white} />
+    </View>
+  );
+}
+
+function GameRow({
+  ch,
+  scheduled,
+  onOpen,
+  onToggleReminder,
+}: {
+  ch: XtreamLive;
+  scheduled: boolean;
+  onOpen: () => void;
+  onToggleReminder: () => void;
+}) {
+  const { time, rest } = parseGameChannelName(ch.name);
+  const [teamA, teamB] = splitTeams(rest);
+  const visual = detectSportVisual(ch.name);
+
+  return (
+    <TVFocusable onPress={onOpen} style={styles.row} testID={`games-row-${ch.stream_id}`}>
+      <View style={[styles.sportBadge, { backgroundColor: visual.color }]}>
+        <MaterialCommunityIcons name={visual.icon as any} size={18} color={colors.white} />
+      </View>
+
+      <View style={styles.teamsCol}>
+        <View style={styles.teamRow}>
+          <TeamLogo teamName={teamA} fallbackIcon={visual.icon} fallbackColor={visual.color} />
+          <Text style={styles.teamName} numberOfLines={1}>{teamA}</Text>
+        </View>
+        {!!teamB && (
+          <View style={styles.teamRow}>
+            <TeamLogo teamName={teamB} fallbackIcon={visual.icon} fallbackColor={visual.color} />
+            <Text style={styles.teamName} numberOfLines={1}>{teamB}</Text>
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.timeText}>{time || '--:--'}</Text>
+
+      <TVFocusable onPress={onToggleReminder} style={styles.bellBtn} testID={`games-reminder-${ch.stream_id}`} hitSlop={10}>
+        <Ionicons name={scheduled ? 'notifications' : 'notifications-outline'} size={18} color={scheduled ? colors.accentCyan : colors.textMuted} />
+      </TVFocusable>
+    </TVFocusable>
+  );
 }
 
 export default function GamesScreen() {
@@ -201,12 +271,15 @@ export default function GamesScreen() {
   };
 
   const sorted = useMemo(() => {
-    return [...sportsChannels].sort((a, b) => {
-      const ta = parseGameChannelName(a.name).time;
-      const tb = parseGameChannelName(b.name).time;
-      if (!ta && !tb) return 0;
-      if (!ta) return 1;
-      if (!tb) return -1;
+    // Só mostra canais com horário reconhecível no nome ("[19:30] Time A
+    // x Time B") — são os jogos de verdade programados pro dia. Canal
+    // genérico de esporte (tipo "SporTV" ou "ESPN" sem horário nenhum no
+    // nome) não representa um jogo específico acontecendo agora, só
+    // deixava a lista poluída com coisa que não é bem "jogo do dia".
+    const withTime = sportsChannels.filter((ch) => parseGameChannelName(ch.name).time !== null);
+    return withTime.sort((a, b) => {
+      const ta = parseGameChannelName(a.name).time!;
+      const tb = parseGameChannelName(b.name).time!;
       return ta.localeCompare(tb);
     });
   }, [sportsChannels]);
@@ -244,41 +317,14 @@ export default function GamesScreen() {
           keyExtractor={(ch) => String(ch.stream_id)}
           contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}
           renderItem={({ item: ch }) => {
-            const { time, rest } = parseGameChannelName(ch.name);
-            const [teamA, teamB] = splitTeams(rest);
-            const visual = detectSportVisual(ch.name);
             const reminderId = `panel-${ch.stream_id}`;
-            const scheduled = scheduledIds.has(reminderId);
             return (
-              <TVFocusable
-                onPress={() => openGameChannel(ch)}
-                style={styles.row}
-                testID={`games-row-${ch.stream_id}`}
-              >
-                <View style={[styles.sportBadge, { backgroundColor: visual.color }]}>
-                  <MaterialCommunityIcons name={visual.icon as any} size={18} color={colors.white} />
-                </View>
-
-                <View style={styles.teamsCol}>
-                  <Text style={styles.teamName} numberOfLines={1}>{teamA}</Text>
-                  {!!teamB && <Text style={styles.teamName} numberOfLines={1}>{teamB}</Text>}
-                </View>
-
-                <Text style={styles.timeText}>{time || '--:--'}</Text>
-
-                <TVFocusable
-                  onPress={() => onToggleReminder(ch)}
-                  style={styles.bellBtn}
-                  testID={`games-reminder-${ch.stream_id}`}
-                  hitSlop={10}
-                >
-                  <Ionicons
-                    name={scheduled ? 'notifications' : 'notifications-outline'}
-                    size={18}
-                    color={scheduled ? colors.accentCyan : colors.textMuted}
-                  />
-                </TVFocusable>
-              </TVFocusable>
+              <GameRow
+                ch={ch}
+                scheduled={scheduledIds.has(reminderId)}
+                onOpen={() => openGameChannel(ch)}
+                onToggleReminder={() => onToggleReminder(ch)}
+              />
             );
           }}
         />
@@ -323,6 +369,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   teamsCol: { flex: 1, gap: 4 },
+  teamRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  teamLogoImg: { width: 20, height: 20 },
+  teamLogoFallback: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   teamName: { color: colors.white, fontSize: 14, fontWeight: '700' },
   timeText: { color: colors.accentCyan, fontSize: 14, fontWeight: '800' },
   bellBtn: { padding: 6 },
