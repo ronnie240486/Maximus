@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -218,24 +218,39 @@ export default function PlayerScreen() {
 
   const isAdult = params.adult === '1';
 
+  // Sem isso, esse objeto era recriado do ZERO a cada renderização do
+  // componente (mesmo objeto {} nunca é "igual" ao anterior pro React) —
+  // e como current.stream em si não muda a toda hora, o vídeo em si
+  // continuava o mesmo, MAS o player podia interpretar isso como "fonte
+  // nova" a cada re-render motivado por QUALQUER outra coisa na tela
+  // (sair da tela cheia, foco do D-pad mudando, controles aparecendo/
+  // sumindo) — reiniciando o stream do começo sem necessidade, e
+  // explicando a sensação de "dois vídeos tocando" durante a troca.
+  // Memoizado por current.stream: só recria de verdade quando o vídeo
+  // muda mesmo.
+  const playerSource = useMemo(
+    () =>
+      current.stream
+        ? { uri: current.stream, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } }
+        : '',
+    [current.stream]
+  );
+
   // Alguns servidores de IPTV bloqueiam/travam o stream se o pedido não
   // vier com um User-Agent reconhecido (proteção comum contra uso fora de
   // apps de player) — as chamadas de API já mandavam isso, mas o pedido
   // do vídeo em si (feito pelo player nativo) não mandava nada.
-  const player = useVideoPlayer(
-    current.stream ? { uri: current.stream, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } } : '',
-    (p) => {
-      p.loop = false;
-      // Buffer maior que o padrão (que gira em torno de ~15-20s) — IPTV
-      // costuma rodar em conexões mais instáveis que streaming normal
-      // (Wi-Fi de TV box, servidor do painel compartilhado, etc). Com
-      // mais segundos bufferizados à frente, uma queda de rede breve não
-      // interrompe a reprodução; o custo é só um pouco mais de RAM/dados
-      // baixados com antecedência, o que compensa bem pra live/VOD.
-      p.bufferOptions = { preferredForwardBufferDuration: 45 };
-      p.play();
-    }
-  );
+  const player = useVideoPlayer(playerSource, (p) => {
+    p.loop = false;
+    // Buffer maior que o padrão (que gira em torno de ~15-20s) — IPTV
+    // costuma rodar em conexões mais instáveis que streaming normal
+    // (Wi-Fi de TV box, servidor do painel compartilhado, etc). Com
+    // mais segundos bufferizados à frente, uma queda de rede breve não
+    // interrompe a reprodução; o custo é só um pouco mais de RAM/dados
+    // baixados com antecedência, o que compensa bem pra live/VOD.
+    p.bufferOptions = { preferredForwardBufferDuration: 45 };
+    p.play();
+  });
 
   useEffect(() => {
     if (isLive) return;
