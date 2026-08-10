@@ -8,6 +8,10 @@ import {
   ImageBackground,
   Alert,
   Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { checkMac, MacStatus, registerTestDevice, fetchAppExtras, AppExtras } from '@/src/api/client';
+import { checkMac, MacStatus, registerTestDevice, registerCustomer, fetchAppExtras, AppExtras } from '@/src/api/client';
 import { hasUsedTest, markTestUsed } from '@/src/state/test-usage';
 import { parsePlaylistUrl, xtream, XtreamCreds } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
@@ -197,7 +201,23 @@ export default function MacLoginScreen() {
     Linking.openURL(digits ? `https://wa.me/${digits}` : 'https://wa.me/');
   };
 
-  const onTestRegister = async () => {
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+
+  // Botão "Teste" agora pede nome (e WhatsApp, opcional) ANTES de gerar o
+  // teste de verdade — sem isso, o cadastro de clientes só tinha o MAC
+  // (um código sem sentido nenhum), sem jeito de saber quem é a pessoa de
+  // verdade quando chegar a hora de cobrar.
+  const onTestRegister = () => {
+    if (!mac || testing) return;
+    setNameInput('');
+    setPhoneInput('');
+    setShowNamePrompt(true);
+  };
+
+  const doTestRegister = async () => {
+    setShowNamePrompt(false);
     if (!mac || testing) return;
 
     // Trava o poll automático AGORA, antes de qualquer coisa — ver o
@@ -241,6 +261,15 @@ export default function MacLoginScreen() {
       pollRef.current = setTimeout(() => runPoll(mac), POLL_MS);
       return;
     }
+
+    // Grava no cadastro de clientes (nosso backend) — silencioso, nunca
+    // atrapalha o fluxo da pessoa testando, mesmo que essa chamada falhe.
+    registerCustomer({
+      mac,
+      name: nameInput.trim() || undefined,
+      phone: phoneInput.trim() || undefined,
+      rawResponse: result.raw,
+    });
 
     // O gerador de teste (chatbot) cria um acesso IPTV próprio, num
     // servidor separado do painel principal (que só sabe de MACs já
@@ -566,6 +595,55 @@ export default function MacLoginScreen() {
           <Text style={styles.buildStamp}>{BUILD_SHORT} (toque pra ver o que mudou)</Text>
         </Pressable>
       </SafeAreaView>
+
+      <Modal visible={showNamePrompt} transparent animationType="fade" onRequestClose={() => setShowNamePrompt(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Antes de testar</Text>
+            <Text style={styles.modalSubtitle}>
+              Como podemos te chamar? Ajuda o revendedor a saber quem é você quando for liberar o acesso completo.
+            </Text>
+            <TextInput
+              value={nameInput}
+              onChangeText={setNameInput}
+              placeholder="Seu nome"
+              placeholderTextColor={colors.textMuted}
+              style={styles.modalInput}
+              autoFocus
+              testID="test-prompt-name"
+            />
+            <TextInput
+              value={phoneInput}
+              onChangeText={setPhoneInput}
+              placeholder="WhatsApp (opcional)"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="phone-pad"
+              style={styles.modalInput}
+              testID="test-prompt-phone"
+            />
+            <View style={styles.modalBtnRow}>
+              <Pressable
+                onPress={() => setShowNamePrompt(false)}
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                testID="test-prompt-cancel"
+              >
+                <Text style={styles.modalBtnSecondaryText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={doTestRegister}
+                disabled={!nameInput.trim()}
+                style={[styles.modalBtn, styles.modalBtnPrimary, !nameInput.trim() && { opacity: 0.5 }]}
+                testID="test-prompt-confirm"
+              >
+                <Text style={styles.modalBtnPrimaryText}>Gerar teste</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -811,4 +889,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     opacity: 0.6,
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: colors.darkSurface,
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: 10,
+  },
+  modalTitle: { color: colors.white, fontSize: 18, fontWeight: '800' },
+  modalSubtitle: { color: colors.textSecondary, fontSize: 13, marginBottom: 4 },
+  modalInput: {
+    backgroundColor: colors.darkSurfaceAlt,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.white,
+    fontSize: 15,
+  },
+  modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  modalBtnSecondary: { backgroundColor: colors.darkSurfaceAlt },
+  modalBtnSecondaryText: { color: colors.textSecondary, fontWeight: '700' },
+  modalBtnPrimary: { backgroundColor: colors.accentCyan },
+  modalBtnPrimaryText: { color: colors.black, fontWeight: '800' },
 });

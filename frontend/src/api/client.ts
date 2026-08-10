@@ -286,6 +286,34 @@ export async function registerTestDevice(mac: string): Promise<TestRegisterResul
   }
 }
 
+// Grava o cadastro de cliente no NOSSO backend (não no painel do
+// revendedor) — nome + MAC + o que o teste devolveu, pra o dono do app
+// conseguir ver quem testou e (depois) marcar como pago. Best-effort: se
+// isso falhar (rede caiu, backend fora do ar), a pessoa que está testando
+// não deve ser afetada de jeito nenhum — o teste dela já foi gerado
+// normalmente antes dessa chamada, isso aqui é só registro.
+export async function registerCustomer(input: {
+  mac: string;
+  name?: string;
+  phone?: string;
+  rawResponse?: string;
+}): Promise<void> {
+  try {
+    await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/customers/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mac: input.mac,
+        name: input.name || null,
+        phone: input.phone || null,
+        raw_response: input.rawResponse || null,
+      }),
+    });
+  } catch {
+    // Silencioso de propósito — ver comentário acima.
+  }
+}
+
 // Campos do painel que ainda não tinham lugar nenhum no app — buscados do
 // mesmo /api/guim.php acima. Cada um só aparece se o revendedor de fato
 // preencheu ele no painel (senão fica undefined, e a tela que usa isso

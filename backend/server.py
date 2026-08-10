@@ -45,10 +45,19 @@ class StatusCheckCreate(BaseModel):
 class CustomerRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     mac: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
     requested_at: datetime = Field(default_factory=datetime.utcnow)
     raw_response: str = ""
     status: str = "teste"
     paid_at: Optional[datetime] = None
+
+
+class CustomerRegisterInput(BaseModel):
+    mac: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    raw_response: Optional[str] = None
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -267,6 +276,29 @@ def _check_admin_key(admin_key: str):
         raise HTTPException(status_code=503, detail="ADMIN_API_KEY não configurada no backend.")
     if admin_key != ADMIN_API_KEY:
         raise HTTPException(status_code=403, detail="Chave de administrador inválida.")
+
+
+@api_router.post("/customers/register")
+async def register_customer(input: CustomerRegisterInput):
+    """Chamado pelo próprio app depois de gerar um teste — grava MAC + nome
+    (se a pessoa informou) no cadastro. Diferente de /generate-test (que só
+    é usado como um proxy alternativo, não é o caminho real que o app usa
+    hoje pra testar): esse aqui é chamado direto pelo fluxo de teste de
+    verdade, então é o que realmente populada o cadastro."""
+    try:
+        record = CustomerRecord(
+            mac=input.mac,
+            name=input.name,
+            phone=input.phone,
+            raw_response=(input.raw_response or "")[:4000],
+        )
+        await db.customers.insert_one(record.model_dump())
+        return {"ok": True, "id": record.id}
+    except Exception as e:
+        logger.exception("Falha ao registrar cliente (mac=%s)", input.mac)
+        # Nunca deve travar o app por causa disso — devolve ok=False mas
+        # sem erro HTTP, o app já ignora silenciosamente.
+        return {"ok": False, "error": str(e)}
 
 
 @api_router.get("/customers")
