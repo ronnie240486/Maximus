@@ -40,14 +40,14 @@ class StatusCheckCreate(BaseModel):
 # Um registro por teste gerado — MAC + o que o gerador de teste devolveu
 # (usuário/senha, URL M3U etc, guardado como texto cru já que o formato
 # exato depende do gerador configurado em TEST_REGISTER_URL). `status`
-# começa "pending" e vira "paid" quando você confirmar o pagamento
+# começa "teste" e vira "pago" quando você confirmar o pagamento
 # manualmente (ou, no futuro, quando o painel de IPTV avisar sozinho).
 class CustomerRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     mac: str
     requested_at: datetime = Field(default_factory=datetime.utcnow)
     raw_response: str = ""
-    status: str = "pending"
+    status: str = "teste"
     paid_at: Optional[datetime] = None
 
 # Add your routes to the router instead of directly to app
@@ -283,7 +283,7 @@ async def mark_customer_paid(customer_id: str, admin_key: str = ""):
     _check_admin_key(admin_key)
     result = await db.customers.update_one(
         {"id": customer_id},
-        {"$set": {"status": "paid", "paid_at": datetime.utcnow()}},
+        {"$set": {"status": "pago", "paid_at": datetime.utcnow()}},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Cliente não encontrado.")
