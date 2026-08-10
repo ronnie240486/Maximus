@@ -11,6 +11,7 @@ import { parsePlaylistUrl, xtream } from '@/src/lib/xtream';
 import { getSession, loadSession } from '@/src/state/session';
 import { getSessionLog, clearSessionLog } from '@/src/state/debug-log';
 import { getDeviceCapabilityInfo } from '@/src/hooks/useIsLowEndDevice';
+import * as Notifications from 'expo-notifications';
 import TVFocusable from '@/src/components/TVFocusable';
 
 type CheckState = 'checking' | 'ok' | 'off';
@@ -27,6 +28,35 @@ export default function BackendDiagScreen() {
   const [internetState, setInternetState] = useState<CheckState>('checking');
   const [listState, setListState] = useState<CheckState>('checking');
   const [checking, setChecking] = useState(true);
+
+  const onTestNotification = useCallback(async () => {
+    try {
+      const perm = await Notifications.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permissão negada', 'Vai em Ajustes do Android > Apps > Maximus Player > Notificações, e ativa manualmente.');
+        return;
+      }
+      await Notifications.setNotificationChannelAsync('game-reminders', {
+        name: 'Lembretes de jogo',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Teste de notificação 🔔', body: 'Se você está vendo isso, o mecanismo funciona!' },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: Date.now() + 10000,
+          channelId: 'game-reminders',
+        },
+      });
+      Alert.alert(
+        'Agendado!',
+        'Uma notificação vai aparecer em 10 segundos. Pode fechar o app completamente (deslizar pra fora dos recentes) e esperar — se ela aparecer mesmo com o app fechado, o mecanismo funciona de verdade.'
+      );
+    } catch (e: any) {
+      Alert.alert('Erro ao agendar', e?.message || String(e));
+    }
+  }, []);
 
   const onViewLogs = useCallback(async () => {
     const logs = await getSessionLog();
@@ -160,6 +190,10 @@ export default function BackendDiagScreen() {
 
         {/* Botão temporário de depuração — só existe pra rastrear de vez o
             bug da sessão de teste sendo sobrescrita. Remover depois. */}
+        <TVFocusable onPress={onTestNotification} style={styles.debugBtn} testID="diag-test-notification">
+          <Ionicons name="notifications-outline" size={16} color={colors.textMuted} />
+          <Text style={styles.debugBtnText}>Testar notificação (10s, feche o app depois)</Text>
+        </TVFocusable>
         <TVFocusable onPress={onViewLogs} style={styles.debugBtn} testID="diag-view-logs">
           <Ionicons name="bug-outline" size={16} color={colors.textMuted} />
           <Text style={styles.debugBtnText}>Ver logs de depuração</Text>
