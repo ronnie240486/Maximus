@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime
 import httpx
@@ -36,6 +36,19 @@ class StatusCheck(BaseModel):
 
 class StatusCheckCreate(BaseModel):
     client_name: str
+
+# Um registro por teste gerado — MAC + o que o gerador de teste devolveu
+# (usuário/senha, URL M3U etc, guardado como texto cru já que o formato
+# exato depende do gerador configurado em TEST_REGISTER_URL). `status`
+# começa "pending" e vira "paid" quando você confirmar o pagamento
+# manualmente (ou, no futuro, quando o painel de IPTV avisar sozinho).
+class CustomerRecord(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    mac: str
+    requested_at: datetime = Field(default_factory=datetime.utcnow)
+    raw_response: str = ""
+    status: str = "pending"
+    paid_at: Optional[datetime] = None
 
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
@@ -219,11 +232,62 @@ async def generate_test(mac: str = ""):
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}") from e
 
+    # Salva no cadastro de clientes — MAC + o que o gerador de teste
+    # devolveu (usuário/senha, URL M3U, o que for), pra você conseguir
+    # consultar depois quem já testou e com qual conta. Isso NUNCA deve
+    # atrapalhar o teste em si: se o banco falhar por qualquer motivo, a
+    # pessoa ainda recebe o teste normalmente (só não fica registrado).
+    if mac:
+        try:
+            record = CustomerRecord(mac=mac, raw_response=upstream.text[:4000])
+            await db.customers.insert_one(record.model_dump())
+        except Exception:
+            logger.exception("Falha ao salvar registro de cliente (mac=%s) — teste seguiu normalmente.", mac)
+
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
         media_type=upstream.headers.get("content-type", "application/octet-stream"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Cadastro de clientes
+# ---------------------------------------------------------------------------
+# Lista simples de quem já testou (e, futuramente, quem pagou) — pensado
+# pra você acompanhar manualmente enquanto a liberação automática pelo
+# painel de IPTV não estiver pronta. Protegido por uma chave simples
+# (ADMIN_API_KEY) pra não ficar público na internet mostrando MAC/senha
+# de clientes pra qualquer um que ache a URL.
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")
+
+
+def _check_admin_key(admin_key: str):
+    if not ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="ADMIN_API_KEY não configurada no backend.")
+    if admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Chave de administrador inválida.")
+
+
+@api_router.get("/customers")
+async def list_customers(admin_key: str = ""):
+    _check_admin_key(admin_key)
+    docs = await db.customers.find().sort("requested_at", -1).to_list(500)
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return docs
+
+
+@api_router.post("/customers/{customer_id}/mark-paid")
+async def mark_customer_paid(customer_id: str, admin_key: str = ""):
+    _check_admin_key(admin_key)
+    result = await db.customers.update_one(
+        {"id": customer_id},
+        {"$set": {"status": "paid", "paid_at": datetime.utcnow()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado.")
+    return {"ok": True}
 
 
 # Include the router in the main app
