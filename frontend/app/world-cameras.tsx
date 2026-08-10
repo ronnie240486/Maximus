@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Linking } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,54 +7,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
 
-// O site "Câmeras do Mundo" (camerasdomundo.com) foi descartado como fonte
-// — o player deles está quebrado até no site oficial (fora do nosso app),
-// só o link "canal do YouTube" funciona. Em vez de depender de um player
-// de terceiro instável, cada país abre uma BUSCA no YouTube por câmeras
-// ao vivo — o YouTube é a mesma base que já usamos (e sabemos que
-// funciona bem) pros trailers. Sem link fixo pra vídeo nenhum (esses
-// mudam/saem do ar o tempo todo) — a pessoa escolhe, dentro da busca,
-// qual câmera ao vivo daquele país quer ver.
-function youtubeSearchUrl(query: string): string {
-  // sp=EgJAAQ%3D%3D é o filtro oficial do YouTube pra "Ao vivo" — sem
-  // ele, a busca misturava vídeos gravados/antigos junto com as
-  // transmissões de verdade, e um vídeo gravado que já terminou (ou é
-  // só um trecho de áudio) dava a impressão de "câmera com defeito, só
-  // sai som" quando na real só não era uma câmera ao vivo mesmo.
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgJAAQ%3D%3D`;
-}
-
+// Países listados no menu oficial do site "Câmeras do Mundo"
+// (en.camerasdomundo.com). Cada um abre a página de câmeras daquele
+// país dentro de um WebView, mesmo padrão que já usamos para trailers
+// do YouTube e para o portal de trânsito do CET-SP.
 const COUNTRIES: { id: string; name: string; flag: string; url: string }[] = [
-  { id: 'brazil', name: 'Brasil', flag: '🇧🇷', url: youtubeSearchUrl('câmera ao vivo Brasil live cam') },
-  { id: 'usa', name: 'Estados Unidos', flag: '🇺🇸', url: youtubeSearchUrl('USA live cam 24/7') },
-  { id: 'japan', name: 'Japão', flag: '🇯🇵', url: youtubeSearchUrl('Japan live cam 24/7') },
-  { id: 'canada', name: 'Canadá', flag: '🇨🇦', url: youtubeSearchUrl('Canada live cam 24/7') },
-  { id: 'spain', name: 'Espanha', flag: '🇪🇸', url: youtubeSearchUrl('Spain live cam 24/7') },
-  { id: 'turkey', name: 'Turquia', flag: '🇹🇷', url: youtubeSearchUrl('Turkey live cam 24/7') },
-  { id: 'thailand', name: 'Tailândia', flag: '🇹🇭', url: youtubeSearchUrl('Thailand live cam 24/7') },
-  { id: 'singapore', name: 'Singapura', flag: '🇸🇬', url: youtubeSearchUrl('Singapore live cam 24/7') },
-  { id: 'philippines', name: 'Filipinas', flag: '🇵🇭', url: youtubeSearchUrl('Philippines live cam 24/7') },
-  { id: 'taiwan', name: 'Taiwan', flag: '🇹🇼', url: youtubeSearchUrl('Taiwan live cam 24/7') },
-  { id: 'israel', name: 'Israel', flag: '🇮🇱', url: youtubeSearchUrl('Israel live cam 24/7') },
-  { id: 'lebanon', name: 'Líbano', flag: '🇱🇧', url: youtubeSearchUrl('Lebanon live cam 24/7') },
-  { id: 'iran', name: 'Irã', flag: '🇮🇷', url: youtubeSearchUrl('Iran live cam 24/7') },
-  { id: 'palestine', name: 'Palestina', flag: '🇵🇸', url: youtubeSearchUrl('Palestine live cam 24/7') },
-  { id: 'virgin-islands', name: 'Ilhas Virgens', flag: '🇻🇬', url: youtubeSearchUrl('Virgin Islands live cam 24/7') },
-  { id: 'all', name: 'Ver todas', flag: '🌎', url: youtubeSearchUrl('live cam 24/7 world') },
+  { id: 'brazil', name: 'Brasil', flag: '🇧🇷', url: 'https://en.camerasdomundo.com/brazil/' },
+  { id: 'usa', name: 'Estados Unidos', flag: '🇺🇸', url: 'https://en.camerasdomundo.com/usa/' },
+  { id: 'japan', name: 'Japão', flag: '🇯🇵', url: 'https://en.camerasdomundo.com/live-cams/japan/' },
+  { id: 'canada', name: 'Canadá', flag: '🇨🇦', url: 'https://en.camerasdomundo.com/canada/' },
+  { id: 'spain', name: 'Espanha', flag: '🇪🇸', url: 'https://en.camerasdomundo.com/spain/' },
+  { id: 'turkey', name: 'Turquia', flag: '🇹🇷', url: 'https://en.camerasdomundo.com/turkey/' },
+  { id: 'thailand', name: 'Tailândia', flag: '🇹🇭', url: 'https://en.camerasdomundo.com/live-cams/thailand/' },
+  { id: 'singapore', name: 'Singapura', flag: '🇸🇬', url: 'https://en.camerasdomundo.com/singapore/' },
+  { id: 'philippines', name: 'Filipinas', flag: '🇵🇭', url: 'https://en.camerasdomundo.com/philippines/' },
+  { id: 'taiwan', name: 'Taiwan', flag: '🇹🇼', url: 'https://en.camerasdomundo.com/taiwan/' },
+  { id: 'israel', name: 'Israel', flag: '🇮🇱', url: 'https://en.camerasdomundo.com/live-cams/israel/' },
+  { id: 'lebanon', name: 'Líbano', flag: '🇱🇧', url: 'https://en.camerasdomundo.com/live-cams/lebanon/' },
+  { id: 'iran', name: 'Irã', flag: '🇮🇷', url: 'https://en.camerasdomundo.com/live-cams/iran/' },
+  { id: 'palestine', name: 'Palestina', flag: '🇵🇸', url: 'https://en.camerasdomundo.com/live-cams/palestine/' },
+  { id: 'virgin-islands', name: 'Ilhas Virgens', flag: '🇻🇬', url: 'https://en.camerasdomundo.com/virgin-islands/' },
+  { id: 'all', name: 'Ver todas', flag: '🌎', url: 'https://en.camerasdomundo.com/live-cams/' },
 ];
 
 export default function WorldCamerasScreen() {
   const router = useRouter();
 
-  // Depois de VÁRIAS tentativas diferentes de manter isso dentro do
-  // WebView do app (busca simples, player dedicado) — todas travando em
-  // algum país mais cedo ou mais tarde ("tela azul girando a bolinha") —
-  // a única versão que realmente funciona sem travar é abrir no
-  // navegador/app do YouTube do próprio celular. Sai do Maximus pra
-  // assistir, mas garante que funciona de verdade — decisão final,
-  // depois de esgotar as alternativas dentro do app.
-  const openCountry = (url: string) => {
-    Linking.openURL(url).catch(() => {});
+  const openCountry = (name: string, url: string) => {
+    router.push({ pathname: '/world-camera-view', params: { title: name, url } });
   };
 
   return (
@@ -77,13 +57,12 @@ export default function WorldCamerasScreen() {
         columnWrapperStyle={styles.row}
         renderItem={({ item }) => (
           <TVFocusable
-            onPress={() => openCountry(item.url)}
+            onPress={() => openCountry(item.name, item.url)}
             style={styles.card}
             testID={`world-country-${item.id}`}
           >
             <Text style={styles.flag}>{item.flag}</Text>
             <Text style={styles.countryName}>{item.name}</Text>
-            <Ionicons name="open-outline" size={14} color={colors.textMuted} />
           </TVFocusable>
         )}
       />
