@@ -40,6 +40,13 @@
       "expo-router",
       "expo-updates",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0B0F1A"
+        }
+      ],
+      [
         "expo-video",
         {
           "supportsBackgroundPlayback": true,
