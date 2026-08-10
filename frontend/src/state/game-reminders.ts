@@ -16,14 +16,23 @@ const CHANNEL_ID = 'game-reminders';
 // Como a notificação deve se comportar quando o app está ABERTO na hora
 // que ela dispara (sem isso, o padrão do expo-notifications é não mostrar
 // nada visualmente enquanto o app está em primeiro plano).
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+//
+// Protegido com try/catch: essa chamada roda no escopo do MÓDULO (bem
+// cedo, antes até da tela abrir de verdade) — se o módulo nativo do
+// expo-notifications não estiver pronto nesse instante por qualquer
+// motivo, sem o try/catch isso derrubava o app inteiro na abertura
+// ("abre e fecha rápido"). Com isso, na pior hipótese só perde o
+// comportamento de notificação com app aberto, mas o app continua de pé.
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch {}
 
 let channelReady = false;
 async function ensureChannel(): Promise<void> {

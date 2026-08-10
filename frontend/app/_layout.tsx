@@ -13,13 +13,6 @@ import { logSessionEvent } from "@/src/state/debug-log";
 
 LogBox.ignoreAllLogs(true);
 
-// Marca o instante em que o bundle JS terminou de ser avaliado (o motor
-// já processou todo o código, RootLayout tá prestes a montar) — junto
-// com a marca de quando a splash é escondida (mais abaixo), dá pra ver
-// no Diagnóstico quanto tempo ficou só na "tela de sistema" antes do
-// nosso JS sequer começar a rodar, separado do resto.
-logSessionEvent('startup', 'bundle JS avaliado, RootLayout monta');
-
 // Mantém a splash nativa visível (a imagem/cor configurada em app.json,
 // desenhada pelo SISTEMA antes de qualquer JS rodar) até sabermos que dá
 // pra mostrar alguma coisa de verdade — fontes de ícone carregadas e a
@@ -33,6 +26,17 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Marca o instante em que o RootLayout montou de verdade — antes essa
+    // chamada ficava no escopo do MÓDULO (fora do componente, antes até
+    // do React montar nada), o que rodava antes dos módulos nativos
+    // (storage/MMKV) estarem garantidamente prontos — suspeito forte de
+    // ter causado o app abrindo e fechando na hora (crash). Dentro de
+    // useEffect, só roda depois que o componente já montou de verdade,
+    // com tudo inicializado.
+    logSessionEvent('startup', 'RootLayout montado').catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Destrava a rotação de forma ativa — o "orientation": "default" no
