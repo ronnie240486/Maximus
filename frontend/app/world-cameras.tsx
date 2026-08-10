@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,11 +46,15 @@ const COUNTRIES: { id: string; name: string; flag: string; url: string }[] = [
 export default function WorldCamerasScreen() {
   const router = useRouter();
 
-  // Abre a busca DENTRO do app (WebView) — a pessoa escolhe o país,
-  // navega pelos resultados sem sair do Maximus, e o vídeo específico
-  // toca via YouTube dentro dessa mesma tela.
-  const openCountry = (name: string, url: string) => {
-    router.push({ pathname: '/world-camera-view', params: { title: name, url } });
+  // Depois de VÁRIAS tentativas diferentes de manter isso dentro do
+  // WebView do app (busca simples, player dedicado) — todas travando em
+  // algum país mais cedo ou mais tarde ("tela azul girando a bolinha") —
+  // a única versão que realmente funciona sem travar é abrir no
+  // navegador/app do YouTube do próprio celular. Sai do Maximus pra
+  // assistir, mas garante que funciona de verdade — decisão final,
+  // depois de esgotar as alternativas dentro do app.
+  const openCountry = (url: string) => {
+    Linking.openURL(url).catch(() => {});
   };
 
   return (
@@ -73,12 +77,13 @@ export default function WorldCamerasScreen() {
         columnWrapperStyle={styles.row}
         renderItem={({ item }) => (
           <TVFocusable
-            onPress={() => openCountry(item.name, item.url)}
+            onPress={() => openCountry(item.url)}
             style={styles.card}
             testID={`world-country-${item.id}`}
           >
             <Text style={styles.flag}>{item.flag}</Text>
             <Text style={styles.countryName}>{item.name}</Text>
+            <Ionicons name="open-outline" size={14} color={colors.textMuted} />
           </TVFocusable>
         )}
       />
