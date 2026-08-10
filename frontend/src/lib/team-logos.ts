@@ -8,6 +8,7 @@
 // ícone genérico do esporte (nunca mostra um escudo errado por engano).
 
 import { storage } from '@/src/utils/storage';
+import { logSessionEventFast } from '@/src/state/debug-log';
 
 const CACHE_KEY = 'team_logo_cache_v1';
 
@@ -84,11 +85,25 @@ function normalize(s: string): string {
 
 /** Devolve a URL do escudo do time se reconhecido na lista curada — null
  * se o time não estiver na lista (nesse caso, a tela deve continuar
- * usando o ícone genérico do esporte, nunca mostrar algo incerto). */
+ * usando o ícone genérico do esporte, nunca mostrar algo incerto).
+ *
+ * Usa comparação por CONTÉM, não igualdade exata — o nome do time no
+ * canal do painel raramente vem "limpo" (ex: "São Paulo/SP", "SPFC",
+ * "São Paulo Futebol Clube"), então exigir bater 100% igual deixava a
+ * lista curada praticamente inútil na prática.
+ */
 export async function getTeamLogoUrl(teamName: string): Promise<string | null> {
   const key = normalize(teamName);
-  const wikiTitle = TEAM_WIKI_TITLES[key];
-  if (!wikiTitle) return null;
+  if (!key) return null;
+
+  const match = Object.entries(TEAM_WIKI_TITLES).find(
+    ([teamKey]) => key.includes(teamKey) || teamKey.includes(key)
+  );
+  if (!match) {
+    logSessionEventFast('team-logo', `nao reconhecido: "${teamName}"`);
+    return null;
+  }
+  const wikiTitle = match[1];
 
   const cache = await loadCache();
   const cached = cache[wikiTitle];
@@ -97,16 +112,19 @@ export async function getTeamLogoUrl(teamName: string): Promise<string | null> {
   try {
     const res = await fetch(`https://pt.wikipedia.org/api/rest_v1/page/summary/${wikiTitle}`);
     if (!res.ok) {
+      logSessionEventFast('team-logo', `wikipedia respondeu ${res.status} pra "${wikiTitle}"`);
       cache[wikiTitle] = { url: null, ts: Date.now() };
       await saveCache();
       return null;
     }
     const json = await res.json();
     const url: string | null = json?.thumbnail?.source || null;
+    if (!url) logSessionEventFast('team-logo', `sem thumbnail pra "${wikiTitle}"`);
     cache[wikiTitle] = { url, ts: Date.now() };
     await saveCache();
     return url;
-  } catch {
+  } catch (e: any) {
+    logSessionEventFast('team-logo', `erro de rede: ${e?.message || e}`);
     return null;
   }
 }
