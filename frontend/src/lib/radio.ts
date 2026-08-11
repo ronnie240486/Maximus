@@ -41,6 +41,7 @@ export type RadioStation = {
   country?: string;
   bitrate?: number;
   clickcount?: number;
+  lastcheckok?: number;
 };
 
 export type RadioCategory = {
@@ -92,6 +93,18 @@ function dedupeStations(list: RadioStation[]): RadioStation[] {
   });
 }
 
+// `hidebroken=true` sozinho não é suficiente — é um filtro mais antigo/
+// permissivo. `lastcheckok=true` é mais rigoroso: exige que a ÚLTIMA
+// checagem de conectividade da Radio Browser (eles testam as rádios
+// periodicamente de verdade) tenha dado certo. Mesmo assim, confere de
+// novo no lado do app (lastcheckok !== 0) — não custa nada e é uma
+// segunda camada de proteção caso o filtro do servidor falhe silencioso.
+function isLikelyWorking(s: RadioStation): boolean {
+  if (!(s.url_resolved || s.url)) return false;
+  if (s.lastcheckok === 0) return false;
+  return true;
+}
+
 /** Busca estações de uma categoria — antes parava na PRIMEIRA tag que
  * desse algum resultado (perdendo estações das outras tags à toa); agora
  * busca todas as tags em paralelo e JUNTA tudo (sem duplicar), trazendo
@@ -100,10 +113,10 @@ export async function fetchStationsByCategory(cat: RadioCategory, limit = 100): 
   // Categoria "Populares"/"Nacionais": sem tag, só país (ou nada).
   if (cat.tags.length === 0) {
     const url = cat.countryCode
-      ? `/json/stations/search?countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`
-      : `/json/stations/search?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+      ? `/json/stations/search?countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&lastcheckok=true&order=clickcount&reverse=true`
+      : `/json/stations/search?limit=${limit}&hidebroken=true&lastcheckok=true&order=clickcount&reverse=true`;
     const json = await fetchJson(url);
-    return dedupeStations((json || []).filter((s: RadioStation) => s.url_resolved || s.url));
+    return dedupeStations((json || []).filter(isLikelyWorking));
   }
 
   // Tag(s) + país (ex: gospel/esportes + Brasil) — busca TODAS as tags em
@@ -114,12 +127,12 @@ export async function fetchStationsByCategory(cat: RadioCategory, limit = 100): 
       cat.tags.map((tag) => {
         const url =
           withCountry && cat.countryCode
-            ? `/json/stations/search?tag=${encodeURIComponent(tag)}&countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`
-            : `/json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+            ? `/json/stations/search?tag=${encodeURIComponent(tag)}&countrycode=${cat.countryCode}&limit=${limit}&hidebroken=true&lastcheckok=true&order=clickcount&reverse=true`
+            : `/json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&hidebroken=true&lastcheckok=true&order=clickcount&reverse=true`;
         return fetchJson(url).then((json) => (json || []) as RadioStation[]);
       })
     );
-    return dedupeStations(results.flat().filter((s) => s.url_resolved || s.url));
+    return dedupeStations(results.flat().filter(isLikelyWorking));
   };
 
   if (cat.countryCode) {
@@ -140,9 +153,9 @@ export async function fetchStationsByCategory(cat: RadioCategory, limit = 100): 
 
 /** Busca por nome — usada pela lupa de pesquisa da tela de Rádios. */
 export async function searchStationsByName(query: string, limit = 60): Promise<RadioStation[]> {
-  const url = `/json/stations/search?name=${encodeURIComponent(query)}&limit=${limit}&hidebroken=true&order=clickcount&reverse=true`;
+  const url = `/json/stations/search?name=${encodeURIComponent(query)}&limit=${limit}&hidebroken=true&lastcheckok=true&order=clickcount&reverse=true`;
   const json = await fetchJson(url);
-  return dedupeStations((json || []).filter((s: RadioStation) => s.url_resolved || s.url));
+  return dedupeStations((json || []).filter(isLikelyWorking));
 }
 
 export function radioStreamUrl(s: RadioStation): string {
