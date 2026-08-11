@@ -55,40 +55,56 @@ function cacheKeyFor(title: string, kind: 'movie' | 'series'): string {
   return `${kind}:${title.toLowerCase().trim()}`;
 }
 
-export function isTmdbConfigured(): boolean {
-  return !!API_KEY;
+/** Acha títulos PARECIDOS com uma referência ("uma série igual a Tulsa
+ * King") usando o próprio recurso de recomendação do TMDb — bem mais
+ * preciso que só bater gênero, porque leva em conta tom, elenco,
+ * temática etc, não só a categoria ampla. Busca o título de referência
+ * primeiro (tenta filme E série, já que a pessoa nem sempre fala qual é
+ * qual), pega o ID, e usa o endpoint de similares/recomendados dele.
+ */
+export async function getSimilarTitles(referenceTitle: string): Promise<string[]> {
+  if (!API_KEY) return [];
+
+  for (const kind of ['tv', 'movie'] as const) {
+    try {
+      const searchUrl = `https://api.themoviedb.org/3/search/${kind}?api_key=${API_KEY}&query=${encodeURIComponent(referenceTitle)}&language=pt-BR`;
+      const searchRes = await fetch(searchUrl);
+      if (!searchRes.ok) continue;
+      const searchJson = await searchRes.json();
+      const found = searchJson?.results?.[0];
+      if (!found) continue;
+
+      // Confere se achou o título certo mesmo (mesma checagem usada no
+      // enriquecimento de gênero) — não adianta pegar recomendação de um
+      // título errado.
+      const foundTitle = normalizeTitle(found.title || found.name || '');
+      const refTitle = normalizeTitle(referenceTitle);
+      const isMatch = foundTitle === refTitle || (refTitle.length >= 4 && foundTitle.includes(refTitle)) || (foundTitle.length >= 4 && refTitle.includes(foundTitle));
+      if (!isMatch) continue;
+
+      // "recommendations" costuma trazer resultado mais parecido em tom/
+      // temática que "similar" (que às vezes só olha gênero+palavra-chave
+      // solta) — tenta recommendations primeiro, cai pra similar se vier
+      // vazio.
+      for (const endpoint of ['recommendations', 'similar']) {
+        const relatedUrl = `https://api.themoviedb.org/3/${kind}/${found.id}/${endpoint}?api_key=${API_KEY}&language=pt-BR`;
+        const relatedRes = await fetch(relatedUrl);
+        if (!relatedRes.ok) continue;
+        const relatedJson = await relatedRes.json();
+        const titles: string[] = (relatedJson?.results || [])
+          .map((r: any) => r.title || r.name)
+          .filter(Boolean);
+        if (titles.length > 0) return titles;
+      }
+    } catch {
+      // Tenta o outro tipo (filme/série) antes de desistir de vez.
+    }
+  }
+  return [];
 }
 
-/**
- * "Me dê uma série parecida com Tulsa King" — busca o título de
- * referência no TMDb, pega o recurso de "títulos parecidos" deles
- * (baseado no próprio algoritmo do TMDb, não é nosso), e devolve os
- * NOMES desses títulos parecidos — quem chama isso depois cruza esses
- * nomes com o catálogo real da pessoa, pra só mostrar o que ela
- * realmente tem disponível pra assistir.
- */
-export async function findSimilarTitles(referenceTitle: string, kind: 'movie' | 'series'): Promise<string[]> {
-  if (!API_KEY) return [];
-  const endpoint = kind === 'movie' ? 'movie' : 'tv';
-  try {
-    const searchUrl = `https://api.themoviedb.org/3/search/${endpoint}?api_key=${API_KEY}&query=${encodeURIComponent(referenceTitle)}&language=pt-BR`;
-    const searchRes = await fetch(searchUrl);
-    if (!searchRes.ok) return [];
-    const searchJson = await searchRes.json();
-    const id = searchJson?.results?.[0]?.id;
-    if (!id) return [];
-
-    const similarUrl = `https://api.themoviedb.org/3/${endpoint}/${id}/similar?api_key=${API_KEY}&language=pt-BR`;
-    const similarRes = await fetch(similarUrl);
-    if (!similarRes.ok) return [];
-    const similarJson = await similarRes.json();
-    const titles: string[] = (similarJson?.results || [])
-      .map((r: any) => r.title || r.name)
-      .filter(Boolean);
-    return titles;
-  } catch {
-    return [];
-  }
+export function isTmdbConfigured(): boolean {
+  return !!API_KEY;
 }
 
 function normalizeTitle(s: string): string {

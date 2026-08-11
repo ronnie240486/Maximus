@@ -32,11 +32,11 @@ export default function VoiceSearchButton() {
     // SIMILARIDADE a um título de referência, diferente de pedir um
     // gênero solto. Checa isso ANTES do gênero, porque uma frase desse
     // tipo poderia acidentalmente conter uma palavra de gênero também.
-    const similar = detectSimilarToRequest(transcript);
-    if (similar) {
+    const similarTitle = detectSimilarToRequest(transcript);
+    if (similarTitle) {
       router.push({
         pathname: '/recommend',
-        params: { similarTo: similar.reference, similarKind: similar.kind, query: transcript },
+        params: { similarTo: similarTitle, query: transcript },
       });
       return;
     }

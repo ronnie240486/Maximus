@@ -15,7 +15,7 @@ import { isActiveProfileKids } from '@/src/state/profiles';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadListCache } from '@/src/state/list-cache';
 import { GenreKey, GENRE_LABELS, filterByGenre, shuffleSample } from '@/src/lib/genre-detect';
-import { enrichGenresInBackground, getAllCachedGenres, isTmdbConfigured, findSimilarTitles } from '@/src/lib/tmdb';
+import { enrichGenresInBackground, getAllCachedGenres, isTmdbConfigured, getSimilarTitles } from '@/src/lib/tmdb';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const SUGGESTION_COUNT = 20;
@@ -31,7 +31,7 @@ type SuggestionItem = {
 
 export default function RecommendScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ genre?: string; query?: string; similarTo?: string; similarKind?: string }>();
+  const params = useLocalSearchParams<{ genre?: string; query?: string; similarTo?: string }>();
   const genre = params.genre as GenreKey | undefined;
   const similarTo = params.similarTo;
   const { modal: parentalModal, guard } = useParentalGate();
@@ -99,7 +99,7 @@ export default function RecommendScreen() {
     if (loading || !similarTo || !isTmdbConfigured()) return;
     let cancelled = false;
     setSimilarLoading(true);
-    findSimilarTitles(similarTo, (params.similarKind as 'movie' | 'series') || 'series').then((names) => {
+    getSimilarTitles(similarTo).then((names) => {
       if (!cancelled) {
         setSimilarNames(names);
         setSimilarLoading(false);
@@ -108,7 +108,7 @@ export default function RecommendScreen() {
     return () => {
       cancelled = true;
     };
-  }, [loading, similarTo, params.similarKind]);
+  }, [loading, similarTo]);
 
   // Enriquecimento em segundo plano: manda os títulos do catálogo (que
   // ainda não sabemos o gênero real) pro TMDb, aos poucos, sem travar a
