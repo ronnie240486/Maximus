@@ -14,7 +14,12 @@ import { storage } from '@/src/utils/storage';
 import { GenreKey } from './genre-detect';
 
 const API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY || '';
-const CACHE_KEY = 'tmdb_genre_cache_v1';
+// v2: invalida o cache antigo — antes da correção que confere se o
+// resultado do TMDb é REALMENTE o mesmo título antes de confiar no
+// gênero, dados errados podem ter ficado salvos (ex: Barbie marcada
+// como "ação" por engano). Trocar a chave da versão faz esses dados
+// velhos serem ignorados, forçando busca nova com a lógica corrigida.
+const CACHE_KEY = 'tmdb_genre_cache_v2';
 
 // IDs oficiais de gênero do TMDb (developers.themoviedb.org/3/genres) —
 // mapeados pros nossos GenreKey internos. Gêneros do TMDb sem

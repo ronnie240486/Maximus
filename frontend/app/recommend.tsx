@@ -186,10 +186,19 @@ export default function RecommendScreen() {
       // "contém" nos dois sentidos, pra tolerar título com sufixo (ano,
       // "dublado" etc) de qualquer um dos dois lados.
       const names = similarNames || [];
+      const normalizeForMatch = (s: string) =>
+        s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
       const nameMatches = (itemName: string) => {
-        const n = itemName.toLowerCase();
+        const n = normalizeForMatch(itemName);
+        if (n.length < 4) return false;
         return names.some((sim) => {
-          const s = sim.toLowerCase();
+          const s = normalizeForMatch(sim);
+          // Limite mínimo de tamanho pros dois lados — sem isso, um
+          // pedaço de texto curto/genérico (ex: um número, uma palavra
+          // solta) podia "bater" por acidente e trazer coisa sem nada a
+          // ver (foi o caso reportado: "Ben 10" aparecendo como
+          // parecido com "De Volta pro Futuro").
+          if (s.length < 4) return false;
           return n.includes(s) || s.includes(n);
         });
       };
