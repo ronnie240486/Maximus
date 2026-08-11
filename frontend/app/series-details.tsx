@@ -18,6 +18,7 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { toggleFavorite, isFavorite } from '@/src/state/favorites';
 import TVFocusable from '@/src/components/TVFocusable';
+import { useIsTV } from '@/src/hooks/useIsTV';
 import {
   xtream,
   seriesEpisodeUrl,
@@ -28,6 +29,7 @@ import {
 
 export default function SeriesDetailsScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const params = useLocalSearchParams<{ id: string; name?: string; cover?: string; adult?: string }>();
   const seriesId = Number(params.id);
 
@@ -118,37 +120,37 @@ export default function SeriesDetailsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView contentContainerStyle={[{ paddingBottom: 32 }, isTV && styles.scrollContentTV]}>
         {/* Hero */}
         <ImageBackground
           source={backdrop ? { uri: backdrop } : undefined}
-          style={styles.hero}
+          style={[styles.hero, isTV && styles.heroTV]}
           imageStyle={{ opacity: 0.55 }}
         >
           <LinearGradient
             colors={['transparent', 'rgba(11,15,26,0.9)', colors.black]}
             style={StyleSheet.absoluteFill as any}
           />
-          <View style={styles.heroInner}>
+          <View style={[styles.heroInner, isTV && styles.heroInnerTV]}>
             {cover ? (
-              <Image source={{ uri: cover }} style={styles.cover} contentFit="cover" />
+              <Image source={{ uri: cover }} style={[styles.cover, isTV && styles.coverTV]} contentFit="cover" />
             ) : (
-              <View style={[styles.cover, styles.coverFallback]}>
-                <Ionicons name="film" size={40} color={colors.textMuted} />
+              <View style={[styles.cover, isTV && styles.coverTV, styles.coverFallback]}>
+                <Ionicons name="film" size={isTV ? 56 : 40} color={colors.textMuted} />
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.titleText} numberOfLines={3}>
+              <Text style={[styles.titleText, isTV && styles.titleTextTV]} numberOfLines={3}>
                 {info?.info.name || params.name}
               </Text>
-              {!!info?.info.genre && <Text style={styles.metaText}>{info.info.genre}</Text>}
+              {!!info?.info.genre && <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{info.info.genre}</Text>}
               {!!info?.info.releaseDate && (
-                <Text style={styles.metaText}>{info.info.releaseDate}</Text>
+                <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{info.info.releaseDate}</Text>
               )}
               {!!info?.info.rating && (
                 <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={12} color={colors.accentMagenta} />
-                  <Text style={styles.metaText}>{String(info.info.rating)}</Text>
+                  <Ionicons name="star" size={isTV ? 16 : 12} color={colors.accentMagenta} />
+                  <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{String(info.info.rating)}</Text>
                 </View>
               )}
             </View>
@@ -402,4 +404,11 @@ const styles = StyleSheet.create({
   epPlot: { color: colors.textSecondary, fontSize: 11, marginTop: 2, lineHeight: 15 },
   epMeta: { color: colors.textMuted, fontSize: 10, marginTop: 4 },
   emptyEp: { color: colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: 20 },
+  // Variantes maiores pra TV (mesmo raciocínio de movie-details.tsx).
+  scrollContentTV: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+  heroTV: { height: 420 },
+  heroInnerTV: { padding: spacing.xl, gap: spacing.xl },
+  coverTV: { width: 160, height: 230, borderRadius: 12 },
+  titleTextTV: { fontSize: 32 },
+  metaTextTV: { fontSize: 15 },
 });

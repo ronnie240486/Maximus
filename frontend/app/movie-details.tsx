@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { toggleFavorite, isFavorite } from '@/src/state/favorites';
 import TVFocusable from '@/src/components/TVFocusable';
+import { useIsTV } from '@/src/hooks/useIsTV';
 import {
   xtream,
   movieStreamUrl,
@@ -27,6 +28,8 @@ import {
 
 export default function MovieDetailsScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
+  const playBtnRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
   const params = useLocalSearchParams<{ id: string; name?: string; cover?: string; adult?: string }>();
   const movieId = Number(params.id);
   const favoriteId = `movie-${movieId}`;
@@ -57,6 +60,18 @@ export default function MovieDetailsScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    // Assim que abrir os detalhes numa TV, já foca o botão ASSISTIR —
+    // sem isso, a pessoa tinha que empurrar o D-pad até achar o botão
+    // toda vez que abria um filme, quando na prática é quase sempre o
+    // que ela quer fazer (só apertar OK e já ir assistir).
+    if (!isTV) return;
+    const t = setTimeout(() => {
+      playBtnRef.current?.focus();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [isTV]);
 
   const cover = info?.info.cover_big || info?.info.movie_image || params.cover;
   const backdrop = info?.info.backdrop_path?.[0] || cover;
@@ -112,35 +127,35 @@ export default function MovieDetailsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView contentContainerStyle={[{ paddingBottom: 32 }, isTV && styles.scrollContentTV]}>
         <ImageBackground
           source={backdrop ? { uri: backdrop } : undefined}
-          style={styles.hero}
+          style={[styles.hero, isTV && styles.heroTV]}
           imageStyle={{ opacity: 0.55 }}
         >
           <LinearGradient
             colors={['transparent', 'rgba(11,15,26,0.9)', colors.black]}
             style={StyleSheet.absoluteFill as any}
           />
-          <View style={styles.heroInner}>
+          <View style={[styles.heroInner, isTV && styles.heroInnerTV]}>
             {cover ? (
-              <Image source={{ uri: cover }} style={styles.cover} contentFit="cover" />
+              <Image source={{ uri: cover }} style={[styles.cover, isTV && styles.coverTV]} contentFit="cover" />
             ) : (
-              <View style={[styles.cover, styles.coverFallback]}>
-                <Ionicons name="film" size={40} color={colors.textMuted} />
+              <View style={[styles.cover, isTV && styles.coverTV, styles.coverFallback]}>
+                <Ionicons name="film" size={isTV ? 56 : 40} color={colors.textMuted} />
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.titleText} numberOfLines={3}>{name}</Text>
-              {!!info?.info.genre && <Text style={styles.metaText}>{info.info.genre}</Text>}
+              <Text style={[styles.titleText, isTV && styles.titleTextTV]} numberOfLines={3}>{name}</Text>
+              {!!info?.info.genre && <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{info.info.genre}</Text>}
               {!!(info?.info.releasedate || info?.info.release_date) && (
-                <Text style={styles.metaText}>{info?.info.releasedate || info?.info.release_date}</Text>
+                <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{info?.info.releasedate || info?.info.release_date}</Text>
               )}
-              {!!info?.info.duration && <Text style={styles.metaText}>{info.info.duration}</Text>}
+              {!!info?.info.duration && <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{info.info.duration}</Text>}
               {!!info?.info.rating && (
                 <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={12} color={colors.accentMagenta} />
-                  <Text style={styles.metaText}>{String(info.info.rating)}</Text>
+                  <Ionicons name="star" size={isTV ? 16 : 12} color={colors.accentMagenta} />
+                  <Text style={[styles.metaText, isTV && styles.metaTextTV]}>{String(info.info.rating)}</Text>
                 </View>
               )}
             </View>
@@ -148,22 +163,22 @@ export default function MovieDetailsScreen() {
         </ImageBackground>
 
         {/* Action row */}
-        <View style={styles.actionRow}>
-          <TVFocusable onPress={play} style={styles.playBtn} testID="md-play">
-            <Ionicons name="play" size={18} color={colors.black} />
-            <Text style={styles.playText}>ASSISTIR</Text>
+        <View style={[styles.actionRow, isTV && styles.actionRowTV]}>
+          <TVFocusable ref={playBtnRef} onPress={play} style={[styles.playBtn, isTV && styles.playBtnTV]} testID="md-play">
+            <Ionicons name="play" size={isTV ? 24 : 18} color={colors.black} />
+            <Text style={[styles.playText, isTV && styles.playTextTV]}>ASSISTIR</Text>
           </TVFocusable>
           <TVFocusable onPress={openTrailer} style={styles.iconBtn} testID="md-trailer">
-            <Ionicons name="logo-youtube" size={20} color={colors.white} />
-            <Text style={styles.iconBtnText}>Trailer</Text>
+            <Ionicons name="logo-youtube" size={isTV ? 26 : 20} color={colors.white} />
+            <Text style={[styles.iconBtnText, isTV && styles.iconBtnTextTV]}>Trailer</Text>
           </TVFocusable>
           <TVFocusable onPress={onToggleFavorite} style={styles.iconBtn} testID="md-favorite">
             <Ionicons
               name={favorited ? 'heart' : 'heart-outline'}
-              size={20}
+              size={isTV ? 26 : 20}
               color={favorited ? colors.accentMagenta : colors.white}
             />
-            <Text style={styles.iconBtnText}>{favorited ? 'Favoritado' : 'Favoritar'}</Text>
+            <Text style={[styles.iconBtnText, isTV && styles.iconBtnTextTV]}>{favorited ? 'Favoritado' : 'Favoritar'}</Text>
           </TVFocusable>
         </View>
 
@@ -187,15 +202,15 @@ export default function MovieDetailsScreen() {
           </View>
         ) : (
           <>
-            {!!info?.info.plot && <Text style={styles.plot}>{info.info.plot}</Text>}
+            {!!info?.info.plot && <Text style={[styles.plot, isTV && styles.plotTV]}>{info.info.plot}</Text>}
             {!!info?.info.cast && (
-              <Text style={styles.cast} numberOfLines={3}>
+              <Text style={[styles.cast, isTV && styles.plotTV]} numberOfLines={3}>
                 <Text style={styles.castLabel}>Elenco: </Text>
                 {info.info.cast}
               </Text>
             )}
             {!!info?.info.director && (
-              <Text style={styles.cast}>
+              <Text style={[styles.cast, isTV && styles.plotTV]}>
                 <Text style={styles.castLabel}>Direção: </Text>
                 {info.info.director}
               </Text>
@@ -287,4 +302,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   castLabel: { color: colors.textMuted, fontWeight: '700' },
+  // Variantes maiores pra TV — a tela original era dimensionada pra
+  // celular (hero de 220px, capa 90x130) e ficava pequena/perdida numa
+  // tela grande de TV, sem usar o espaço direito. O conteúdo também
+  // ganha uma largura máxima centralizada em telas muito largas, pra não
+  // esticar de ponta a ponta de forma esquisita.
+  scrollContentTV: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+  heroTV: { height: 420 },
+  heroInnerTV: { padding: spacing.xl, gap: spacing.xl },
+  coverTV: { width: 160, height: 230, borderRadius: 12 },
+  titleTextTV: { fontSize: 32 },
+  metaTextTV: { fontSize: 15 },
+  actionRowTV: { paddingHorizontal: spacing.xl, marginTop: spacing.lg },
+  playBtnTV: { paddingVertical: 16 },
+  playTextTV: { fontSize: 15 },
+  iconBtnTextTV: { fontSize: 12 },
+  plotTV: { fontSize: 15, lineHeight: 22, paddingHorizontal: spacing.xl },
 });
