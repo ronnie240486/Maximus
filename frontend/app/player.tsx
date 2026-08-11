@@ -22,7 +22,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 import { colors, spacing } from '@/src/theme';
-import { recordWatch } from '@/src/state/watch-history';
+import { recordWatch, updateWatchPosition, getResumePosition } from '@/src/state/watch-history';
 import { getXtream } from '@/src/state/session';
 import { getDeviceMac } from '@/src/lib/device';
 import { sendHeartbeat } from '@/src/api/client';
@@ -102,6 +102,7 @@ export default function PlayerScreen() {
   // tentar de novo em loop se o .ts também falhar — ver o listener de
   // erro do player mais abaixo.
   const tsFallbackTriedFor = useRef<string | null>(null);
+  const resumeAppliedRef = useRef(false);
   // Reconexão automática: quantas vezes já tentamos religar sozinho pro
   // stream ATUAL, sem a pessoa precisar fazer nada. Zera toda vez que o
   // stream muda (troca de canal/filme).
@@ -253,6 +254,7 @@ export default function PlayerScreen() {
   });
 
   useEffect(() => {
+    resumeAppliedRef.current = false;
     if (isLive) return;
     // Adult content NEVER goes into continue-watching, regardless of
     // whether the parental lock happens to be on or off right now.
@@ -320,6 +322,18 @@ export default function PlayerScreen() {
 
     const statusSub = player.addListener('statusChange', (s) => {
       setBuffering(s.status === 'loading');
+      // Assim que o player carregou o suficiente pra tocar, se tiver uma
+      // posição salva de uma sessão anterior (e ainda não tiver retomado
+      // nessa montagem — só faz isso UMA vez, não a cada reconexão),
+      // pula direto pra lá. Perguntar aqui em vez de logo na abertura
+      // porque currentTime só funciona de verdade depois que o player
+      // sabe a duração do vídeo.
+      if (s.status === 'readyToPlay' && !isLive && !resumeAppliedRef.current && params.id) {
+        resumeAppliedRef.current = true;
+        getResumePosition(params.id).then((pos) => {
+          if (pos !== null) player.currentTime = pos;
+        });
+      }
       if (s.status === 'error') {
         // Alguns servidores Xtream (comum em contas de teste) não servem
         // o formato HLS (.m3u8) pros canais ao vivo, só o .ts direto —
@@ -362,6 +376,26 @@ export default function PlayerScreen() {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
     };
   }, [player, isLive, current.stream]);
+
+  // Salva a posição atual a cada 10s enquanto toca (não é live, não é
+  // adulto) — é isso que faz "continuar assistindo" funcionar de
+  // verdade. Também salva uma última vez ao sair da tela, pra não
+  // perder os últimos segundos entre um salvamento periódico e o outro.
+  useEffect(() => {
+    if (isLive || isAdult || !params.id) return;
+    const saveNow = () => {
+      const pos = player.currentTime;
+      const dur = player.duration;
+      if (pos > 0 && dur > 0) {
+        updateWatchPosition(params.id!, pos, dur);
+      }
+    };
+    const interval = setInterval(saveNow, 10000);
+    return () => {
+      clearInterval(interval);
+      saveNow();
+    };
+  }, [player, isLive, isAdult, params.id]);
 
   // Poll current time / duration for VOD content.
   useEffect(() => {

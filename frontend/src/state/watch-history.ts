@@ -16,6 +16,10 @@ export type WatchEntry = {
   logo?: string;
   stream: string;
   seriesId?: number; // present for episodes, so "resume" can reopen the series details instead
+  positionSeconds?: number; // de onde a pessoa parou — usado pra retomar
+  durationSeconds?: number; // duração total, pra calcular % assistido e
+  // pra saber quando o item está "praticamente terminado" (não vale a
+  // pena oferecer retomar os últimos 30s de um filme de 2h)
   updatedAt: number;
 };
 
@@ -51,4 +55,33 @@ export async function recordWatch(entry: Omit<WatchEntry, 'updatedAt'>): Promise
   const withoutThis = list.filter((e) => e.id !== entry.id);
   const next = [{ ...entry, updatedAt: Date.now() }, ...withoutThis].slice(0, MAX_ITEMS);
   await persist(next);
+}
+
+/** Atualiza só a posição de reprodução de um item que já está no
+ * histórico (chamado periodicamente enquanto o vídeo toca) — não
+ * recria a entrada do zero, só atualiza o número. Se o item ainda não
+ * estiver no histórico por algum motivo (chamada antes do recordWatch
+ * inicial rodar), não faz nada — evita criar uma entrada incompleta. */
+export async function updateWatchPosition(id: string, positionSeconds: number, durationSeconds: number): Promise<void> {
+  const list = await loadWatchHistory();
+  const idx = list.findIndex((e) => e.id === id);
+  if (idx === -1) return;
+  const next = [...list];
+  next[idx] = { ...next[idx], positionSeconds, durationSeconds, updatedAt: Date.now() };
+  await persist(next);
+}
+
+/** Posição salva pra um item, se tiver — usado quando o player abre, pra
+ * saber se deve pular direto pra onde a pessoa parou. Ignora posições
+ * "praticamente no início" (menos de 15s, não vale a pena) ou
+ * "praticamente no fim" (menos de 30s restantes, mais fácil deixar
+ * assistir o final e começar do zero da próxima vez do que ficar preso
+ * retomando os últimos segundos pra sempre). */
+export async function getResumePosition(id: string): Promise<number | null> {
+  const list = await loadWatchHistory();
+  const entry = list.find((e) => e.id === id);
+  if (!entry?.positionSeconds || !entry.durationSeconds) return null;
+  if (entry.positionSeconds < 15) return null;
+  if (entry.durationSeconds - entry.positionSeconds < 30) return null;
+  return entry.positionSeconds;
 }
