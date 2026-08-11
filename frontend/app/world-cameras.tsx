@@ -7,27 +7,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
 
-// Países listados no menu oficial do site "Câmeras do Mundo"
-// (en.camerasdomundo.com). Cada um abre a página de câmeras daquele
-// país dentro de um WebView, mesmo padrão que já usamos para trailers
-// do YouTube e para o portal de trânsito do CET-SP.
+// Trocado de camerasdomundo.com pra webcamera24.com — testado e
+// confirmado funcionando pelo usuário. Site maior (tem app próprio na
+// Google Play, avaliação 4/5 no Trustpilot), e muitas câmeras de lá usam
+// embed direto do YouTube por baixo. Países fora da lista oficial deles
+// (Líbano, Irã, Palestina, Ilhas Virgens) foram removidos — apontar pra
+// um país que não existe no site dava página vazia/erro.
 const COUNTRIES: { id: string; name: string; flag: string; url: string }[] = [
-  { id: 'brazil', name: 'Brasil', flag: '🇧🇷', url: 'https://en.camerasdomundo.com/brazil/' },
-  { id: 'usa', name: 'Estados Unidos', flag: '🇺🇸', url: 'https://en.camerasdomundo.com/usa/' },
-  { id: 'japan', name: 'Japão', flag: '🇯🇵', url: 'https://en.camerasdomundo.com/live-cams/japan/' },
-  { id: 'canada', name: 'Canadá', flag: '🇨🇦', url: 'https://en.camerasdomundo.com/canada/' },
-  { id: 'spain', name: 'Espanha', flag: '🇪🇸', url: 'https://en.camerasdomundo.com/spain/' },
-  { id: 'turkey', name: 'Turquia', flag: '🇹🇷', url: 'https://en.camerasdomundo.com/turkey/' },
-  { id: 'thailand', name: 'Tailândia', flag: '🇹🇭', url: 'https://en.camerasdomundo.com/live-cams/thailand/' },
-  { id: 'singapore', name: 'Singapura', flag: '🇸🇬', url: 'https://en.camerasdomundo.com/singapore/' },
-  { id: 'philippines', name: 'Filipinas', flag: '🇵🇭', url: 'https://en.camerasdomundo.com/philippines/' },
-  { id: 'taiwan', name: 'Taiwan', flag: '🇹🇼', url: 'https://en.camerasdomundo.com/taiwan/' },
-  { id: 'israel', name: 'Israel', flag: '🇮🇱', url: 'https://en.camerasdomundo.com/live-cams/israel/' },
-  { id: 'lebanon', name: 'Líbano', flag: '🇱🇧', url: 'https://en.camerasdomundo.com/live-cams/lebanon/' },
-  { id: 'iran', name: 'Irã', flag: '🇮🇷', url: 'https://en.camerasdomundo.com/live-cams/iran/' },
-  { id: 'palestine', name: 'Palestina', flag: '🇵🇸', url: 'https://en.camerasdomundo.com/live-cams/palestine/' },
-  { id: 'virgin-islands', name: 'Ilhas Virgens', flag: '🇻🇬', url: 'https://en.camerasdomundo.com/virgin-islands/' },
-  { id: 'all', name: 'Ver todas', flag: '🌎', url: 'https://en.camerasdomundo.com/live-cams/' },
+  { id: 'brazil', name: 'Brasil', flag: '🇧🇷', url: 'https://webcamera24.com/pt/countries/brazil/' },
+  { id: 'usa', name: 'Estados Unidos', flag: '🇺🇸', url: 'https://webcamera24.com/pt/countries/usa/' },
+  { id: 'japan', name: 'Japão', flag: '🇯🇵', url: 'https://webcamera24.com/pt/countries/japan/' },
+  { id: 'canada', name: 'Canadá', flag: '🇨🇦', url: 'https://webcamera24.com/pt/countries/canada/' },
+  { id: 'spain', name: 'Espanha', flag: '🇪🇸', url: 'https://webcamera24.com/pt/countries/spain/' },
+  { id: 'turkey', name: 'Turquia', flag: '🇹🇷', url: 'https://webcamera24.com/pt/countries/turkey/' },
+  { id: 'thailand', name: 'Tailândia', flag: '🇹🇭', url: 'https://webcamera24.com/pt/countries/thailand/' },
+  { id: 'singapore', name: 'Singapura', flag: '🇸🇬', url: 'https://webcamera24.com/pt/countries/singapore/' },
+  { id: 'philippines', name: 'Filipinas', flag: '🇵🇭', url: 'https://webcamera24.com/pt/countries/philippines/' },
+  { id: 'taiwan', name: 'Taiwan', flag: '🇹🇼', url: 'https://webcamera24.com/pt/countries/taiwan/' },
+  { id: 'israel', name: 'Israel', flag: '🇮🇱', url: 'https://webcamera24.com/pt/countries/israel/' },
+  { id: 'italy', name: 'Itália', flag: '🇮🇹', url: 'https://webcamera24.com/pt/countries/italy/' },
+  { id: 'france', name: 'França', flag: '🇫🇷', url: 'https://webcamera24.com/pt/countries/france/' },
+  { id: 'uk', name: 'Reino Unido', flag: '🇬🇧', url: 'https://webcamera24.com/pt/countries/united-kingdom/' },
+  { id: 'all', name: 'Ver todas', flag: '🌎', url: 'https://webcamera24.com/pt/popular/' },
 ];
 
 export default function WorldCamerasScreen() {

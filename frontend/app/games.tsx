@@ -66,8 +66,13 @@ function parseGameChannelName(name: string): { time: string | null; rest: string
  * pra mostrar empilhado (igual Placar). Se não der pra separar, devolve
  * só a primeira parte com a segunda vazia. */
 function splitTeams(rest: string): [string, string] {
-  const m = rest.split(/\s+(?:x|vs\.?)\s+/i);
-  if (m.length === 2) return [m[0].trim(), m[1].trim()];
+  // Aceita mais formatos de separador — painéis diferentes escrevem
+  // "Time A x Time B" mas também "Time A - Time B" ou "Time A / Time B".
+  // Sem isso, um formato diferente do esperado fazia o nome inteiro virar
+  // "um time só" (nunca batendo com nada da lista de escudos, mesmo que o
+  // time individual estivesse lá).
+  const m = rest.split(/\s+(?:x|vs\.?)\s+|\s+-\s+|\s*\/\s*/i);
+  if (m.length === 2 && m[0].trim() && m[1].trim()) return [m[0].trim(), m[1].trim()];
   return [rest.trim(), ''];
 }
 

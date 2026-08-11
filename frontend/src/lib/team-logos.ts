@@ -38,6 +38,7 @@ const TEAM_WIKI_TITLES: Record<string, string> = {
   'ceara': 'Ceará_Sporting_Club',
   'fortaleza': 'Fortaleza_Esporte_Clube',
   'goias': 'Goiás_Esporte_Clube',
+  'londrina': 'Londrina_Esporte_Clube',
   'coritiba': 'Coritiba_Foot_Ball_Club',
   'athletico paranaense': 'Club_Athletico_Paranaense',
   'athletico-pr': 'Club_Athletico_Paranaense',
