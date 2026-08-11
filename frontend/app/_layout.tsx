@@ -131,15 +131,17 @@ export default function RootLayout() {
     // é o que abriu o app agora — pega a última notificação que causou
     // a abertura (se teve alguma).
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      const streamId = response?.notification.request.content.data?.streamId as number | undefined;
-      if (streamId) openStream(streamId);
+      const data = response?.notification.request.content.data;
+      const id = (data?.streamId ?? data?.channelId) as number | undefined;
+      if (id) openStream(id);
     });
 
     // Caso 2: app já estava aberto (em primeiro ou segundo plano) e a
     // pessoa tocou na notificação.
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const streamId = response.notification.request.content.data?.streamId as number | undefined;
-      if (streamId) openStream(streamId);
+      const data = response.notification.request.content.data;
+      const id = (data?.streamId ?? data?.channelId) as number | undefined;
+      if (id) openStream(id);
     });
 
     return () => sub.remove();
