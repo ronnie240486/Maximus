@@ -207,60 +207,61 @@ export default function PlacarScreen() {
     });
   }, []);
 
-  const load = useCallback(async (s: string) => {
-    setLoading(true);
-    setError(null);
-    const def = SPORTS.find((sp) => sp.key === s);
-    if (!def) {
-      setEvents([]);
-      setLoading(false);
-      return;
-    }
+  const fetchDay = useCallback(async (def: SportDef, date: string): Promise<ScoreEvent[]> => {
     try {
-      const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => isoDate(new Date(Date.now() + i * 86400000)));
-      let merged: ScoreEvent[] = [];
-
       if (def.source === 'espn') {
-        const results = await Promise.all(
-          dates.map(async (date) => {
-            const yyyymmdd = date.replace(/-/g, '');
-            try {
-              const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${def.espnPath}/scoreboard?dates=${yyyymmdd}`);
-              if (!res.ok) return [];
-              const json = await res.json();
-              const raw: any[] = json?.events || [];
-              return raw.map(normalizeEspnEvent).filter((e): e is ScoreEvent => !!e);
-            } catch {
-              return [];
-            }
-          })
-        );
-        merged = results.flat();
+        const yyyymmdd = date.replace(/-/g, '');
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${def.espnPath}/scoreboard?dates=${yyyymmdd}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        const raw: any[] = json?.events || [];
+        return raw.map(normalizeEspnEvent).filter((e): e is ScoreEvent => !!e);
       } else {
-        const results = await Promise.all(
-          dates.map(async (date) => {
-            try {
-              const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${date}&s=${encodeURIComponent(def.sportsdbSport!)}`;
-              const res = await fetch(url);
-              if (!res.ok) return [];
-              const json = await res.json();
-              const raw: any[] = json?.events || [];
-              return raw.map((e) => normalizeSportsDbEvent({ ...e, dateEvent: e.dateEvent || date }));
-            } catch {
-              return [];
-            }
-          })
-        );
-        merged = results.flat();
+        const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/eventsday.php?d=${date}&s=${encodeURIComponent(def.sportsdbSport!)}`;
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        const json = await res.json();
+        const raw: any[] = json?.events || [];
+        return raw.map((e) => normalizeSportsDbEvent({ ...e, dateEvent: e.dateEvent || date }));
       }
-
-      setEvents(merged);
     } catch {
-      setEvents([]);
-      setError('Não foi possível carregar os placares agora.');
+      return [];
+    }
+  }, []);
+
+  const load = useCallback(
+    async (s: string) => {
+      setLoading(true);
+      setError(null);
+      const def = SPORTS.find((sp) => sp.key === s);
+      if (!def) {
+        setEvents([]);
+        setLoading(false);
+        return;
+      }
+      const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => isoDate(new Date(Date.now() + i * 86400000)));
+
+      try {
+        // HOJE primeiro, sozinho — uma chamada de rede só, mostra
+        // resultado rápido. Os outros dias (amanhã em diante, menos
+        // urgentes de ver na hora) carregam depois, em segundo plano,
+        // sem travar a abertura da tela. Antes, as 4 chamadas disparavam
+        // juntas, competindo por rede/CPU bem na hora que a tela abre —
+        // exatamente o momento que mais importa parecer rápido.
+        const todayEvents = await fetchDay(def, dates[0]);
+        setEvents(todayEvents);
+        setLoading(false);
+
+        if (dates.length > 1) {
+          const restResults = await Promise.all(dates.slice(1).map((date) => fetchDay(def, date)));
+          setEvents((prev) => [...prev, ...restResults.flat()]);
+        }
+      } catch {
+        setEvents([]);
+        setError('Não foi possível carregar os placares agora.');
     }
     setLoading(false);
-  }, []);
+  }, [fetchDay]);
 
   useEffect(() => {
     load(sport);
