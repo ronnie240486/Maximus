@@ -142,14 +142,22 @@ function normalizeEspnEvent(raw: any): ScoreEvent | null {
   const iso = raw.date as string | undefined;
   const d = iso ? new Date(iso) : null;
   const pad = (n: number) => String(n).padStart(2, '0');
-  const started = comp.status?.type?.state !== 'pre';
   const broadcastNames: string[] = (comp.broadcasts || []).flatMap((b: any) => b.names || []);
+  // Antes só mostrava o placar se `comp.status.type.state !== 'pre'` — mas
+  // isso escondia o placar de jogo JÁ TERMINADO em alguns esportes (ex:
+  // futebol mostrava tudo sem número, mesmo com jogo acabado, mas
+  // beisebol funcionava certo). Não achei o motivo exato da diferença
+  // entre esportes sem poder testar ao vivo — mais seguro simplificar:
+  // mostra o número sempre que a ESPN mandar ele (mesmo que seja "0"),
+  // só fica em branco quando o campo realmente não vier preenchido.
+  const homeScoreRaw = home?.score;
+  const awayScoreRaw = away?.score;
   return {
     id: `espn-${raw.id}`,
     home: home?.team?.displayName || home?.athlete?.displayName || '—',
     away: away?.team?.displayName || away?.athlete?.displayName || '—',
-    homeScore: started ? home?.score ?? null : null,
-    awayScore: started ? away?.score ?? null : null,
+    homeScore: homeScoreRaw !== undefined && homeScoreRaw !== null && homeScoreRaw !== '' ? homeScoreRaw : null,
+    awayScore: awayScoreRaw !== undefined && awayScoreRaw !== null && awayScoreRaw !== '' ? awayScoreRaw : null,
     // Times (esportes coletivos) já vêm com o escudo pronto — esportes
     // individuais (tênis, golfe, MMA, corrida) não têm "team", só
     // "athlete", que não tem escudo, então fica null e a tela usa um
