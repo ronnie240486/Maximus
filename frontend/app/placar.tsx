@@ -38,6 +38,12 @@ const SPORTS: SportDef[] = [
   { key: 'hockey', label: 'Hóquei no Gelo', source: 'espn', espnPath: 'hockey/nhl' },
   { key: 'golf', label: 'Golfe', source: 'espn', espnPath: 'golf/pga' },
   { key: 'f1', label: 'Fórmula 1', source: 'espn', espnPath: 'racing/f1' },
+  // Nascar: encontrei fontes conflitantes sobre qual caminho da ESPN
+  // funciona pra esse — mantido "nascar-premier" por ter pelo menos uma
+  // confirmação real de funcionamento, mas pode não ser 100% confiável.
+  // Os outros (hóquei, MMA, tênis, golfe) frequentemente aparecem vazios
+  // porque são fora de temporada, ou só têm jogo em dias específicos —
+  // não é bug, é a realidade do calendário esportivo.
   { key: 'nascar', label: 'Nascar', source: 'espn', espnPath: 'racing/nascar-premier' },
   { key: 'indycar', label: 'IndyCar', source: 'espn', espnPath: 'racing/irl' },
 ];
@@ -394,7 +400,9 @@ export default function PlacarScreen() {
       ) : events.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="calendar-outline" size={40} color={colors.textMuted} />
-          <Text style={styles.emptyText}>Nenhum jogo encontrado nos próximos dias.</Text>
+          <Text style={styles.emptyText}>
+            Nenhum jogo encontrado nos próximos dias. Pode ser que esse esporte esteja fora de temporada agora.
+          </Text>
         </View>
       ) : (
         <FlatList
