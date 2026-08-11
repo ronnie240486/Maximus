@@ -331,7 +331,9 @@ export default function PlayerScreen() {
       if (s.status === 'readyToPlay' && !isLive && !resumeAppliedRef.current && params.id) {
         resumeAppliedRef.current = true;
         getResumePosition(params.id).then((pos) => {
-          if (pos !== null) player.currentTime = pos;
+          try {
+            if (pos !== null) player.currentTime = pos;
+          } catch {}
         });
       }
       if (s.status === 'error') {
@@ -384,11 +386,18 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (isLive || isAdult || !params.id) return;
     const saveNow = () => {
-      const pos = player.currentTime;
-      const dur = player.duration;
-      if (pos > 0 && dur > 0) {
-        updateWatchPosition(params.id!, pos, dur);
-      }
+      // Protegido: ao sair da tela, o player pode já ter sido liberado
+      // (recursos nativos desalocados) antes desse cleanup rodar —
+      // tentar ler currentTime/duration de um player já desligado pode
+      // lançar um erro. Sem o try/catch, isso quebrava a navegação de
+      // volta (tela cinza ao apertar voltar).
+      try {
+        const pos = player.currentTime;
+        const dur = player.duration;
+        if (pos > 0 && dur > 0) {
+          updateWatchPosition(params.id!, pos, dur);
+        }
+      } catch {}
     };
     const interval = setInterval(saveNow, 10000);
     return () => {
