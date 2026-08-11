@@ -9,6 +9,7 @@ import { colors, spacing } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
 import { getXtream } from '@/src/state/session';
 import { xtream } from '@/src/lib/xtream';
+import { logSessionEventFast } from '@/src/state/debug-log';
 
 // Esportes que a TheSportsDB (usada em "Jogos do dia") não cobre bem no
 // tier gratuito, e por isso não têm um canal pra casar/assistir dentro do
@@ -103,11 +104,8 @@ type StandingRow = {
 };
 
 async function fetchStandings(espnPath: string): Promise<StandingRow[]> {
-  try {
-    const res = await fetch(`https://site.api.espn.com/apis/v2/sports/${espnPath}/standings`);
-    if (!res.ok) return [];
-    const json = await res.json();
-    const entries = json?.standings?.entries || json?.children?.[0]?.standings?.entries || [];
+  const parse = (json: any): any[] => json?.standings?.entries || json?.children?.[0]?.standings?.entries || [];
+  const build = (entries: any[]): StandingRow[] => {
     const getStat = (stats: any[], name: string) => stats?.find((s: any) => s.name === name || s.type === name)?.value ?? 0;
     return entries.map((e: any, idx: number) => ({
       position: getStat(e.stats, 'rank') || idx + 1,
@@ -120,7 +118,27 @@ async function fetchStandings(espnPath: string): Promise<StandingRow[]> {
       points: getStat(e.stats, 'points'),
       goalDiff: getStat(e.stats, 'pointDifferential') || getStat(e.stats, 'goalDifferential'),
     }));
-  } catch {
+  };
+
+  try {
+    const year = new Date().getFullYear();
+    // Alguns relatos indicam que sem "season=" esse endpoint pode voltar
+    // vazio — tenta com o ano atual primeiro, cai pra sem o parâmetro se
+    // não trouxer nada.
+    const res1 = await fetch(`https://site.api.espn.com/apis/v2/sports/${espnPath}/standings?season=${year}`);
+    const json1 = res1.ok ? await res1.json() : null;
+    const entries1 = json1 ? parse(json1) : [];
+    if (entries1.length > 0) return build(entries1);
+
+    const res2 = await fetch(`https://site.api.espn.com/apis/v2/sports/${espnPath}/standings`);
+    const json2 = res2.ok ? await res2.json() : null;
+    const entries2 = json2 ? parse(json2) : [];
+    if (entries2.length > 0) return build(entries2);
+
+    logSessionEventFast('standings', `vazio pra ${espnPath} (com e sem season=${year})`);
+    return [];
+  } catch (e: any) {
+    logSessionEventFast('standings', `erro pra ${espnPath}: ${e?.message || e}`);
     return [];
   }
 }
@@ -133,8 +151,10 @@ function isoDate(d: Date): string {
 function dayLabel(dateStr: string): string {
   const today = isoDate(new Date());
   const tomorrow = isoDate(new Date(Date.now() + 86400000));
+  const yesterday = isoDate(new Date(Date.now() - 86400000));
   if (dateStr === today) return 'HOJE';
   if (dateStr === tomorrow) return 'AMANHÃ';
+  if (dateStr === yesterday) return 'ONTEM';
   const d = new Date(`${dateStr}T00:00:00`);
   const weekday = d.toLocaleDateString('pt-BR', { weekday: 'short' });
   return `${weekday.toUpperCase()} ${d.getDate()}/${d.getMonth() + 1}`;
@@ -253,23 +273,31 @@ export default function PlacarScreen() {
         setLoading(false);
         return;
       }
-      const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => isoDate(new Date(Date.now() + i * 86400000)));
+      // Antes só buscava HOJE em diante — jogo de ontem (ou antes), já
+      // com resultado final, nunca nem era buscado, mesmo que a pessoa
+      // quisesse muito ver quem ganhou. Agora inclui 2 dias pra trás
+      // também, mantendo hoje como a primeira busca (mais rápida de
+      // aparecer).
+      const dates = [
+        isoDate(new Date(Date.now() - 2 * 86400000)),
+        isoDate(new Date(Date.now() - 86400000)),
+        isoDate(new Date()),
+        isoDate(new Date(Date.now() + 86400000)),
+        isoDate(new Date(Date.now() + 2 * 86400000)),
+      ];
+      const todayIdx = 2;
 
       try {
         // HOJE primeiro, sozinho — uma chamada de rede só, mostra
-        // resultado rápido. Os outros dias (amanhã em diante, menos
-        // urgentes de ver na hora) carregam depois, em segundo plano,
-        // sem travar a abertura da tela. Antes, as 4 chamadas disparavam
-        // juntas, competindo por rede/CPU bem na hora que a tela abre —
-        // exatamente o momento que mais importa parecer rápido.
-        const todayEvents = await fetchDay(def, dates[0]);
+        // resultado rápido. Os outros dias carregam depois, em segundo
+        // plano, sem travar a abertura da tela.
+        const todayEvents = await fetchDay(def, dates[todayIdx]);
         setEvents(todayEvents);
         setLoading(false);
 
-        if (dates.length > 1) {
-          const restResults = await Promise.all(dates.slice(1).map((date) => fetchDay(def, date)));
-          setEvents((prev) => [...prev, ...restResults.flat()]);
-        }
+        const otherDates = dates.filter((_, i) => i !== todayIdx);
+        const restResults = await Promise.all(otherDates.map((date) => fetchDay(def, date)));
+        setEvents((prev) => [...prev, ...restResults.flat()]);
       } catch {
         setEvents([]);
         setError('Não foi possível carregar os placares agora.');
