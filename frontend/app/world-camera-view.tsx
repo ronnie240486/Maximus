@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -12,6 +12,26 @@ export default function WorldCameraViewScreen() {
   const { title, url } = useLocalSearchParams<{ title?: string; url: string }>();
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  // Carregar um site completo (JS, imagens, etc) dentro do WebView é bem
+  // mais pesado que qualquer tela nossa — em processador fraco, pode
+  // legitimamente demorar bastante sem ter travado. Sem uma explicação,
+  // uma bolinha girando por 15-20s parece quebrado mesmo quando só está
+  // lento. Esse aviso extra aparece só depois de um tempo, pra não
+  // poluir a espera normal (rápida na maioria dos aparelhos).
+  const [showSlowHint, setShowSlowHint] = useState(false);
+  const slowHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (loading) {
+      slowHintTimer.current = setTimeout(() => setShowSlowHint(true), 8000);
+    } else {
+      setShowSlowHint(false);
+      if (slowHintTimer.current) clearTimeout(slowHintTimer.current);
+    }
+    return () => {
+      if (slowHintTimer.current) clearTimeout(slowHintTimer.current);
+    };
+  }, [loading]);
 
   useEffect(() => {
     // Sem isso, o botão FÍSICO de voltar do controle remoto pode ser
@@ -72,6 +92,11 @@ export default function WorldCameraViewScreen() {
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator color={colors.accentCyan} size="large" />
+              {showSlowHint && (
+                <Text style={styles.slowHintText}>
+                  Ainda carregando... pode demorar mais em aparelhos mais lentos, é normal.
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -101,6 +126,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.black,
+    gap: 14,
+    paddingHorizontal: spacing.xl,
+  },
+  slowHintText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
   },
   centerBox: {
     flex: 1,
