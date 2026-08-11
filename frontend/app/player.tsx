@@ -339,9 +339,41 @@ export default function PlayerScreen() {
       if (s.status === 'readyToPlay' && !isLive && !resumeAppliedRef.current && params.id) {
         resumeAppliedRef.current = true;
         getResumePosition(params.id).then((pos) => {
+          if (pos === null) return;
+          // Pergunta explicitamente, em vez de pular a posição em
+          // silêncio — assim a pessoa vê claramente que o app "lembrou"
+          // de onde parou (e se por acaso não tiver salvo certo, ela
+          // sabe na hora, em vez de só reparar que voltou do início sem
+          // entender por quê).
+          const mm = Math.floor(pos / 60);
+          const ss = String(Math.floor(pos % 60)).padStart(2, '0');
           try {
-            if (pos !== null) player.currentTime = pos;
+            player.pause();
           } catch {}
+          Alert.alert(
+            'Continuar de onde parou?',
+            `Você parou em ${mm}:${ss}.`,
+            [
+              {
+                text: 'Começar do início',
+                style: 'cancel',
+                onPress: () => {
+                  try {
+                    player.play();
+                  } catch {}
+                },
+              },
+              {
+                text: `Continuar (${mm}:${ss})`,
+                onPress: () => {
+                  try {
+                    player.currentTime = pos;
+                    player.play();
+                  } catch {}
+                },
+              },
+            ]
+          );
         });
       }
       if (s.status === 'error') {
@@ -403,7 +435,12 @@ export default function PlayerScreen() {
         const pos = player.currentTime;
         const dur = player.duration;
         if (pos > 0 && dur > 0) {
-          updateWatchPosition(params.id!, pos, dur);
+          updateWatchPosition(params.id!, pos, dur, {
+            name: params.name || 'Sem título',
+            logo: params.logo,
+            stream: params.stream!,
+            seriesId: params.seriesId ? Number(params.seriesId) : undefined,
+          });
         }
       } catch {}
     };

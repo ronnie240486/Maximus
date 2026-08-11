@@ -62,10 +62,27 @@ export async function recordWatch(entry: Omit<WatchEntry, 'updatedAt'>): Promise
  * recria a entrada do zero, só atualiza o número. Se o item ainda não
  * estiver no histórico por algum motivo (chamada antes do recordWatch
  * inicial rodar), não faz nada — evita criar uma entrada incompleta. */
-export async function updateWatchPosition(id: string, positionSeconds: number, durationSeconds: number): Promise<void> {
+/** Atualiza a posição de reprodução — se o item ainda não estiver no
+ * histórico por algum motivo (ex: recordWatch falhou ou ainda não tinha
+ * terminado quando isso rodou pela primeira vez), CRIA o registro na
+ * hora em vez de desistir silenciosamente. Antes, se recordWatch não
+ * tivesse rodado com sucesso por qualquer razão, a posição nunca era
+ * salva e ninguém percebia — o filme sempre voltava do início sem
+ * nenhum aviso de erro. */
+export async function updateWatchPosition(
+  id: string,
+  positionSeconds: number,
+  durationSeconds: number,
+  fallback?: { name: string; logo?: string; stream: string; seriesId?: number }
+): Promise<void> {
   const list = await loadWatchHistory();
   const idx = list.findIndex((e) => e.id === id);
-  if (idx === -1) return;
+  if (idx === -1) {
+    if (!fallback) return;
+    const next = [{ ...fallback, id, positionSeconds, durationSeconds, updatedAt: Date.now() }, ...list].slice(0, MAX_ITEMS);
+    await persist(next);
+    return;
+  }
   const next = [...list];
   next[idx] = { ...next[idx], positionSeconds, durationSeconds, updatedAt: Date.now() };
   await persist(next);
