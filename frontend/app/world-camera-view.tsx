@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,20 @@ export default function WorldCameraViewScreen() {
   const { title, url } = useLocalSearchParams<{ title?: string; url: string }>();
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    // Sem isso, o botão FÍSICO de voltar do controle remoto pode ser
+    // capturado pelo WebView (navegando pra trás dentro do histórico do
+    // site, tipo YouTube/webcamera24) em vez de fechar nossa tela — e aí
+    // ficar preso numa página que não termina de carregar (é o "fica só
+    // carregando" ao apertar voltar). Isso garante que o botão voltar
+    // SEMPRE sai da nossa tela, nunca navega dentro do site.
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
+  }, [router]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
