@@ -59,6 +59,21 @@ export function isTmdbConfigured(): boolean {
   return !!API_KEY;
 }
 
+function normalizeTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // remove ruído comum de nome de canal/VOD de painel IPTV (ano entre
+    // parênteses/colchetes, tags de qualidade) que não existe no título
+    // "limpo" que o TMDb devolve — sem isso, a comparação abaixo quase
+    // nunca bateria mesmo pro título certo.
+    .replace(/\(\d{4}\)|\[\d{4}\]|\b\d{4}\b/g, '')
+    .replace(/\b(4k|hd|fullhd|dublado|legendado|dual|lançamento)\b/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 async function fetchGenresFor(title: string, kind: 'movie' | 'series'): Promise<GenreKey[]> {
   const endpoint = kind === 'movie' ? 'movie' : 'tv';
   const url = `https://api.themoviedb.org/3/search/${endpoint}?api_key=${API_KEY}&query=${encodeURIComponent(title)}&language=pt-BR`;
@@ -67,6 +82,23 @@ async function fetchGenresFor(title: string, kind: 'movie' | 'series'): Promise<
     if (!res.ok) return [];
     const json = await res.json();
     const first = json?.results?.[0];
+    if (!first) return [];
+
+    // Confere se o resultado que o TMDb achou é DE VERDADE o mesmo
+    // título do catálogo antes de confiar no gênero dele — sem essa
+    // checagem, um título parecido só no nome (mas sendo um filme
+    // totalmente diferente) podia "vazar" gênero errado pro catálogo
+    // (ex: uma comédia romântica aparecendo numa busca por ficção
+    // científica, porque o primeiro resultado da busca no TMDb pra
+    // aquele nome era outra coisa).
+    const resultTitle = normalizeTitle(first.title || first.name || '');
+    const queryTitle = normalizeTitle(title);
+    const isSameTitle =
+      resultTitle === queryTitle ||
+      (queryTitle.length >= 4 && resultTitle.includes(queryTitle)) ||
+      (resultTitle.length >= 4 && queryTitle.includes(resultTitle));
+    if (!isSameTitle) return [];
+
     const genreIds: number[] = first?.genre_ids || [];
     const mapped = new Set<GenreKey>();
     for (const id of genreIds) {

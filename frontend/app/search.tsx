@@ -77,8 +77,17 @@ export default function SearchScreen() {
     if (!q) return [];
     const creds = getXtream();
     if (!creds) return [];
+    // Bidirecional: cobre tanto "digitei parte do nome" (nome contém a
+    // busca) quanto "busca por voz com frase inteira" tipo "quero
+    // assistir tulsa king" (a frase contém o nome, mas o nome sozinho é
+    // mais curto que a frase, então só checar "nome contém busca" nunca
+    // batia nesse caso).
+    const titleMatches = (name: string) => {
+      const n = name.toLowerCase();
+      return n.includes(q) || q.includes(n);
+    };
     const liveRows: Row[] = live
-      .filter((x) => x.name.toLowerCase().includes(q))
+      .filter((x) => titleMatches(x.name))
       .slice(0, 40)
       .map((x) => ({
         kind: 'live',
@@ -88,7 +97,7 @@ export default function SearchScreen() {
         stream: liveStreamUrl(creds, x.stream_id, 'm3u8'),
       }));
     const movieRows: Row[] = movies
-      .filter((x) => x.name.toLowerCase().includes(q))
+      .filter((x) => titleMatches(x.name))
       .slice(0, 40)
       .map((x) => ({
         kind: 'movie',
@@ -98,7 +107,7 @@ export default function SearchScreen() {
         stream: movieStreamUrl(creds, x.stream_id, x.container_extension),
       }));
     const seriesRows: Row[] = series
-      .filter((x) => x.name.toLowerCase().includes(q))
+      .filter((x) => titleMatches(x.name))
       .slice(0, 40)
       .map((x) => ({
         kind: 'series',
