@@ -30,7 +30,6 @@ import { getFlashListPerfProps, useIsLowEndDevice } from '@/src/hooks/useIsLowEn
 import { useListImagePrefetch } from '@/src/hooks/useListImagePrefetch';
 import TVFocusable from '@/src/components/TVFocusable';
 import TVChannelPreview from '@/src/components/TVChannelPreview';
-import { loadGameReminders, toggleGameReminder } from '@/src/state/game-reminders';
 
 const ALL = 'Todos';
 const FAVORITES = 'Favoritos';
@@ -43,42 +42,21 @@ const SIDE_COL_WIDTH = 160;
 // tela a cada movimento do controle — não só a que realmente mudou. Com
 // React.memo, só as linhas cujas props de verdade mudaram (a que ganhou
 // e a que perdeu o destaque) re-renderizam.
-/** Reconhece o padrão "[19:30] Time A x Time B" comum em canais de
- * "jogos do dia" — quando bate, mostra o sino de lembrete na linha do
- * canal (movido pra cá depois que a tela separada "Jogos do Dia" foi
- * removida do menu, já que os jogos aparecem aqui mesmo). */
-function parseGameTime(name: string): string | null {
-  const m = name.match(/^\[?(\d{1,2}:\d{2})\]?/);
-  return m ? m[1] : null;
-}
-
-function todayAtTime(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  const d = new Date();
-  d.setHours(h || 0, m || 0, 0, 0);
-  return d.getTime();
-}
-
 const ChannelRow = React.memo(function ChannelRow({
   item,
   index,
   isActive,
   isFavorite,
-  isReminderScheduled,
   onFocus,
   onPress,
-  onToggleReminder,
 }: {
   item: XtreamLive;
   index: number;
   isActive: boolean;
   isFavorite: boolean;
-  isReminderScheduled: boolean;
   onFocus: (item: XtreamLive) => void;
   onPress: (item: XtreamLive) => void;
-  onToggleReminder: (item: XtreamLive) => void;
 }) {
-  const gameTime = parseGameTime(item.name);
   return (
     <TVFocusable
       onFocus={() => onFocus(item)}
@@ -96,20 +74,6 @@ const ChannelRow = React.memo(function ChannelRow({
       <Text style={styles.tvRowName} numberOfLines={1}>
         {item.name}
       </Text>
-      {!!gameTime && (
-        <TVFocusable
-          onPress={() => onToggleReminder(item)}
-          style={styles.tvRowBell}
-          testID={`tv-channel-reminder-${item.stream_id}`}
-          hitSlop={10}
-        >
-          <Ionicons
-            name={isReminderScheduled ? 'notifications' : 'notifications-outline'}
-            size={16}
-            color={isReminderScheduled ? colors.accentCyan : colors.textMuted}
-          />
-        </TVFocusable>
-      )}
       {isFavorite && <Ionicons name="heart" size={14} color={colors.accentMagenta} />}
     </TVFocusable>
   );
@@ -134,7 +98,6 @@ export default function ChannelsScreen() {
   const [query, setQuery] = useState(params.initialQuery || '');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [reminderIds, setReminderIds] = useState<Set<string>>(new Set());
   const [showCategoryDrawer, setShowCategoryDrawer] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<XtreamLive | null>(null);
   // Destaque visual da linha (instantâneo) — separado do preview de vídeo
@@ -153,28 +116,8 @@ export default function ChannelsScreen() {
       loadFavorites().then((list) => {
         setFavoriteIds(new Set(list.filter((f) => f.kind === 'channel').map((f) => f.id)));
       });
-      loadGameReminders().then((list) => {
-        setReminderIds(new Set(list.map((r) => r.id)));
-      });
     }, [])
   );
-
-  const onToggleReminder = async (ch: XtreamLive) => {
-    const gameTime = parseGameTime(ch.name);
-    const id = `panel-${ch.stream_id}`;
-    const nowScheduled = await toggleGameReminder({
-      id,
-      name: ch.name.replace(/^\[?\d{1,2}:\d{2}\]?\s*[-–—]?\s*/, ''),
-      startsAt: gameTime ? todayAtTime(gameTime) : Date.now(),
-      streamId: ch.stream_id,
-    });
-    setReminderIds((prev) => {
-      const next = new Set(prev);
-      if (nowScheduled) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  };
 
   const onToggleFavorite = async (s: XtreamLive) => {
     const id = `channel-${s.stream_id}`;
@@ -551,10 +494,8 @@ export default function ChannelsScreen() {
                     index={index}
                     isActive={focusedChannel?.stream_id === item.stream_id}
                     isFavorite={favoriteIds.has(`channel-${item.stream_id}`)}
-                    isReminderScheduled={reminderIds.has(`panel-${item.stream_id}`)}
                     onFocus={onFocusChannel}
                     onPress={onPressChannel}
-                    onToggleReminder={onToggleReminder}
                   />
                 )}
               />
@@ -833,7 +774,6 @@ const styles = StyleSheet.create({
   tvRowNum: { color: colors.textMuted, fontSize: 14, width: 34, fontVariant: ['tabular-nums'] },
   tvRowIcon: { width: 32, height: 32 },
   tvRowName: { color: colors.white, fontSize: 16, fontWeight: '600', flex: 1 },
-  tvRowBell: { padding: 6, marginRight: 4 },
   tvPreviewCol: { flex: 1, padding: spacing.sm },
   sideChipTextActive: { color: colors.accentCyan },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
