@@ -59,6 +59,38 @@ export function isTmdbConfigured(): boolean {
   return !!API_KEY;
 }
 
+/**
+ * "Me dê uma série parecida com Tulsa King" — busca o título de
+ * referência no TMDb, pega o recurso de "títulos parecidos" deles
+ * (baseado no próprio algoritmo do TMDb, não é nosso), e devolve os
+ * NOMES desses títulos parecidos — quem chama isso depois cruza esses
+ * nomes com o catálogo real da pessoa, pra só mostrar o que ela
+ * realmente tem disponível pra assistir.
+ */
+export async function findSimilarTitles(referenceTitle: string, kind: 'movie' | 'series'): Promise<string[]> {
+  if (!API_KEY) return [];
+  const endpoint = kind === 'movie' ? 'movie' : 'tv';
+  try {
+    const searchUrl = `https://api.themoviedb.org/3/search/${endpoint}?api_key=${API_KEY}&query=${encodeURIComponent(referenceTitle)}&language=pt-BR`;
+    const searchRes = await fetch(searchUrl);
+    if (!searchRes.ok) return [];
+    const searchJson = await searchRes.json();
+    const id = searchJson?.results?.[0]?.id;
+    if (!id) return [];
+
+    const similarUrl = `https://api.themoviedb.org/3/${endpoint}/${id}/similar?api_key=${API_KEY}&language=pt-BR`;
+    const similarRes = await fetch(similarUrl);
+    if (!similarRes.ok) return [];
+    const similarJson = await similarRes.json();
+    const titles: string[] = (similarJson?.results || [])
+      .map((r: any) => r.title || r.name)
+      .filter(Boolean);
+    return titles;
+  } catch {
+    return [];
+  }
+}
+
 function normalizeTitle(s: string): string {
   return s
     .toLowerCase()

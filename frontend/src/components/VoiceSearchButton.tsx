@@ -6,7 +6,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 
 import { colors } from '@/src/theme';
 import TVFocusable from '@/src/components/TVFocusable';
-import { detectVoiceGenre } from '@/src/lib/genre-detect';
+import { detectVoiceGenre, detectSimilarToRequest } from '@/src/lib/genre-detect';
 
 // Isolado da Home de propósito — importar 'expo-speech-recognition' no
 // topo do home.tsx fazia esse módulo (que registra listeners nativos de
@@ -27,6 +27,19 @@ export default function VoiceSearchButton() {
     const transcript = event.results[0]?.transcript?.trim();
     setListening(false);
     if (!transcript) return;
+
+    // "Me dê uma série parecida com Tulsa King" — pedido por
+    // SIMILARIDADE a um título de referência, diferente de pedir um
+    // gênero solto. Checa isso ANTES do gênero, porque uma frase desse
+    // tipo poderia acidentalmente conter uma palavra de gênero também.
+    const similar = detectSimilarToRequest(transcript);
+    if (similar) {
+      router.push({
+        pathname: '/recommend',
+        params: { similarTo: similar.reference, similarKind: similar.kind, query: transcript },
+      });
+      return;
+    }
 
     // "Quero assistir um filme de ação" — reconhece o gênero pedido e
     // manda pra tela de sugestões (mistura filmes+séries daquele gênero),

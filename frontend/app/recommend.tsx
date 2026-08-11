@@ -15,7 +15,7 @@ import { isActiveProfileKids } from '@/src/state/profiles';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadListCache } from '@/src/state/list-cache';
 import { GenreKey, GENRE_LABELS, filterByGenre, shuffleSample } from '@/src/lib/genre-detect';
-import { enrichGenresInBackground, getAllCachedGenres, isTmdbConfigured } from '@/src/lib/tmdb';
+import { enrichGenresInBackground, getAllCachedGenres, isTmdbConfigured, findSimilarTitles } from '@/src/lib/tmdb';
 import TVFocusable from '@/src/components/TVFocusable';
 
 const SUGGESTION_COUNT = 20;
@@ -31,8 +31,9 @@ type SuggestionItem = {
 
 export default function RecommendScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ genre: string; query?: string }>();
-  const genre = params.genre as GenreKey;
+  const params = useLocalSearchParams<{ genre?: string; query?: string; similarTo?: string; similarKind?: string }>();
+  const genre = params.genre as GenreKey | undefined;
+  const similarTo = params.similarTo;
   const { modal: parentalModal, guard } = useParentalGate();
 
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,11 @@ export default function RecommendScreen() {
   const [tmdbCache, setTmdbCache] = useState<Record<string, { genres: GenreKey[] }>>({});
   const [enriching, setEnriching] = useState(false);
   const [enrichedCount, setEnrichedCount] = useState(0);
+  // Modo "parecido com X": nomes de títulos parecidos que o TMDb devolveu
+  // (baseado no algoritmo deles) — depois cruzados com o catálogo real da
+  // pessoa, pra só mostrar o que ela de fato tem disponível.
+  const [similarNames, setSimilarNames] = useState<string[] | null>(null);
+  const [similarLoading, setSimilarLoading] = useState(false);
 
   useEffect(() => {
     isActiveProfileKids().then(setKidsMode);
@@ -89,15 +95,31 @@ export default function RecommendScreen() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (loading || !similarTo || !isTmdbConfigured()) return;
+    let cancelled = false;
+    setSimilarLoading(true);
+    findSimilarTitles(similarTo, (params.similarKind as 'movie' | 'series') || 'series').then((names) => {
+      if (!cancelled) {
+        setSimilarNames(names);
+        setSimilarLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, similarTo, params.similarKind]);
+
   // Enriquecimento em segundo plano: manda os títulos do catálogo (que
   // ainda não sabemos o gênero real) pro TMDb, aos poucos, sem travar a
   // tela. Cada vez que um lote termina, atualiza o cache local — e como
   // o cache é PERSISTENTE (fica salvo no aparelho), o catálogo vai
   // ficando cada vez mais coberto a cada busca por voz feita, não só
   // nessa sessão. Não faz nada se a chave do TMDb não estiver
-  // configurada (EXPO_PUBLIC_TMDB_API_KEY).
+  // configurada (EXPO_PUBLIC_TMDB_API_KEY), nem no modo "parecido com X"
+  // (não precisa de gênero nesse modo).
   useEffect(() => {
-    if (loading || !isTmdbConfigured()) return;
+    if (loading || !isTmdbConfigured() || similarTo) return;
     let cancelled = false;
     setEnriching(true);
     setEnrichedCount(0);
@@ -155,8 +177,31 @@ export default function RecommendScreen() {
     const seriesCats = kidsMode ? filterToKidsCategories(seriesPool.categories) : seriesPool.categories;
     const seriesItemsBase = kidsMode ? filterToKidsItems(seriesPool.items, seriesPool.categories) : seriesPool.items;
 
-    const matchedMovies = genre ? matchWithTmdb(movieItems, movieCats, genre, 'movie') : [];
-    const matchedSeries = genre ? matchWithTmdb(seriesItemsBase, seriesCats, genre, 'series') : [];
+    let matchedMovies: XtreamMovie[];
+    let matchedSeries: XtreamSeries[];
+
+    if (similarTo) {
+      // Modo "parecido com X": cruza os nomes que o TMDb achou como
+      // parecidos com o que a pessoa REALMENTE tem no catálogo — nome
+      // "contém" nos dois sentidos, pra tolerar título com sufixo (ano,
+      // "dublado" etc) de qualquer um dos dois lados.
+      const names = similarNames || [];
+      const nameMatches = (itemName: string) => {
+        const n = itemName.toLowerCase();
+        return names.some((sim) => {
+          const s = sim.toLowerCase();
+          return n.includes(s) || s.includes(n);
+        });
+      };
+      matchedMovies = movieItems.filter((m) => nameMatches(m.name));
+      matchedSeries = seriesItemsBase.filter((s) => nameMatches(s.name));
+    } else if (genre) {
+      matchedMovies = matchWithTmdb(movieItems, movieCats, genre, 'movie');
+      matchedSeries = matchWithTmdb(seriesItemsBase, seriesCats, genre, 'series');
+    } else {
+      matchedMovies = [];
+      matchedSeries = [];
+    }
 
     // Mistura filme e série no resultado — metade de cada, mais ou menos
     // (se um dos dois tiver pouca coisa, completa com o outro).
@@ -177,11 +222,11 @@ export default function RecommendScreen() {
     }
 
     setShownItems(shuffleSample(combined, combined.length));
-  }, [genre, kidsMode, moviePool, seriesPool, matchWithTmdb]);
+  }, [genre, similarTo, similarNames, kidsMode, moviePool, seriesPool, matchWithTmdb]);
 
   useEffect(() => {
-    if (!loading) pick();
-  }, [loading, seed, pick]);
+    if (!loading && (!similarTo || similarNames !== null)) pick();
+  }, [loading, seed, pick, similarTo, similarNames]);
 
   const totalMatches = useMemo(() => {
     const movieCats = kidsMode ? filterToKidsCategories(moviePool.categories) : moviePool.categories;
@@ -219,7 +264,7 @@ export default function RecommendScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </TVFocusable>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {genre ? GENRE_LABELS[genre] : 'Sugestões'}
+          {similarTo ? `Parecido com ${similarTo}` : genre ? GENRE_LABELS[genre] : 'Sugestões'}
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -233,16 +278,18 @@ export default function RecommendScreen() {
         </Text>
       )}
 
-      {loading ? (
+      {(loading || similarLoading) ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accentCyan} size="large" />
+          {similarLoading && <Text style={styles.emptyText}>Buscando títulos parecidos...</Text>}
         </View>
       ) : shownItems.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="film-outline" size={40} color={colors.textMuted} />
           <Text style={styles.emptyText}>
-            Não achei filmes ou séries desse gênero no seu catálogo ainda. Essa busca reconhece os títulos mais
-            conhecidos — pode não cobrir tudo que você tem disponível.
+            {similarTo
+              ? `Não achei nada parecido com "${similarTo}" no seu catálogo — o TMDb pode ter sugerido títulos que seu painel não tem disponível.`
+              : 'Não achei filmes ou séries desse gênero no seu catálogo ainda. Essa busca reconhece os títulos mais conhecidos — pode não cobrir tudo que você tem disponível.'}
           </Text>
         </View>
       ) : (
@@ -269,12 +316,14 @@ export default function RecommendScreen() {
             )}
           />
 
-          <TVFocusable onPress={() => setSeed((s) => s + 1)} style={styles.shuffleBtn} testID="recommend-shuffle">
-            <Ionicons name="shuffle" size={16} color={colors.black} />
-            <Text style={styles.shuffleBtnText}>
-              Outras sugestões{totalMatches > SUGGESTION_COUNT ? ` (${totalMatches} no total)` : ''}
-            </Text>
-          </TVFocusable>
+          {!similarTo && (
+            <TVFocusable onPress={() => setSeed((s) => s + 1)} style={styles.shuffleBtn} testID="recommend-shuffle">
+              <Ionicons name="shuffle" size={16} color={colors.black} />
+              <Text style={styles.shuffleBtnText}>
+                Outras sugestões{totalMatches > SUGGESTION_COUNT ? ` (${totalMatches} no total)` : ''}
+              </Text>
+            </TVFocusable>
+          )}
         </>
       )}
 

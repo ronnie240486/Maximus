@@ -165,6 +165,22 @@ export function detectVoiceGenre(transcript: string): GenreKey | null {
   return null;
 }
 
+/** Reconhece pedido de "algo parecido com X" ("me dê uma série igual a
+ * Tulsa King", "um filme parecido com Duro de Matar") — diferente de
+ * pedir um GÊNERO, aqui a pessoa dá um título de referência específico.
+ * Devolve o título de referência + se ela pediu filme ou série
+ * especificamente (assume série se não disser, só um pouco mais comum
+ * nesse tipo de pedido — não muda muito o resultado de qualquer forma,
+ * já que a busca no TMDb roda pros dois tipos).
+ */
+export function detectSimilarToRequest(transcript: string): { kind: 'movie' | 'series'; reference: string } | null {
+  const n = normalize(transcript);
+  const simMatch = n.match(/(?:igual(?:zinho)?a?|parecid[ao]s?|similar(?:es)?)\s*(?:a|com)?\s+(.+)/);
+  if (!simMatch || !simMatch[1]?.trim()) return null;
+  const kind: 'movie' | 'series' = /\bfilmes?\b/.test(n) ? 'movie' : 'series';
+  return { kind, reference: simMatch[1].trim() };
+}
+
 export const GENRE_LABELS: Record<GenreKey, string> = {
   acao: 'Ação',
   comedia: 'Comédia',
