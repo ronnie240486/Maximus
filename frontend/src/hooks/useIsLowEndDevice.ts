@@ -24,8 +24,16 @@ const LOW_RAM_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // 2GB
 // aparelhos reais (ver Diagnóstico > Logs de depuração) e ajustar os
 // números abaixo com base no que aparecer.
 const CPU_BENCHMARK_ITERATIONS = 3_000_000;
-const CPU_FAST_MAX_MS = 25; // abaixo disso: CPU rápida
-const CPU_SLOW_MIN_MS = 60; // acima disso: CPU lenta (entre os dois: médio)
+// CALIBRADO COM DADOS REAIS (não mais chute):
+// - Celular topo de linha (Android 16, 11GB RAM): 265ms no benchmark
+// - TV box genuinamente fraca (TORRESTEK, Android 7.1.2, 3.9GB RAM): 3076ms
+// A diferença relativa entre os dois (quase 12x) é um sinal real, mesmo
+// sabendo que os números absolutos são inflados (o benchmark roda cedo
+// demais, antes do motor JS esquentar — ver comentário mais abaixo).
+// Ponto de corte escolhido no meio do caminho: bem acima do celular
+// rápido, bem abaixo da TV box fraca confirmada.
+const CPU_FAST_MAX_MS = 400;
+const CPU_SLOW_MIN_MS = 1200;
 
 function benchmarkCpuMs(): number {
   const start = Date.now();
@@ -60,15 +68,16 @@ function degradeTier(tier: DevicePerfTier): DevicePerfTier {
 
 const devicePerfTier: DevicePerfTier = (() => {
   try {
-    // O benchmark de CPU (cpuBenchmarkMs, abaixo) roda cedo demais — antes
-    // do motor JS "esquentar" e competindo com todo o resto que carrega
-    // na abertura do app — e por isso dá números sem sentido mesmo em
-    // aparelhos rápidos de verdade (confirmado: celular topo de linha,
-    // 11GB RAM, deu 265ms, dez vezes acima do limite de "lento"). Não dá
-    // pra confiar nele pra CLASSIFICAR o aparelho — mantém só como
-    // número informativo no Diagnóstico. A classificação usa só RAM e
-    // arquitetura, que são sinais reais e confiáveis.
-    let tier: DevicePerfTier = 'high';
+    // O benchmark de CPU roda cedo demais (antes do motor JS "esquentar",
+    // competindo com o resto do app carregando) — os números absolutos
+    // são inflados mesmo em aparelhos rápidos (celular topo de linha deu
+    // 265ms). MAS a diferença RELATIVA entre aparelhos continua sendo um
+    // sinal real: a mesma TV box fraca que dá 3076ms nesse teste também é
+    // a que trava de verdade navegando no app — por isso volta a entrar
+    // na conta, só que com limiares recalibrados nos dois pontos de
+    // dados reais que já temos (ver comentário nas constantes acima).
+    let tier: DevicePerfTier =
+      cpuBenchmarkMs <= CPU_FAST_MAX_MS ? 'high' : cpuBenchmarkMs >= CPU_SLOW_MIN_MS ? 'low' : 'mid';
 
     const mem = Device.totalMemory;
     const weakByRam = typeof mem === 'number' && mem > 0 && mem < LOW_RAM_THRESHOLD_BYTES;
