@@ -173,8 +173,12 @@ export function detectVoiceGenre(transcript: string): GenreKey | null {
  * só o gênero solto.
  */
 export function detectSimilarToRequest(transcript: string): string | null {
+  // Aceita várias formas de conectivo que a pessoa pode falar antes do
+  // título de referência — "igual A", "igual DE" (como em "igual de
+  // volta pro futuro"), "que nem", etc. Antes só aceitava "igual a/ao/à"
+  // explicitamente, perdendo frases bem naturais em português.
   const match = transcript.match(
-    /(?:igual\s+(?:a|ao|à)|parecid[oa]\s+com|tipo|no\s+estilo\s+de)\s+(.+)$/i
+    /(?:igual\s+(?:a|ao|à|de)?|parecid[oa]\s+com|que\s+nem|tipo|no\s+estilo\s+de)\s+(.+)$/i
   );
   if (!match) return null;
   const title = match[1].trim().replace(/[?.!]+$/, '');
@@ -194,10 +198,27 @@ export const GENRE_LABELS: Record<GenreKey, string> = {
   documentario: 'Documentário',
 };
 
+/** Quantos gêneros diferentes o nome de uma categoria bate ao mesmo tempo
+ * — usado pra detectar categoria "combinada" tipo "Ação/Aventura" ou
+ * "Ação e Comédia", comum em painel de IPTV. Uma categoria assim não dá
+ * pra confiar pra NENHUM dos dois gêneros por categoria (senão todo item
+ * dela aparecia em ambas as buscas, mesmo sendo só de um gênero de
+ * verdade) — nesses casos, só o match por título conhecido continua
+ * valendo. */
+function countMatchingGenres(normalizedCategoryName: string): number {
+  let count = 0;
+  for (const keywords of Object.values(CATEGORY_KEYWORDS)) {
+    if (keywords.some((kw) => normalizedCategoryName.includes(kw))) count++;
+  }
+  return count;
+}
+
 function itemMatchesGenre(name: string, categoryName: string | undefined, genre: GenreKey): boolean {
   const nName = normalize(name);
   const nCat = categoryName ? normalize(categoryName) : '';
-  if (nCat && CATEGORY_KEYWORDS[genre].some((kw) => nCat.includes(kw))) return true;
+  if (nCat && countMatchingGenres(nCat) === 1 && CATEGORY_KEYWORDS[genre].some((kw) => nCat.includes(kw))) {
+    return true;
+  }
   return TITLE_HINTS[genre].some((kw) => nName.includes(kw));
 }
 
