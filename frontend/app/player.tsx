@@ -112,7 +112,15 @@ export default function PlayerScreen() {
   const isLive = String(params.id || '').startsWith('live-');
 
   useEffect(() => {
-    if (!isTV) return;
+    // Antes, isso só rodava se isTV fosse true — mas isTV depende de uma
+    // flag do Android (UI_MODE_TYPE_TELEVISION) que só existe em TV box
+    // OFICIALMENTE certificada como Android TV. TV box genérica/barata
+    // (comum entre os clientes) continua sendo usada com controle
+    // remoto do mesmo jeito, só que o Android não se identifica como
+    // "televisão" — isTV vinha falso, e essa navegação inteira ficava
+    // desligada, mesmo em quem mais precisa dela. Resolver esses handles
+    // não tem custo real em celular (só alguns refs a mais resolvidos à
+    // toa), então agora roda sempre, independente de isTV.
     const t = setTimeout(() => {
       const handle = findNodeHandle(topBarRef.current);
       if (handle) setTopBarHandle(handle);

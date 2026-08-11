@@ -706,14 +706,19 @@ export default function HomeScreen() {
   const homeNavRef = useRef<React.ElementRef<typeof TVFocusable>>(null);
   const [homeNavHandle, setHomeNavHandle] = useState<number | undefined>();
   useEffect(() => {
-    if (!isTV) return;
+    // Antes só rodava com isTV=true — mas isTV depende de uma flag do
+    // Android que TV box genérica/barata (comum entre clientes) não
+    // costuma ter, mesmo sendo usada com controle remoto do mesmo jeito.
+    // Isso desligava essa navegação inteira bem no aparelho que mais
+    // precisa dela. Resolver o handle não tem custo real em celular,
+    // então roda sempre agora.
     // Espera o próximo tick pra garantir que o node nativo já existe.
     const t = setTimeout(() => {
       const handle = findNodeHandle(homeNavRef.current);
       if (handle) setHomeNavHandle(handle);
     }, 300);
     return () => clearTimeout(t);
-  }, [isTV]);
+  }, []);
   const allNavItems = [
     { key: 'home', label: 'Início', testID: 'nav-home', icon: (active: boolean) => <Ionicons name="home" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: undefined },
     { key: 'live', label: 'Canais', testID: 'nav-live', icon: (active: boolean) => <MaterialCommunityIcons name="television-classic" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/channels') },
