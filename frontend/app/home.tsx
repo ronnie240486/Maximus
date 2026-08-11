@@ -11,6 +11,9 @@ import {
   Alert,
   useWindowDimensions,
   findNodeHandle,
+  BackHandler,
+  ToastAndroid,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -280,6 +283,31 @@ export default function HomeScreen() {
         cancelled = true;
       };
     }, [router])
+  );
+
+  // "Aperta voltar de novo pra sair" — padrão esperado em qualquer app
+  // Android, principalmente em TV box (onde não existe gesto de "ir pra
+  // home", só o botão voltar do controle). Sem isso, não tinha jeito
+  // nenhum de fechar o app pelo controle remoto. Só fica ativo com a
+  // Home em foco (useFocusEffect) — nas outras telas, o botão voltar
+  // continua navegando pra tela anterior normalmente.
+  const lastBackPress = useRef(0);
+  useFocusEffect(
+    React.useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        const now = Date.now();
+        if (now - lastBackPress.current < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+        lastBackPress.current = now;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Aperte voltar de novo para sair', ToastAndroid.SHORT);
+        }
+        return true;
+      });
+      return () => sub.remove();
+    }, [])
   );
 
   const isLowEndDevice = useIsLowEndDevice();
