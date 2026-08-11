@@ -195,8 +195,8 @@ const styles = StyleSheet.create({
   },
   centerBlock: { flex: 1, justifyContent: 'center' },
   centerBlockTV: { paddingTop: 32 },
-  profileItem: { alignItems: 'center', width: 110 },
-  profileFocusTV: { borderWidth: 2, borderColor: colors.accentCyan },
+  profileItem: { alignItems: 'center', width: 108, padding: 4, borderRadius: 20 },
+  profileFocusTV: { borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 20 },
   avatarCard: {
     width: 100,
     height: 100,

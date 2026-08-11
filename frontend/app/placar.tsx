@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView, Modal, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,6 +27,7 @@ type SportDef = {
 };
 
 const SPORTS: SportDef[] = [
+  { key: 'futebol', label: 'Futebol (Brasileirão)', source: 'espn', espnPath: 'soccer/bra.1' },
   { key: 'baseball', label: 'Beisebol', source: 'espn', espnPath: 'baseball/mlb' },
   { key: 'tennis', label: 'Tênis', source: 'espn', espnPath: 'tennis/atp' },
   { key: 'nfl', label: 'Futebol Americano', source: 'espn', espnPath: 'football/nfl' },
@@ -50,6 +51,7 @@ const DAYS_AHEAD = 4;
 // de canais daquele esporte no painel da pessoa, e deixa ela escolher lá
 // dentro.
 const SPORT_CHANNEL_KEYWORDS: Record<string, string[]> = {
+  futebol: ['futebol', 'esportes', 'sportv', 'premiere', 'campeonato brasileiro', 'brasileirao'],
   baseball: ['beisebol', 'baseball', 'mlb'],
   tennis: ['tenis', 'tênis', 'tennis', 'atp', 'wta'],
   nfl: ['nfl', 'futebol americano'],
@@ -77,6 +79,45 @@ type ScoreEvent = {
   status: string | null;
   broadcast?: string | null;
 };
+
+// Tabela de classificação — só disponível pra futebol por enquanto (a
+// ESPN devolve isso num endpoint DIFERENTE do resto: "/apis/v2/" em vez
+// de "/apis/site/v2/" — só descobri isso testando, o padrão normal
+// devolve vazio pra futebol especificamente).
+type StandingRow = {
+  position: number;
+  teamName: string;
+  teamLogo?: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+  goalDiff: number;
+};
+
+async function fetchStandings(espnPath: string): Promise<StandingRow[]> {
+  try {
+    const res = await fetch(`https://site.api.espn.com/apis/v2/sports/${espnPath}/standings`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const entries = json?.standings?.entries || json?.children?.[0]?.standings?.entries || [];
+    const getStat = (stats: any[], name: string) => stats?.find((s: any) => s.name === name || s.type === name)?.value ?? 0;
+    return entries.map((e: any, idx: number) => ({
+      position: getStat(e.stats, 'rank') || idx + 1,
+      teamName: e.team?.displayName || e.team?.name || '—',
+      teamLogo: e.team?.logos?.[0]?.href,
+      played: getStat(e.stats, 'gamesPlayed'),
+      wins: getStat(e.stats, 'wins'),
+      draws: getStat(e.stats, 'ties') || getStat(e.stats, 'draws'),
+      losses: getStat(e.stats, 'losses'),
+      points: getStat(e.stats, 'points'),
+      goalDiff: getStat(e.stats, 'pointDifferential') || getStat(e.stats, 'goalDifferential'),
+    }));
+  } catch {
+    return [];
+  }
+}
 
 function isoDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -137,7 +178,7 @@ function normalizeSportsDbEvent(raw: any): ScoreEvent {
 
 export default function PlacarScreen() {
   const router = useRouter();
-  const [sport, setSport] = useState<string>('baseball');
+  const [sport, setSport] = useState<string>('futebol');
   const [events, setEvents] = useState<ScoreEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +186,9 @@ export default function PlacarScreen() {
   // existir) — usado só pro botão "Assistir ao vivo" aparecer quando faz
   // sentido, nunca pra tentar casar um jogo específico com um canal.
   const [sportChannelCategory, setSportChannelCategory] = useState<Record<string, string>>({});
+  const [showStandings, setShowStandings] = useState(false);
+  const [standings, setStandings] = useState<StandingRow[]>([]);
+  const [standingsLoading, setStandingsLoading] = useState(false);
 
   useEffect(() => {
     const creds = getXtream();
@@ -239,21 +283,77 @@ export default function PlacarScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </TVFocusable>
         <Text style={styles.headerTitle}>Placar</Text>
-        {sportChannelCategory[sport] ? (
-          <TVFocusable
-            onPress={() =>
-              router.push({ pathname: '/channels', params: { initialCategory: sportChannelCategory[sport] } })
-            }
-            style={styles.watchBtn}
-            testID="placar-watch-live"
-          >
-            <Ionicons name="play-circle" size={16} color={colors.black} />
-            <Text style={styles.watchBtnText}>Assistir</Text>
-          </TVFocusable>
-        ) : (
-          <View style={{ width: 24 }} />
-        )}
+        <View style={styles.headerBtnRow}>
+          {sport === 'futebol' && (
+            <TVFocusable
+              onPress={() => {
+                setShowStandings(true);
+                if (standings.length === 0 && !standingsLoading) {
+                  setStandingsLoading(true);
+                  fetchStandings(SPORTS.find((s) => s.key === sport)!.espnPath!).then((rows) => {
+                    setStandings(rows);
+                    setStandingsLoading(false);
+                  });
+                }
+              }}
+              style={styles.tableBtn}
+              testID="placar-standings"
+            >
+              <Ionicons name="list" size={16} color={colors.white} />
+            </TVFocusable>
+          )}
+          {sportChannelCategory[sport] ? (
+            <TVFocusable
+              onPress={() =>
+                router.push({ pathname: '/channels', params: { initialCategory: sportChannelCategory[sport] } })
+              }
+              style={styles.watchBtn}
+              testID="placar-watch-live"
+            >
+              <Ionicons name="play-circle" size={16} color={colors.black} />
+              <Text style={styles.watchBtnText}>Assistir</Text>
+            </TVFocusable>
+          ) : (
+            <View style={{ width: 24 }} />
+          )}
+        </View>
       </View>
+
+      <Modal visible={showStandings} transparent animationType="fade" onRequestClose={() => setShowStandings(false)}>
+        <Pressable style={styles.standingsBackdrop} onPress={() => setShowStandings(false)}>
+          <Pressable style={styles.standingsPanel} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.standingsTitle}>Tabela — Brasileirão</Text>
+            {standingsLoading ? (
+              <ActivityIndicator color={colors.accentCyan} style={{ marginVertical: 20 }} />
+            ) : standings.length === 0 ? (
+              <Text style={styles.standingsEmpty}>Não consegui carregar a tabela agora. Tenta de novo mais tarde.</Text>
+            ) : (
+              <ScrollView>
+                <View style={styles.standingsHeaderRow}>
+                  <Text style={[styles.standingsHeaderCell, { width: 24 }]}>#</Text>
+                  <Text style={[styles.standingsHeaderCell, { flex: 1 }]}>Time</Text>
+                  <Text style={styles.standingsHeaderCell}>P</Text>
+                  <Text style={styles.standingsHeaderCell}>J</Text>
+                  <Text style={styles.standingsHeaderCell}>SG</Text>
+                </View>
+                {standings.map((row) => (
+                  <View key={row.teamName} style={styles.standingsRow}>
+                    <Text style={[styles.standingsCell, { width: 24, color: colors.textMuted }]}>{row.position}</Text>
+                    {!!row.teamLogo && <Image source={{ uri: row.teamLogo }} style={styles.standingsLogo} contentFit="contain" />}
+                    <Text style={[styles.standingsCell, { flex: 1 }]} numberOfLines={1}>{row.teamName}</Text>
+                    <Text style={[styles.standingsCell, styles.standingsPoints]}>{row.points}</Text>
+                    <Text style={styles.standingsCell}>{row.played}</Text>
+                    <Text style={styles.standingsCell}>{row.goalDiff > 0 ? `+${row.goalDiff}` : row.goalDiff}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TVFocusable onPress={() => setShowStandings(false)} style={styles.standingsCloseBtn} testID="placar-standings-close">
+              <Text style={styles.standingsCloseBtnText}>Fechar</Text>
+            </TVFocusable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <View style={styles.chipRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowInner}>
@@ -353,6 +453,59 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '800' },
+  headerBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tableBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.darkSurface,
+  },
+  standingsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  standingsPanel: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '75%',
+    backgroundColor: colors.darkSurface,
+    borderRadius: 14,
+    padding: spacing.md,
+  },
+  standingsTitle: { color: colors.white, fontSize: 16, fontWeight: '800', marginBottom: 10 },
+  standingsEmpty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', paddingVertical: 20 },
+  standingsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.darkSurfaceAlt,
+    marginBottom: 4,
+  },
+  standingsHeaderCell: { color: colors.textMuted, fontSize: 11, fontWeight: '700', width: 28, textAlign: 'center' },
+  standingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  standingsCell: { color: colors.white, fontSize: 13, width: 28, textAlign: 'center' },
+  standingsPoints: { fontWeight: '800', color: colors.accentCyan },
+  standingsLogo: { width: 18, height: 18 },
+  standingsCloseBtn: {
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.accentCyan,
+    alignItems: 'center',
+  },
+  standingsCloseBtnText: { color: colors.black, fontWeight: '800' },
   watchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
