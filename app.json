@@ -1,0 +1,92 @@
+{
+  "expo": {
+    "name": "Maximus Player",
+    "slug": "interactive-player-v2",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/images/icon.png",
+    "scheme": "interactiveplayer",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "autolinking": {
+      "exclude": ["react-native-reanimated", "react-native-worklets"]
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8689cf66-c386-4180-a6c1-c070e2600314"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.interactiveplayer.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0B0F1A"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.interactiveplayer.app",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-updates",
+      "expo-notifications",
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ],
+      "expo-speech-recognition",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Usado só para mostrar a previsão do tempo da sua região na tela principal."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-image.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0B0F1A"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b2a1da79-088f-4b3e-b349-e1eae94ba4e1"
+      }
+    },
+    "owner": "ronnie102030s-team"
+  }
+}
