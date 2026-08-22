@@ -389,7 +389,8 @@ export default function MacLoginScreen() {
   const bg = status?.bg_url;
   const logo = status?.logo_url;
   const banner = status?.banner_url;
-  const appName = status?.app_name;
+  const rawAppName = status?.app_name?.trim();
+  const appName = rawAppName && rawAppName.toLowerCase() !== 'onixone' ? rawAppName : 'Maximus Player';
   useEffect(() => {
     setBgFailed(false);
   }, [bg]);

@@ -328,7 +328,8 @@ export default function HomeScreen() {
     setMac(m);
     setBg(session?.bg_url);
     setLogo(session?.logo_url);
-    setAppName(session?.app_name || 'Maximus Player');
+    const panelAppName = session?.app_name?.trim();
+    setAppName(panelAppName && panelAppName.toLowerCase() !== 'onixone' ? panelAppName : 'Maximus Player');
 
     // Stale-while-revalidate: paint whatever we had last time immediately,
     // then keep loading in the background and swap in fresh data per
