@@ -38,7 +38,11 @@ import { popDueReminders } from '@/src/state/game-reminders';
 import { logSessionEvent, logSessionEventFast } from '@/src/state/debug-log';
 import { popDueProgramReminders, ProgramReminder } from '@/src/state/program-reminders';
 import ProgramReminderPopup from '@/src/components/ProgramReminderPopup';
-import { isAdultCategoryName, filterToKidsItems } from '@/src/lib/adult-content';
+import {
+  isAdultCategoryName,
+  filterOutAdultItems,
+  filterToKidsItems,
+} from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -411,10 +415,11 @@ export default function HomeScreen() {
       if (gotSomething || settled >= 3) setLoading(false);
     };
 
-    const liveCatsP = kidsMode ? xtream.liveCategories(creds) : Promise.resolve(null);
+    const liveCatsP = xtream.liveCategories(creds);
     const liveP = Promise.all([xtream.liveStreams(creds), liveCatsP]).then(([live, liveCats]) => {
+      const withoutAdultLive = filterOutAdultItems(live || [], liveCats || []);
       const filteredLive =
-        kidsMode && liveCats ? filterToKidsItems(live || [], liveCats) : live;
+        kidsMode && liveCats ? filterToKidsItems(withoutAdultLive, liveCats) : withoutAdultLive;
       const gotSomething = !!(filteredLive && filteredLive.length);
       if (gotSomething) {
         setSlots((prev) => ({
@@ -441,10 +446,11 @@ export default function HomeScreen() {
       return filteredLive;
     });
 
-    const vodCatsP = kidsMode ? xtream.vodCategories(creds) : Promise.resolve(null);
+    const vodCatsP = xtream.vodCategories(creds);
     const moviesP = Promise.all([xtream.vodStreams(creds), vodCatsP]).then(([movies, vodCats]) => {
+      const withoutAdultMovies = filterOutAdultItems(movies || [], vodCats || []);
       const filteredMovies =
-        kidsMode && vodCats ? filterToKidsItems(movies || [], vodCats) : movies;
+        kidsMode && vodCats ? filterToKidsItems(withoutAdultMovies, vodCats) : withoutAdultMovies;
       const gotSomething = !!(filteredMovies && filteredMovies.length);
       if (gotSomething) {
         const deduped = dedupeByName(filteredMovies!);
@@ -468,10 +474,11 @@ export default function HomeScreen() {
       return filteredMovies;
     });
 
-    const seriesCatsP = kidsMode ? xtream.seriesCategories(creds) : Promise.resolve(null);
+    const seriesCatsP = xtream.seriesCategories(creds);
     const seriesP = Promise.all([xtream.seriesList(creds), seriesCatsP]).then(([series, seriesCats]) => {
+      const withoutAdultSeries = filterOutAdultItems(series || [], seriesCats || []);
       const filteredSeries =
-        kidsMode && seriesCats ? filterToKidsItems(series || [], seriesCats) : series;
+        kidsMode && seriesCats ? filterToKidsItems(withoutAdultSeries, seriesCats) : withoutAdultSeries;
       const gotSomething = !!(filteredSeries && filteredSeries.length);
       if (gotSomething) {
         setSlots((prev) => ({
@@ -848,7 +855,7 @@ export default function HomeScreen() {
                 </Suspense>
                 <TVFocusable onPress={() => router.replace('/profiles')} testID="nav-profile">
                   <Image
-                    source={logo ? { uri: logo } : require('@/assets/images/icon.png')}
+                    source={logo ? { uri: logo } : require('@/assets/images/maximus-logo-transparent.png')}
                     style={{ width: isLandscape ? 28 : 34, height: isLandscape ? 28 : 34, borderRadius: 17 }}
                     contentFit="cover"
                   />

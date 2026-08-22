@@ -12,14 +12,37 @@ function normalize(s: string): string {
 const ADULT_KEYWORDS = [
   'adulto',
   'adultos',
+  'adult',
   '+18',
   '18+',
   'xxx',
-  'adult',
   'porn',
+  'pornografia',
   'sexo',
+  'sexual',
   'erotic',
-  'erótico',
+  'erotico',
+  'brasileirinhas',
+  'brasileirinha',
+  'novinhas',
+  'novinha',
+  'ninfetas',
+  'ninfeta',
+  'vazadas',
+  'vazada',
+  'onlyfans',
+  'only fans',
+  'privacy',
+  'privacy girl',
+  'sensual',
+  'sensuais',
+  'putaria',
+  'orgia',
+  'orgy',
+  'hardcore',
+  'hentai',
+  'xxx videos',
+  'caiu na net',
 ];
 
 // Palavras que costumam aparecer em categorias feitas pra criança de
@@ -172,10 +195,18 @@ const NORMALIZED_ADULT_KEYWORDS = ADULT_KEYWORDS.map(normalize);
 const NORMALIZED_KIDS_KEYWORDS = KIDS_KEYWORDS.map(normalize);
 const NORMALIZED_KIDS_TITLE_KEYWORDS = KIDS_TITLE_KEYWORDS.map(normalize);
 
-export function isAdultCategoryName(categoryName?: string | null): boolean {
-  if (!categoryName) return false;
-  const n = normalize(categoryName);
+export function isAdultContentName(name?: string | null): boolean {
+  if (!name) return false;
+  const n = normalize(name);
   return NORMALIZED_ADULT_KEYWORDS.some((kw) => n.includes(kw));
+}
+
+export function isAdultCategoryName(categoryName?: string | null): boolean {
+  return isAdultContentName(categoryName);
+}
+
+export function isAdultTitle(title?: string | null): boolean {
+  return isAdultContentName(title);
 }
 
 export function isKidsCategoryName(categoryName?: string | null): boolean {
@@ -225,8 +256,9 @@ export function filterOutAdultItems<T extends { category_id?: string | number }>
   const adultIds = new Set(
     categories.filter((c) => isAdultCategoryName(c.category_name)).map((c) => String(c.category_id))
   );
-  if (adultIds.size === 0) return items;
-  return items.filter((i) => !adultIds.has(String(i.category_id)));
+  return items.filter(
+    (i) => !adultIds.has(String(i.category_id)) && !isAdultTitle((i as T & { name?: string }).name)
+  );
 }
 
 // Curadoria de verdade pro perfil infantil: só deixa passar categorias

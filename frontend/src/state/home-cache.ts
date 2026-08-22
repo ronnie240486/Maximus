@@ -7,6 +7,7 @@
 // opens instead of showing a spinner every time.
 
 import { storage } from '@/src/utils/storage';
+import { isAdultCategoryName, isAdultTitle } from '@/src/lib/adult-content';
 
 const STORAGE_KEY = 'home_sections_cache_v1';
 
@@ -18,6 +19,34 @@ export type CachedHomeData = {
 };
 
 let cached: CachedHomeData | null = null;
+
+function isAdultHomeObject(value: any): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Boolean(
+    isAdultTitle(value.name) ||
+    isAdultTitle(value.title) ||
+    isAdultCategoryName(value.category_name) ||
+    isAdultTitle(value.stream_name) ||
+    isAdultTitle(value.info?.name)
+  );
+}
+
+function sanitizeHomeValue<T>(value: T): T | null {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => !isAdultHomeObject(item))
+      .map((item) => sanitizeHomeValue(item))
+      .filter((item): item is NonNullable<typeof item> => item !== null) as T;
+  }
+  if (!value || typeof value !== 'object') return value;
+  if (isAdultHomeObject(value)) return null;
+  const output: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const safe = sanitizeHomeValue(child);
+    if (safe !== null) output[key] = safe;
+  }
+  return output as T;
+}
 
 export function getHomeCache(): CachedHomeData | null {
   return cached;
@@ -33,7 +62,7 @@ export function getHomeCache(): CachedHomeData | null {
 let saveHomeCacheTimer: ReturnType<typeof setTimeout> | null = null;
 
 export async function saveHomeCache(sections: unknown): Promise<void> {
-  cached = { sections, savedAt: Date.now() };
+  cached = { sections: sanitizeHomeValue(sections), savedAt: Date.now() };
   if (saveHomeCacheTimer) clearTimeout(saveHomeCacheTimer);
   saveHomeCacheTimer = setTimeout(() => {
     saveHomeCacheTimer = null;
@@ -46,7 +75,11 @@ export async function loadHomeCache(): Promise<CachedHomeData | null> {
   const raw = await storage.getItem<string>(STORAGE_KEY, '');
   if (!raw) return null;
   try {
-    cached = JSON.parse(raw) as CachedHomeData;
+    const parsed = JSON.parse(raw) as CachedHomeData;
+    cached = { sections: sanitizeHomeValue(parsed.sections), savedAt: parsed.savedAt || Date.now() };
+    if (JSON.stringify(cached.sections) !== JSON.stringify(parsed.sections)) {
+      void storage.setItem(STORAGE_KEY, JSON.stringify(cached));
+    }
     return cached;
   } catch {
     return null;
@@ -82,7 +115,7 @@ let cachedFeatured: unknown[] | null = null;
 let saveFeaturedCacheTimer: ReturnType<typeof setTimeout> | null = null;
 
 export async function saveFeaturedCache(items: unknown[]): Promise<void> {
-  cachedFeatured = items;
+  cachedFeatured = sanitizeHomeValue(items) || [];
   if (saveFeaturedCacheTimer) clearTimeout(saveFeaturedCacheTimer);
   saveFeaturedCacheTimer = setTimeout(() => {
     saveFeaturedCacheTimer = null;
@@ -95,7 +128,11 @@ export async function loadFeaturedCache(): Promise<unknown[] | null> {
   const raw = await storage.getItem<string>(FEATURED_KEY, '');
   if (!raw) return null;
   try {
-    cachedFeatured = JSON.parse(raw) as unknown[];
+    const parsed = JSON.parse(raw) as unknown[];
+    cachedFeatured = (sanitizeHomeValue(parsed) as unknown[]) || [];
+    if (JSON.stringify(cachedFeatured) !== JSON.stringify(parsed)) {
+      void storage.setItem(FEATURED_KEY, JSON.stringify(cachedFeatured));
+    }
     return cachedFeatured;
   } catch {
     return null;

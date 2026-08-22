@@ -3,6 +3,7 @@ import { xtream, XtreamMovie, XtreamSeries } from '@/src/lib/xtream';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { saveListCache } from '@/src/state/list-cache';
 import { saveHomeCache, saveFeaturedCache } from '@/src/state/home-cache';
+import { filterOutAdultItems } from '@/src/lib/adult-content';
 
 let prefetchStarted = false;
 
@@ -26,27 +27,33 @@ export function prefetchHomeContent(): void {
 
   (async () => {
     try {
-      const [live, movies, series] = await Promise.all([
+      const [live, movies, series, liveCats, movieCats, seriesCats] = await Promise.all([
         xtream.liveStreams(creds).catch(() => null),
         xtream.vodStreams(creds).catch(() => null),
         xtream.seriesList(creds).catch(() => null),
+        xtream.liveCategories(creds).catch(() => null),
+        xtream.vodCategories(creds).catch(() => null),
+        xtream.seriesCategories(creds).catch(() => null),
       ]);
+      const safeLive = filterOutAdultItems(live || [], liveCats || []);
+      const safeMovies = filterOutAdultItems(movies || [], movieCats || []);
+      const safeSeries = filterOutAdultItems(series || [], seriesCats || []);
 
-      if (live?.length) {
-        saveListCache('channels', [], live);
+      if (safeLive.length) {
+        saveListCache('channels', liveCats || [], safeLive);
       }
-      if (movies?.length) {
-        saveListCache('movies', [], movies);
+      if (safeMovies.length) {
+        saveListCache('movies', movieCats || [], safeMovies);
       }
-      if (series?.length) {
-        saveListCache('series', [], series);
+      if (safeSeries.length) {
+        saveListCache('series', seriesCats || [], safeSeries);
       }
 
       const sections: Record<string, { title: string; items: any[] }> = {};
-      if (live?.length) {
+      if (safeLive.length) {
         sections.live = {
           title: 'CANAIS AO VIVO',
-          items: dedupeByName(live).slice(0, 20).map((c) => ({
+          items: dedupeByName(safeLive).slice(0, 20).map((c) => ({
             id: `live-${c.stream_id}`,
             name: c.name,
             logo: c.stream_icon || undefined,
@@ -54,10 +61,10 @@ export function prefetchHomeContent(): void {
           })),
         };
       }
-      if (movies?.length) {
+      if (safeMovies.length) {
         sections.movies = {
           title: 'FILMES EM ALTA',
-          items: dedupeByName(movies).slice(0, 20).map((m: XtreamMovie) => ({
+          items: dedupeByName(safeMovies).slice(0, 20).map((m: XtreamMovie) => ({
             id: `movie-${m.stream_id}`,
             name: m.name,
             logo: m.stream_icon || undefined,
@@ -65,10 +72,10 @@ export function prefetchHomeContent(): void {
           })),
         };
       }
-      if (series?.length) {
+      if (safeSeries.length) {
         sections.series = {
           title: 'SÉRIES POPULARES',
-          items: dedupeByName(series).slice(0, 20).map((s: XtreamSeries) => ({
+          items: dedupeByName(safeSeries).slice(0, 20).map((s: XtreamSeries) => ({
             id: `series-${s.series_id}`,
             name: s.name,
             logo: s.cover || undefined,
@@ -82,11 +89,11 @@ export function prefetchHomeContent(): void {
         saveHomeCache(sections as any);
       }
 
-      if (movies?.length || series?.length) {
-        const movieEntries = dedupeByName(movies || [])
+      if (safeMovies.length || safeSeries.length) {
+        const movieEntries = dedupeByName(safeMovies)
           .slice(0, 15)
           .map((m: XtreamMovie) => ({ kind: 'movie' as const, id: m.stream_id, name: m.name, cover: m.stream_icon }));
-        const seriesEntries = dedupeByName(series || [])
+        const seriesEntries = dedupeByName(safeSeries)
           .slice(0, 15)
           .map((s: XtreamSeries) => ({ kind: 'series' as const, id: s.series_id, name: s.name, cover: s.cover }));
         const combined = [...movieEntries, ...seriesEntries];

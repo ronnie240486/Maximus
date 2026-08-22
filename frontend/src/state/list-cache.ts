@@ -4,6 +4,7 @@
 // background instead of showing a blank spinner every time.
 
 import { storage } from '@/src/utils/storage';
+import { isAdultCategoryName, isAdultTitle } from '@/src/lib/adult-content';
 
 const PREFIX = 'list_cache_v1_';
 
@@ -14,6 +15,21 @@ export type CachedList<TCategory, TItem> = {
 };
 
 const memory: Record<string, CachedList<any, any>> = {};
+
+function sanitizeList<TCategory, TItem>(categories: TCategory[], items: TItem[]): CachedList<TCategory, TItem> {
+  const safeCategories = Array.isArray(categories)
+    ? categories.filter((category: any) => !isAdultCategoryName(category?.category_name))
+    : [];
+  const adultIds = new Set(
+    (categories || [])
+      .filter((category: any) => isAdultCategoryName(category?.category_name))
+      .map((category: any) => String(category.category_id))
+  );
+  const safeItems = Array.isArray(items)
+    ? items.filter((item: any) => !adultIds.has(String(item?.category_id)) && !isAdultTitle(item?.name))
+    : [];
+  return { categories: safeCategories, items: safeItems, savedAt: Date.now() };
+}
 
 // Limpa tanto o que está salvo no celular quanto a cópia guardada em
 // memória enquanto o app está aberto — sem isso, "Limpar cache" parecia
@@ -31,7 +47,7 @@ export async function saveListCache<TCategory, TItem>(
   categories: TCategory[],
   items: TItem[]
 ): Promise<void> {
-  const data: CachedList<TCategory, TItem> = { categories, items, savedAt: Date.now() };
+  const data = sanitizeList(categories, items);
   memory[key] = data;
   await storage.setItem(PREFIX + key, JSON.stringify(data));
 }
@@ -44,8 +60,13 @@ export async function loadListCache<TCategory, TItem>(
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as CachedList<TCategory, TItem>;
-    memory[key] = parsed;
-    return parsed;
+    const safe = sanitizeList(parsed.categories || [], parsed.items || []);
+    safe.savedAt = parsed.savedAt || Date.now();
+    memory[key] = safe;
+    if (safe.categories.length !== parsed.categories.length || safe.items.length !== parsed.items.length) {
+      void storage.setItem(PREFIX + key, JSON.stringify(safe));
+    }
+    return safe;
   } catch {
     return null;
   }

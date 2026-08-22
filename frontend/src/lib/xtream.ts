@@ -14,6 +14,11 @@ export type XtreamCreds = {
 
 import { Platform } from 'react-native';
 import { storage } from '@/src/utils/storage';
+import {
+  filterOutAdultCategories,
+  isAdultCategoryName,
+  isAdultTitle,
+} from '@/src/lib/adult-content';
 
 // Some Xtream servers hide behind Cloudflare and reject datacenter IPs; from
 // a residential mobile connection (Expo Go / APK) they respond normally, so
@@ -109,6 +114,60 @@ type CacheEntry = { value: unknown; expiresAt: number };
 const xtreamCache = new Map<string, CacheEntry>();
 const xtreamInFlight = new Map<string, Promise<unknown>>();
 
+// IDs de categorias adultas vistos nesta conta. O filtro por título continua
+// ativo mesmo quando o painel não informa a categoria corretamente.
+const adultCategoryIdsByAccount = new Map<string, Set<string>>();
+
+function accountKey(creds: XtreamCreds): string {
+  return `${creds.server}|${creds.username}`;
+}
+
+function sanitizeXtreamPayload<T>(creds: XtreamCreds, action: string, payload: T): T | null {
+  if (payload == null) return payload;
+  const account = accountKey(creds);
+
+  if (action === 'get_live_categories' || action === 'get_vod_categories' || action === 'get_series_categories') {
+    if (!Array.isArray(payload)) return payload;
+    const categories = payload as Array<{ category_id: string | number; category_name: string }>;
+    const adultIds = new Set(
+      categories
+        .filter((category) => isAdultCategoryName(category.category_name))
+        .map((category) => String(category.category_id))
+    );
+    adultCategoryIdsByAccount.set(account, adultIds);
+    return filterOutAdultCategories(categories) as T;
+  }
+
+  if (action === 'get_live_streams' || action === 'get_vod_streams' || action === 'get_series') {
+    if (!Array.isArray(payload)) return payload;
+    const adultIds = adultCategoryIdsByAccount.get(account) || new Set<string>();
+    return (payload as Array<{ category_id?: string | number; name?: string }>).filter(
+      (item) => !adultIds.has(String(item.category_id)) && !isAdultTitle(item.name)
+    ) as T;
+  }
+
+  if (action === 'get_vod_info' || action === 'get_series_info') {
+    const value = payload as { info?: { name?: string }; episodes?: Record<string, Array<{ title?: string }>> };
+    if (isAdultTitle(value?.info?.name)) return null;
+    if (value?.episodes) {
+      for (const key of Object.keys(value.episodes)) {
+        value.episodes[key] = value.episodes[key].filter((episode) => !isAdultTitle(episode.title));
+      }
+    }
+    return payload;
+  }
+
+  if (action === 'get_short_epg') {
+    const value = payload as { epg_listings?: Array<{ title?: string; description?: string }> };
+    if (Array.isArray(value?.epg_listings)) {
+      value.epg_listings = value.epg_listings.filter((entry) => !isAdultTitle(entry.title));
+    }
+    return payload;
+  }
+
+  return payload;
+}
+
 // Métricas simples pra mostrar em Configurações — só conta, não guarda
 // nada sensível. Zera quando o app reabre (é só da sessão atual).
 let cacheHits = 0;
@@ -164,7 +223,9 @@ async function xtreamGet<T>(
     const cached = xtreamCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       cacheHits++;
-      return cached.value as T;
+      const sanitized = sanitizeXtreamPayload(creds, action, cached.value as T);
+      cached.value = sanitized;
+      return sanitized as T;
     }
     // Miss em memória (cold start, provavelmente) — antes de ir pra rede,
     // tenta o disco. Se achar algo ainda válido, usa e já repovoa a
@@ -174,7 +235,10 @@ async function xtreamGet<T>(
       if (fromDisk) {
         cacheHits++;
         xtreamCache.set(cacheKey, fromDisk);
-        return fromDisk.value as T;
+        const sanitized = sanitizeXtreamPayload(creds, action, fromDisk.value as T);
+        fromDisk.value = sanitized;
+        xtreamCache.set(cacheKey, fromDisk);
+        return sanitized as T;
       }
     }
     cacheMisses++;
@@ -210,12 +274,13 @@ async function xtreamGet<T>(
         }
         lastError = null;
         const json = (await res.json()) as T;
+        const sanitized = sanitizeXtreamPayload(creds, action, json);
         if (ttl > 0) {
-          const entry: CacheEntry = { value: json, expiresAt: Date.now() + ttl };
+          const entry: CacheEntry = { value: sanitized, expiresAt: Date.now() + ttl };
           xtreamCache.set(cacheKey, entry);
           if (persistToDisk) writeDiskCache(cacheKey, entry);
         }
-        return json;
+        return sanitized as T;
       } catch (e: any) {
         lastError = e?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
         if (attempt < RETRY_DELAYS_MS.length) {

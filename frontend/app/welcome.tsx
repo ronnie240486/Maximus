@@ -209,7 +209,7 @@ export default function WelcomeScreen() {
             )}
             {showFallbackLogo && (
               <Image
-                source={require('@/assets/images/icon.png')}
+                source={require('@/assets/images/maximus-logo-transparent.png')}
                 style={styles.logoImg}
                 contentFit="contain"
                 testID="welcome-fallback-logo"

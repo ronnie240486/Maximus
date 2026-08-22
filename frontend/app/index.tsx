@@ -488,7 +488,7 @@ export default function MacLoginScreen() {
             <Image source={{ uri: logo }} style={styles.logoImg} contentFit="contain" />
           ) : (
             <Image
-              source={require('@/assets/images/icon.png')}
+              source={require('@/assets/images/maximus-logo-transparent.png')}
               style={styles.logoImg}
               contentFit="contain"
               testID="app-logo"

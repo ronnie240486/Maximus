@@ -6,6 +6,7 @@
 
 import { storage } from '@/src/utils/storage';
 import { getActiveProfileId } from '@/src/state/active-profile';
+import { isAdultTitle } from '@/src/lib/adult-content';
 
 const KEY_PREFIX = 'watch_history_v1_';
 const MAX_ITEMS = 20;
@@ -43,7 +44,11 @@ export async function loadWatchHistory(): Promise<WatchEntry[]> {
     return cache[profileId];
   }
   try {
-    cache[profileId] = JSON.parse(raw) as WatchEntry[];
+    const parsed = JSON.parse(raw) as WatchEntry[];
+    cache[profileId] = Array.isArray(parsed) ? parsed.filter((entry) => !isAdultTitle(entry.name)) : [];
+    if (cache[profileId].length !== parsed.length) {
+      void persist(cache[profileId]);
+    }
   } catch {
     cache[profileId] = [];
   }
@@ -51,6 +56,7 @@ export async function loadWatchHistory(): Promise<WatchEntry[]> {
 }
 
 export async function recordWatch(entry: Omit<WatchEntry, 'updatedAt'>): Promise<void> {
+  if (isAdultTitle(entry.name)) return;
   const list = await loadWatchHistory();
   const withoutThis = list.filter((e) => e.id !== entry.id);
   const next = [{ ...entry, updatedAt: Date.now() }, ...withoutThis].slice(0, MAX_ITEMS);
@@ -75,6 +81,7 @@ export async function updateWatchPosition(
   durationSeconds: number,
   fallback?: { name: string; logo?: string; stream: string; seriesId?: number }
 ): Promise<void> {
+  if (isAdultTitle(fallback?.name)) return;
   const list = await loadWatchHistory();
   const idx = list.findIndex((e) => e.id === id);
   if (idx === -1) {

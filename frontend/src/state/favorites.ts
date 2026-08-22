@@ -6,6 +6,7 @@
 
 import { storage } from '@/src/utils/storage';
 import { getActiveProfileId } from '@/src/state/active-profile';
+import { isAdultTitle } from '@/src/lib/adult-content';
 
 const KEY_PREFIX = 'favorites_v1_';
 
@@ -43,7 +44,11 @@ export async function loadFavorites(): Promise<FavoriteItem[]> {
     return cache[profileId];
   }
   try {
-    cache[profileId] = JSON.parse(raw) as FavoriteItem[];
+    const parsed = JSON.parse(raw) as FavoriteItem[];
+    cache[profileId] = Array.isArray(parsed) ? parsed.filter((item) => !isAdultTitle(item.name)) : [];
+    if (cache[profileId].length !== parsed.length) {
+      void persist(cache[profileId]);
+    }
   } catch {
     cache[profileId] = [];
   }
@@ -60,6 +65,7 @@ export async function isFavorite(id: string): Promise<boolean> {
 }
 
 export async function toggleFavorite(item: Omit<FavoriteItem, 'addedAt'>): Promise<boolean> {
+  if (isAdultTitle(item.name)) return false;
   const list = await loadFavorites();
   const exists = list.some((f) => f.id === item.id);
   const next = exists

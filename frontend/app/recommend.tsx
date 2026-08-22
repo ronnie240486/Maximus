@@ -10,7 +10,13 @@ import { colors, spacing } from '@/src/theme';
 import { posterImageProps } from '@/src/lib/image-placeholder';
 import { getXtream } from '@/src/state/session';
 import { xtream, XtreamCategory, XtreamMovie, XtreamSeries } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
+import {
+  isAdultCategoryName,
+  filterOutAdultCategories,
+  filterOutAdultItems,
+  filterToKidsCategories,
+  filterToKidsItems,
+} from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
 import { loadListCache } from '@/src/state/list-cache';
@@ -168,14 +174,16 @@ export default function RecommendScreen() {
   );
 
   const pick = useCallback(() => {
-    // Perfil infantil: nunca sugere fora da curadoria kids (mesma regra
-    // das telas de Filmes/Séries). Perfil normal: sugere de tudo, só pede
-    // PIN ao abrir algo de categoria adulta (via guard, igual às outras
-    // telas) — não filtra a sugestão em si.
-    const movieCats = kidsMode ? filterToKidsCategories(moviePool.categories) : moviePool.categories;
-    const movieItems = kidsMode ? filterToKidsItems(moviePool.items, moviePool.categories) : moviePool.items;
-    const seriesCats = kidsMode ? filterToKidsCategories(seriesPool.categories) : seriesPool.categories;
-    const seriesItemsBase = kidsMode ? filterToKidsItems(seriesPool.items, seriesPool.categories) : seriesPool.items;
+    // Conteúdo adulto nunca entra em Sugestões, independentemente do perfil.
+    // No perfil infantil aplicamos também a curadoria exclusiva de conteúdo kids.
+    const safeMovieCats = filterOutAdultCategories(moviePool.categories);
+    const safeMovieItems = filterOutAdultItems(moviePool.items, moviePool.categories);
+    const safeSeriesCats = filterOutAdultCategories(seriesPool.categories);
+    const safeSeriesItems = filterOutAdultItems(seriesPool.items, seriesPool.categories);
+    const movieCats = kidsMode ? filterToKidsCategories(safeMovieCats) : safeMovieCats;
+    const movieItems = kidsMode ? filterToKidsItems(safeMovieItems, moviePool.categories) : safeMovieItems;
+    const seriesCats = kidsMode ? filterToKidsCategories(safeSeriesCats) : safeSeriesCats;
+    const seriesItemsBase = kidsMode ? filterToKidsItems(safeSeriesItems, seriesPool.categories) : safeSeriesItems;
 
     let matchedMovies: XtreamMovie[];
     let matchedSeries: XtreamSeries[];

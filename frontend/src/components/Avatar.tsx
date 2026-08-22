@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
+import { View, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getAvatar,
@@ -23,7 +22,7 @@ export default function Avatar({ id, size = 56, radius }: Props) {
     const a = getKidIllustratedAvatar(id);
     return (
       <View style={[styles.wrap, { width: size, height: size, borderRadius: r }]}>
-        <Image source={a.image} style={{ width: size, height: size }} contentFit="cover" />
+        <Image source={a.image} style={{ width: size, height: size }} resizeMode="cover" />
       </View>
     );
   }
@@ -46,7 +45,7 @@ export default function Avatar({ id, size = 56, radius }: Props) {
   const a = getAvatar(id);
   return (
     <View style={[styles.wrap, { width: size, height: size, borderRadius: r }]}>
-      <Image source={a.image} style={{ width: size, height: size }} contentFit="cover" />
+      <Image source={a.image} style={{ width: size, height: size }} resizeMode="cover" />
     </View>
   );
 }
