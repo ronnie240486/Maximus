@@ -13,8 +13,8 @@ const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 
 // Ofuscados em base64 — ver src/lib/obfuscate.ts pra entender o porquê e
 // os limites disso. Valores decodificados:
-//   PANEL_BASE (Railway, primário):    https://renciaappproduction.up.railway.app/api/v5
-//   PANEL_BASE_V4 (Railway, primário): https://renciaappproduction.up.railway.app/api/v4
+//   PANEL_BASE (Railway, primário):    https://renciaapp.up.railway.app/api/v5
+//   PANEL_BASE_V4 (Railway, primário): https://renciaapp.up.railway.app/api/v4
 //   PANEL_BASE_FALLBACK (Manus):       https://renciaapp.manus.space/api/v5
 //   PANEL_BASE_V4_FALLBACK (Manus):    https://renciaapp.manus.space/api/v4
 //
@@ -23,8 +23,8 @@ const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 // liberado, usa a resposta dele direto. Se não (ou se a chamada
 // falhar), tenta o Manus antes de negar — importante enquanto nem
 // todo cliente foi migrado pro Railway ainda.
-const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHBwcm9kdWN0aW9uLnVwLnJhaWx3YXkuYXBwL2FwaS92NQ==');
-const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHBwcm9kdWN0aW9uLnVwLnJhaWx3YXkuYXBwL2FwaS92NA==');
+const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAudXAucmFpbHdheS5hcHAvYXBpL3Y1');
+const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAudXAucmFpbHdheS5hcHAvYXBpL3Y0');
 const PANEL_BASE_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y1');
 const PANEL_BASE_V4_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y0');
 
@@ -255,7 +255,7 @@ export type TestRegisterResult = {
 // URL raiz do painel, sem o /api/v5 ou /api/v4 no final — usada só pra
 // montar a chamada do /api/guim.php abaixo. Railway primeiro, Manus
 // como reserva.
-const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHBwcm9kdWN0aW9uLnVwLnJhaWx3YXkuYXBw');
+const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAudXAucmFpbHdheS5hcHA=');
 const PANEL_ROOT_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2U=');
 
 // URL de FALLBACK do gerador de teste (chatbot sigmab.pro) — só usada se
