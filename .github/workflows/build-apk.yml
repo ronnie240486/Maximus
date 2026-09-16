@@ -63,6 +63,16 @@ jobs:
           CI: '1'
         run: npx expo prebuild --platform android --no-install
 
+      - name: Cache do Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('frontend/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Buildar o APK (debug, sem assinatura de produção)
         working-directory: frontend/android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
