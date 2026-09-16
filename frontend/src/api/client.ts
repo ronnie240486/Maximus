@@ -13,8 +13,8 @@ const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 
 // Ofuscados em base64 — ver src/lib/obfuscate.ts pra entender o porquê e
 // os limites disso. Valores decodificados:
-//   PANEL_BASE (Railway, primário):    https://renciaapp.up.railway.app/api/v5
-//   PANEL_BASE_V4 (Railway, primário): https://renciaapp.up.railway.app/api/v4
+//   PANEL_BASE (Railway, primário):    https://renciaapp-production.up.railway.app/api/v5
+//   PANEL_BASE_V4 (Railway, primário): https://renciaapp-production.up.railway.app/api/v4
 //   PANEL_BASE_FALLBACK (Manus):       https://renciaapp.manus.space/api/v5
 //   PANEL_BASE_V4_FALLBACK (Manus):    https://renciaapp.manus.space/api/v4
 //
@@ -23,8 +23,8 @@ const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 // liberado, usa a resposta dele direto. Se não (ou se a chamada
 // falhar), tenta o Manus antes de negar — importante enquanto nem
 // todo cliente foi migrado pro Railway ainda.
-const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAudXAucmFpbHdheS5hcHAvYXBpL3Y1');
-const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAudXAucmFpbHdheS5hcHAvYXBpL3Y0');
+const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAtcHJvZHVjdGlvbi51cC5yYWlsd2F5LmFwcC9hcGkvdjU=');
+const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAtcHJvZHVjdGlvbi51cC5yYWlsd2F5LmFwcC9hcGkvdjQ=');
 const PANEL_BASE_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y1');
 const PANEL_BASE_V4_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y0');
 
@@ -166,10 +166,27 @@ export async function sendHeartbeat(mac: string, content: string): Promise<void>
   }
 }
 
+// Timeout usado em toda chamada que pode travar a tela de login/splash
+// esperando resposta (ver checkMacAt, checkExpireAt, fetchApkUpdateAt) —
+// sem isso, um domínio fora do ar ou muito lento (Railway ou Manus)
+// prendia a pessoa indefinidamente na tela de carregamento, sem nenhum
+// jeito de saber que algo tinha travado.
+const FETCH_TIMEOUT_MS = 10000;
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function checkMacAt(base: string, mac: string): Promise<MacStatus | null> {
   const upstream = `${base}/check_mac.php?mac=${encodeURIComponent(mac)}`;
   try {
-    const res = await fetch(proxied(upstream), { headers: commonHeaders });
+    const res = await fetchWithTimeout(proxied(upstream), { headers: commonHeaders });
     const json = await safeJson<any>(res);
     if (!json) return null;
     return normalize(json, mac);
@@ -199,7 +216,7 @@ export type ApkUpdate = { url?: string; version?: string };
 
 async function fetchApkUpdateAt(base: string, mac: string): Promise<ApkUpdate> {
   try {
-    const res = await fetch(proxied(`${base}/update.php?mac=${encodeURIComponent(mac)}`), {
+    const res = await fetchWithTimeout(proxied(`${base}/update.php?mac=${encodeURIComponent(mac)}`), {
       headers: commonHeaders,
     });
     const json = await safeJson<any>(res);
@@ -226,7 +243,7 @@ export async function fetchApkUpdate(mac: string): Promise<ApkUpdate> {
 async function checkExpireAt(base: string, mac: string): Promise<{ expired: boolean; expire_date?: string | null } | null> {
   const upstream = `${base}/check_expire.php?mac=${encodeURIComponent(mac)}`;
   try {
-    const res = await fetch(proxied(upstream), { headers: commonHeaders });
+    const res = await fetchWithTimeout(proxied(upstream), { headers: commonHeaders });
     const json = await safeJson<any>(res);
     if (!json) return null;
     return { expired: !!json.expired, expire_date: json.expire_date };
@@ -255,7 +272,7 @@ export type TestRegisterResult = {
 // URL raiz do painel, sem o /api/v5 ou /api/v4 no final — usada só pra
 // montar a chamada do /api/guim.php abaixo. Railway primeiro, Manus
 // como reserva.
-const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAudXAucmFpbHdheS5hcHA=');
+const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAtcHJvZHVjdGlvbi51cC5yYWlsd2F5LmFwcA==');
 const PANEL_ROOT_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2U=');
 
 // URL de FALLBACK do gerador de teste (chatbot sigmab.pro) — só usada se
