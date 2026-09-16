@@ -13,10 +13,20 @@ const PROXY_BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iptv-proxy`;
 
 // Ofuscados em base64 — ver src/lib/obfuscate.ts pra entender o porquê e
 // os limites disso. Valores decodificados:
-//   PANEL_BASE:    https://renciaapp.manus.space/api/v5
-//   PANEL_BASE_V4: https://renciaapp.manus.space/api/v4
-const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y1');
-const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y0');
+//   PANEL_BASE (Railway, primário):    https://renciaappproduction.up.railway.app/api/v5
+//   PANEL_BASE_V4 (Railway, primário): https://renciaappproduction.up.railway.app/api/v4
+//   PANEL_BASE_FALLBACK (Manus):       https://renciaapp.manus.space/api/v5
+//   PANEL_BASE_V4_FALLBACK (Manus):    https://renciaapp.manus.space/api/v4
+//
+// Migração Railway: o painel de administração mudou do Manus pro
+// Railway. Railway é tentado primeiro; se ele disser que o MAC está
+// liberado, usa a resposta dele direto. Se não (ou se a chamada
+// falhar), tenta o Manus antes de negar — importante enquanto nem
+// todo cliente foi migrado pro Railway ainda.
+const PANEL_BASE = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHBwcm9kdWN0aW9uLnVwLnJhaWx3YXkuYXBwL2FwaS92NQ==');
+const PANEL_BASE_V4 = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHBwcm9kdWN0aW9uLnVwLnJhaWx3YXkuYXBwL2FwaS92NA==');
+const PANEL_BASE_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y1');
+const PANEL_BASE_V4_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2UvYXBpL3Y0');
 
 const commonHeaders: Record<string, string> = {
   Accept: 'application/json, text/plain, */*',
@@ -142,28 +152,42 @@ function normalize(json: any, macFallback: string): MacStatus {
 // (ver player.tsx); se falhar (sem internet, painel fora do ar etc.),
 // simplesmente não atualiza dessa vez — nunca interrompe a reprodução.
 export async function sendHeartbeat(mac: string, content: string): Promise<void> {
+  const body = JSON.stringify({ mac, content });
+  const headers = { ...commonHeaders, 'Content-Type': 'application/json' };
   try {
-    await fetch(proxied(`${PANEL_BASE_V4}/heartbeat.php`), {
-      method: 'POST',
-      headers: { ...commonHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mac, content }),
-    });
+    await fetch(proxied(`${PANEL_BASE_V4}/heartbeat.php`), { method: 'POST', headers, body });
   } catch {
-    // silencioso de propósito — isso é só telemetria pro painel, nunca
-    // pode atrapalhar quem está assistindo.
+    try {
+      await fetch(proxied(`${PANEL_BASE_V4_FALLBACK}/heartbeat.php`), { method: 'POST', headers, body });
+    } catch {
+      // silencioso de propósito — isso é só telemetria pro painel, nunca
+      // pode atrapalhar quem está assistindo.
+    }
+  }
+}
+
+async function checkMacAt(base: string, mac: string): Promise<MacStatus | null> {
+  const upstream = `${base}/check_mac.php?mac=${encodeURIComponent(mac)}`;
+  try {
+    const res = await fetch(proxied(upstream), { headers: commonHeaders });
+    const json = await safeJson<any>(res);
+    if (!json) return null;
+    return normalize(json, mac);
+  } catch {
+    return null;
   }
 }
 
 export async function checkMac(mac: string): Promise<MacStatus> {
-  const upstream = `${PANEL_BASE}/check_mac.php?mac=${encodeURIComponent(mac)}`;
-  try {
-    const res = await fetch(proxied(upstream), { headers: commonHeaders });
-    const json = await safeJson<any>(res);
-    if (!json) return { authorized: false, registered: false, mac, message: 'Resposta inválida.' };
-    return normalize(json, mac);
-  } catch {
-    return { authorized: false, registered: false, mac, message: 'Falha de conexão.' };
-  }
+  const primary = await checkMacAt(PANEL_BASE, mac);
+  if (primary && primary.authorized) return primary;
+
+  const fallback = await checkMacAt(PANEL_BASE_FALLBACK, mac);
+  if (fallback) return fallback;
+
+  // Nenhum dos dois respondeu de verdade — devolve o que o Railway
+  // disse (mesmo negando) ou uma falha de conexão genérica.
+  return primary ?? { authorized: false, registered: false, mac, message: 'Falha de conexão.' };
 }
 
 // Endpoint dedicado do link/versão do APK — antes o app só torcia pra que
@@ -173,16 +197,13 @@ export async function checkMac(mac: string): Promise<MacStatus> {
 // Configurações (não em toda checagem de sessão).
 export type ApkUpdate = { url?: string; version?: string };
 
-export async function fetchApkUpdate(mac: string): Promise<ApkUpdate> {
+async function fetchApkUpdateAt(base: string, mac: string): Promise<ApkUpdate> {
   try {
-    const res = await fetch(proxied(`${PANEL_BASE_V4}/update.php?mac=${encodeURIComponent(mac)}`), {
+    const res = await fetch(proxied(`${base}/update.php?mac=${encodeURIComponent(mac)}`), {
       headers: commonHeaders,
     });
     const json = await safeJson<any>(res);
     if (!json) return {};
-    // Nomes de campo podem variar (link direto de APK, ou link da Play
-    // Store) — aceita as variações mais comuns em vez de travar num nome
-    // só.
     const url =
       json.apk_link || json.download_url || json.url || json.link || json.playstore_url || undefined;
     const versionRaw = json.version ?? json.apk_version ?? json.versao;
@@ -196,16 +217,32 @@ export async function fetchApkUpdate(mac: string): Promise<ApkUpdate> {
   }
 }
 
-export async function checkExpire(mac: string): Promise<{ expired: boolean; expire_date?: string | null }> {
-  const upstream = `${PANEL_BASE}/check_expire.php?mac=${encodeURIComponent(mac)}`;
+export async function fetchApkUpdate(mac: string): Promise<ApkUpdate> {
+  const primary = await fetchApkUpdateAt(PANEL_BASE_V4, mac);
+  if (primary.url || primary.version) return primary;
+  return fetchApkUpdateAt(PANEL_BASE_V4_FALLBACK, mac);
+}
+
+async function checkExpireAt(base: string, mac: string): Promise<{ expired: boolean; expire_date?: string | null } | null> {
+  const upstream = `${base}/check_expire.php?mac=${encodeURIComponent(mac)}`;
   try {
     const res = await fetch(proxied(upstream), { headers: commonHeaders });
     const json = await safeJson<any>(res);
-    if (!json) return { expired: true };
+    if (!json) return null;
     return { expired: !!json.expired, expire_date: json.expire_date };
   } catch {
-    return { expired: true };
+    return null;
   }
+}
+
+export async function checkExpire(mac: string): Promise<{ expired: boolean; expire_date?: string | null }> {
+  const primary = await checkExpireAt(PANEL_BASE, mac);
+  if (primary && !primary.expired) return primary;
+
+  const fallback = await checkExpireAt(PANEL_BASE_FALLBACK, mac);
+  if (fallback) return fallback;
+
+  return primary ?? { expired: true };
 }
 
 export type TestRegisterResult = {
@@ -216,8 +253,10 @@ export type TestRegisterResult = {
 };
 
 // URL raiz do painel, sem o /api/v5 ou /api/v4 no final — usada só pra
-// montar a chamada do /api/guim.php abaixo.
-const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2U=');
+// montar a chamada do /api/guim.php abaixo. Railway primeiro, Manus
+// como reserva.
+const PANEL_ROOT = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHBwcm9kdWN0aW9uLnVwLnJhaWx3YXkuYXBw');
+const PANEL_ROOT_FALLBACK = decodeB64('aHR0cHM6Ly9yZW5jaWFhcHAubWFudXMuc3BhY2U=');
 
 // URL de FALLBACK do gerador de teste (chatbot sigmab.pro) — só usada se
 // a busca dinâmica abaixo (via /api/guim.php) falhar por qualquer motivo.
@@ -241,20 +280,28 @@ let cachedGuim: Record<string, unknown> | null = null;
 
 async function fetchGuim(mac: string): Promise<Record<string, unknown> | null> {
   if (cachedGuim) return cachedGuim;
+  const primary = await fetchGuimAt(PANEL_ROOT, mac);
+  if (primary) {
+    cachedGuim = primary;
+    return primary;
+  }
+  const fallback = await fetchGuimAt(PANEL_ROOT_FALLBACK, mac);
+  if (fallback) cachedGuim = fallback;
+  return fallback;
+}
+
+async function fetchGuimAt(root: string, mac: string): Promise<Record<string, unknown> | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(`${PANEL_ROOT}/api/guim.php?mac=${encodeURIComponent(mac)}`, {
+    const res = await fetch(`${root}/api/guim.php?mac=${encodeURIComponent(mac)}`, {
       headers: commonHeaders,
       signal: controller.signal,
     });
     clearTimeout(timeout);
     if (res.ok) {
       const json = await res.json();
-      if (json && typeof json === 'object') {
-        cachedGuim = json;
-        return json;
-      }
+      if (json && typeof json === 'object') return json;
     }
   } catch {
     // Sem internet nesse instante, endpoint fora do ar, resposta em
