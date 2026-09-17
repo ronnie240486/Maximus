@@ -205,9 +205,19 @@ export default function MacLoginScreen() {
     }
     const raw = status?.reseller_whatsapp || '';
     const digits = raw.replace(/\D/g, '');
-    // Sem número cadastrado no painel, abre o WhatsApp mesmo assim (sem
-    // destinatário) em vez de não fazer nada — o botão nunca fica "morto".
-    Linking.openURL(digits ? `https://wa.me/${digits}` : 'https://wa.me/');
+    if (digits) {
+      Linking.openURL(`https://wa.me/${digits}`).catch(() => {});
+      return;
+    }
+    // Sem nenhum número cadastrado no painel (nem "WhatsApp do suporte" nem
+    // "WhatsApp do Revendedor"): abrir "https://wa.me/" sem destinatário só
+    // fazia o próprio WhatsApp recusar com "Não foi possível abrir o link
+    // da conversa" — uma mensagem confusa pro cliente, sem dizer o que
+    // fazer. Mostra um aviso claro em vez disso.
+    Alert.alert(
+      'WhatsApp não configurado',
+      'Seu revendedor ainda não cadastrou um número de WhatsApp no painel. Peça a ele pra configurar em "WhatsApp do Revendedor" nas configurações do app.'
+    );
   };
 
   const [showNamePrompt, setShowNamePrompt] = useState(false);
