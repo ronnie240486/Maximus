@@ -424,3 +424,35 @@ export async function fetchAppExtras(mac: string, force = false): Promise<AppExt
     lockButtonUrl: str(guim.gpcpro_lock_button_url),
   };
 }
+
+// Botão "Renovar Agora" da tela de bloqueio: gera um link de pagamento novo
+// na hora (Mercado Pago), em vez de usar um link fixo salvo no painel — o
+// link de uma preferência de pagamento não pode ser reaproveitado pra
+// sempre. Se o revendedor não tiver configurado o Mercado Pago (ou a
+// chamada falhar), retorna null e quem chamou cai pro link fixo
+// (gpcpro_lock_button_url) ou pro WhatsApp.
+async function fetchRenewalPaymentUrlAt(root: string, mac: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${root}/api/mp/create-preference?mac=${encodeURIComponent(mac)}`, {
+      headers: commonHeaders,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && typeof json.url === 'string' && /^https?:\/\//i.test(json.url)) return json.url;
+    }
+  } catch {
+    // Sem internet, endpoint fora do ar, Mercado Pago indisponível — quem
+    // chamou trata o retorno null com o fallback normal.
+  }
+  return null;
+}
+
+export async function createRenewalPaymentUrl(mac: string): Promise<string | null> {
+  const primary = await fetchRenewalPaymentUrlAt(PANEL_ROOT, mac);
+  if (primary) return primary;
+  return fetchRenewalPaymentUrlAt(PANEL_ROOT_FALLBACK, mac);
+}
