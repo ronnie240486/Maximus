@@ -281,7 +281,18 @@ export default function SettingsScreen() {
   };
 
   const openWhatsapp = () => {
-    if (session?.whatsapp_url) Linking.openURL(session.whatsapp_url).catch(() => {});
+    // Mesma lógica da tela inicial (index.tsx) — o painel tem dois campos
+    // parecidos ("WhatsApp do suporte" e "WhatsApp do Revendedor"). Essa
+    // linha só usava o do suporte (whatsapp_url); se o revendedor só
+    // preenchesse o campo "WhatsApp do Revendedor" (reseller_whatsapp),
+    // a linha aparecia aqui (o subtítulo mostra o número certo) mas o
+    // toque não fazia nada, porque whatsapp_url ficava vazio.
+    if (session?.whatsapp_url) {
+      Linking.openURL(session.whatsapp_url).catch(() => {});
+      return;
+    }
+    const digits = (session?.reseller_whatsapp || '').replace(/\D/g, '');
+    if (digits) Linking.openURL(`https://wa.me/${digits}`).catch(() => {});
   };
 
   const [checkingUpdate, setCheckingUpdate] = useState(false);
