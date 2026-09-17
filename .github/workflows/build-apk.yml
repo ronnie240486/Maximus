@@ -75,7 +75,15 @@ jobs:
 
       - name: Buildar o APK (debug, sem assinatura de produção)
         working-directory: frontend/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        # reactNativeArchitectures=arm64-v8a: sem isso o Gradle empacota as 4
+        # arquiteturas de processador (arm64-v8a, armeabi-v7a, x86, x86_64)
+        # dentro do mesmo APK, deixando o arquivo ~4x maior (por isso o
+        # build daqui saía com ~190MB contra os ~45MB do build feito antes
+        # pela Expo, que já vinha só com arm64-v8a). Praticamente todo
+        # celular e TV box de uso normal (últimos ~8 anos) é arm64-v8a — só
+        # perde suporte a emulador x86/x86_64 e a aparelhos 32-bit bem
+        # antigos (armeabi-v7a), que não são o caso aqui.
+        run: ./gradlew assembleDebug --no-daemon --stacktrace -PreactNativeArchitectures=arm64-v8a
 
       - name: Encontrar o APK gerado
         id: apk
