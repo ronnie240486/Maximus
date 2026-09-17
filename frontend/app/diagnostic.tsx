@@ -33,7 +33,7 @@ export default function BackendDiagScreen() {
     try {
       const perm = await Notifications.requestPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert('Permissão negada', 'Vai em Ajustes do Android > Apps > Maximus Player > Notificações, e ativa manualmente.');
+        Alert.alert('Permissão negada', 'Vai em Ajustes do Android > Apps > Maximus TV Box > Notificações, e ativa manualmente.');
         return;
       }
       await Notifications.setNotificationChannelAsync('game-reminders', {
