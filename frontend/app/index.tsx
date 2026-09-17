@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '@/src/theme';
 import { getDeviceMac } from '@/src/lib/device';
-import { checkMac, MacStatus, registerTestDevice, registerCustomer, fetchAppExtras, AppExtras } from '@/src/api/client';
+import { checkMac, MacStatus, registerTestDevice, registerCustomer, fetchAppExtras, AppExtras, createRenewalPaymentUrl } from '@/src/api/client';
 import { hasUsedTest, markTestUsed } from '@/src/state/test-usage';
 import { parsePlaylistUrl, xtream, XtreamCreds } from '@/src/lib/xtream';
 import { saveSession, loadSession, clearSession } from '@/src/state/session';
@@ -50,6 +50,9 @@ export default function MacLoginScreen() {
   // onTestRegister) — deixa claro pro usuário que ele não travou, só está
   // esperando o servidor de teste terminar de provisionar a conta nova.
   const [testStage, setTestStage] = useState<string | null>(null);
+  // "Renovar Agora": enquanto gera o link de pagamento no Mercado Pago, pra
+  // não deixar a pessoa apertar de novo e abrir duas cobranças ao mesmo tempo.
+  const [renewLoading, setRenewLoading] = useState(false);
   // Enquanto isso for true, não mostramos a tela de "Como entrar" — só uma
   // tela em branco/carregando. Evita o "flash" da tela de login toda vez
   // que o app abre, mesmo já estando logado: antes, a tela de login sempre
@@ -228,6 +231,31 @@ export default function MacLoginScreen() {
       'WhatsApp não configurado',
       'Seu revendedor ainda não cadastrou um número de WhatsApp no painel. Peça a ele pra configurar em "WhatsApp do Revendedor" nas configurações do app.'
     );
+  };
+
+  // "Renovar Agora" na tela de bloqueio: tenta gerar um link de pagamento
+  // (Mercado Pago) na hora — cada toque precisa de um link novo, por isso
+  // isso não vem junto com o resto de "extras" carregado uma vez só. Se o
+  // revendedor não configurou o Mercado Pago (ou der erro), cai pro link
+  // fixo salvo no painel (extras.lockButtonUrl) e, sem nenhum dos dois,
+  // pro WhatsApp — nunca deixa o botão sem fazer nada.
+  const onRenewNow = async () => {
+    if (!mac || renewLoading) return;
+    setRenewLoading(true);
+    try {
+      const paymentUrl = await createRenewalPaymentUrl(mac);
+      if (paymentUrl) {
+        Linking.openURL(paymentUrl).catch(() => {});
+        return;
+      }
+      if (extras.lockButtonUrl) {
+        Linking.openURL(extras.lockButtonUrl).catch(() => {});
+        return;
+      }
+      onOpenWhatsapp();
+    } finally {
+      if (mountedRef.current) setRenewLoading(false);
+    }
   };
 
   const [showNamePrompt, setShowNamePrompt] = useState(false);
@@ -468,15 +496,18 @@ export default function MacLoginScreen() {
             <Text style={styles.lockTitle}>{extras.lockTitle}</Text>
             <Text style={styles.lockMessage}>{extras.lockMessage}</Text>
 
-            {!!extras.lockButtonText && !!extras.lockButtonUrl && (
-              <TVFocusable
-                onPress={() => Linking.openURL(extras.lockButtonUrl!).catch(() => {})}
-                style={styles.lockBtn}
-                testID="mac-lock-btn"
-              >
-                <Text style={styles.lockBtnText}>{extras.lockButtonText}</Text>
-              </TVFocusable>
-            )}
+            <TVFocusable
+              onPress={onRenewNow}
+              disabled={renewLoading}
+              style={[styles.lockBtn, renewLoading && { opacity: 0.6 }]}
+              testID="mac-lock-btn"
+            >
+              {renewLoading ? (
+                <ActivityIndicator color={colors.black} size="small" />
+              ) : (
+                <Text style={styles.lockBtnText}>{extras.lockButtonText || 'Renovar Agora'}</Text>
+              )}
+            </TVFocusable>
 
             <Text style={styles.lockMacLabel}>ID DO DISPOSITIVO (MAC)</Text>
             <Pressable onPress={onCopy} hitSlop={12} testID="mac-lock-value-copy">
