@@ -189,6 +189,16 @@ export default function MacLoginScreen() {
       pollRef.current = null;
     }
     await runPoll(mac);
+    // Rebusca a frase de bloqueio/link de teste do painel ignorando o cache
+    // em memória — antes disso só era buscado uma vez, na abertura do app,
+    // então quem mudasse a "Tela de Bloqueio" no painel só via a mudança
+    // fechando e abrindo o app de novo. Best-effort: não trava nem quebra
+    // o botão se a rede falhar nesse instante.
+    fetchAppExtras(mac, true)
+      .then((ex) => {
+        if (mountedRef.current) setExtras(ex);
+      })
+      .catch(() => {});
     // Restart auto-polling after manual check
     if (mountedRef.current && !status?.authorized) {
       pollRef.current = setTimeout(() => runPoll(mac), POLL_MS);
