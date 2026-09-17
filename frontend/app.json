@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Maximus TV Box",
+    "name": "Maximus mobile",
     "slug": "interactive-player-v2",
     "version": "1.0.0",
     "orientation": "default",
@@ -70,7 +70,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-image.png",
-          "imageWidth": 220,
+          "imageWidth": 280,
           "resizeMode": "contain",
           "backgroundColor": "#0B0F1A"
         }
