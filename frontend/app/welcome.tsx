@@ -115,7 +115,7 @@ export default function WelcomeScreen() {
       return () => clearTimeout(t);
     }
     // O efeito sonoro (uns 3s) começa primeiro; a voz "Bem-vindo ao
-    // Maximus TV Box" (uns 1s) entra um pouco depois, com um respiro —
+    // Maximus mobile" (uns 1s) entra um pouco depois, com um respiro —
     // assim o efeito não fica em cima da voz nem cortado por ela.
     swooshPlayer.play();
     const voiceDelay = setTimeout(() => player.play(), 350);
@@ -215,7 +215,7 @@ export default function WelcomeScreen() {
                 testID="welcome-fallback-logo"
               />
             )}
-            <Text style={styles.welcomeText}>Bem-vindo ao Maximus TV Box</Text>
+            <Text style={styles.welcomeText}>Bem-vindo ao Maximus mobile</Text>
           </View>
           <Text style={styles.skipHint}>Toque para pular</Text>
         </Pressable>

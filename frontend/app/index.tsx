@@ -359,7 +359,7 @@ export default function MacLoginScreen() {
         // errada sem ninguém perceber.
         expire_date: parsed.expiresAt || null,
         playlists: [{ name: 'Teste', url: playlistUrl, type: 'm3u_plus' }],
-        app_name: 'Maximus TV Box',
+        app_name: 'Maximus mobile',
       };
 
       // Limpa qualquer coisa guardada de uma tentativa anterior (outra
@@ -595,7 +595,7 @@ export default function MacLoginScreen() {
           <Text style={styles.diagText}>Diagnosticar backend</Text>
         </TVFocusable>
 
-        <Text style={styles.footer}>{appName || 'Maximus TV Box'}</Text>
+        <Text style={styles.footer}>{appName || 'Maximus mobile'}</Text>
         <Pressable
           onPress={() => Alert.alert('O que mudou nesse build', BUILD_STAMP)}
           hitSlop={10}

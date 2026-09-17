@@ -275,7 +275,7 @@ export default function SettingsScreen() {
 
   const showVersion = () => {
     Alert.alert(
-      session?.app_name || 'Maximus TV Box',
+      session?.app_name || 'Maximus mobile',
       `Versão ${session?.version || '1.0'}\n\n${BUILD_STAMP}`
     );
   };
