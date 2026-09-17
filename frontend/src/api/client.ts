@@ -305,8 +305,12 @@ const TEST_REGISTER_URL_FALLBACK = decodeB64(
 // mesma resposta em vez de disparar uma chamada de rede cada um.
 let cachedGuim: Record<string, unknown> | null = null;
 
-async function fetchGuim(mac: string): Promise<Record<string, unknown> | null> {
-  if (cachedGuim) return cachedGuim;
+// `force`: ignora o cache em memória e busca de novo no painel. Usado no
+// "VERIFICAR NOVAMENTE" (onCheckNow) pra quem mudou a frase de bloqueio,
+// o link do teste automático, etc. no painel enquanto o app já estava
+// aberto não precise fechar e abrir o app de novo pra ver a mudança.
+async function fetchGuim(mac: string, force = false): Promise<Record<string, unknown> | null> {
+  if (cachedGuim && !force) return cachedGuim;
   const primary = await fetchGuimAt(PANEL_ROOT, mac);
   if (primary) {
     cachedGuim = primary;
@@ -404,8 +408,8 @@ export type AppExtras = {
   lockButtonUrl?: string;
 };
 
-export async function fetchAppExtras(mac: string): Promise<AppExtras> {
-  const guim = await fetchGuim(mac);
+export async function fetchAppExtras(mac: string, force = false): Promise<AppExtras> {
+  const guim = await fetchGuim(mac, force);
   if (!guim) return {};
   const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
   return {
