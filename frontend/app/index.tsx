@@ -473,12 +473,106 @@ export default function MacLoginScreen() {
               <Text style={styles.lockMacValue}>{mac}</Text>
             </Pressable>
 
+            {/* TESTE e ZAP também aparecem aqui, igual na tela "Como entrar" —
+                um cliente bloqueado/expirado ainda precisa poder gerar um novo
+                teste (o painel já permite isso pra MAC já cadastrado, ver
+                doTestRegister) e sempre precisa de um jeito de chamar o
+                revendedor, não só quando o botão de renovação por link estiver
+                configurado. */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md, alignItems: 'center' }}>
+              <TVFocusable
+                onPress={onTestRegister}
+                disabled={testing || !!testStage}
+                style={[styles.testBtn, isTV && styles.testBtnTV, (testing || testStage) && { opacity: 0.5 }]}
+                testID="mac-lock-test-register"
+              >
+                {testing || testStage ? (
+                  <ActivityIndicator color={colors.black} size="small" />
+                ) : (
+                  <Ionicons name="flash" size={isTV ? 20 : 14} color={colors.black} />
+                )}
+                <Text style={[styles.testBtnText, isTV && styles.btnTextTV]}>
+                  {testStage ? 'PREPARANDO...' : 'TESTE'}
+                </Text>
+              </TVFocusable>
+
+              <TVFocusable
+                onPress={onOpenWhatsapp}
+                style={[styles.whatsBtn, isTV && styles.whatsBtnTV]}
+                testID="mac-lock-whatsapp-btn"
+              >
+                <Ionicons name="logo-whatsapp" size={isTV ? 20 : 14} color={colors.white} />
+                <Text style={[styles.whatsBtnText, isTV && styles.btnTextTV]}>ZAP</Text>
+              </TVFocusable>
+            </View>
+
+            {!!testStage && (
+              <View style={styles.testStageBox} testID="mac-lock-test-stage">
+                <ActivityIndicator color={colors.accentCyan} size="small" />
+                <Text style={styles.testStageText}>{testStage}</Text>
+              </View>
+            )}
+
             <TVFocusable onPress={onCheckNow} style={styles.lockRetryBtn} testID="mac-lock-retry">
               <Ionicons name="refresh" size={16} color={colors.accentCyan} />
               <Text style={styles.lockRetryText}>VERIFICAR NOVAMENTE</Text>
             </TVFocusable>
           </View>
         </SafeAreaView>
+
+        {/* Mesmo modal de "antes de testar" da tela "Como entrar" — precisa
+            estar duplicado aqui porque essa tela de bloqueio é um "return"
+            separado (só um dos dois JSX chega a renderizar por vez), então
+            o modal declarado lá embaixo nunca apareceria se o TESTE daqui
+            fosse clicado sem isso. */}
+        <Modal visible={showNamePrompt} transparent animationType="fade" onRequestClose={() => setShowNamePrompt(false)}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalBackdrop}
+          >
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Antes de testar</Text>
+              <Text style={styles.modalSubtitle}>
+                Como podemos te chamar? Ajuda o revendedor a saber quem é você quando for liberar o acesso completo.
+              </Text>
+              <TextInput
+                value={nameInput}
+                onChangeText={setNameInput}
+                placeholder="Seu nome"
+                placeholderTextColor={colors.textMuted}
+                style={styles.modalInput}
+                autoFocus
+                testID="lock-test-prompt-name"
+              />
+              <TextInput
+                value={phoneInput}
+                onChangeText={setPhoneInput}
+                placeholder="WhatsApp (opcional)"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                style={styles.modalInput}
+                testID="lock-test-prompt-phone"
+              />
+              <View style={styles.modalBtnRow}>
+                <Pressable
+                  onPress={() => setShowNamePrompt(false)}
+                  style={[styles.modalBtn, styles.modalBtnSecondary]}
+                  testID="lock-test-prompt-cancel"
+                >
+                  <Text style={styles.modalBtnSecondaryText}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={doTestRegister}
+                  disabled={!nameInput.trim()}
+                  style={[styles.modalBtn, styles.modalBtnPrimary, !nameInput.trim() && { opacity: 0.5 }]}
+                  testID="lock-test-prompt-confirm"
+                >
+                  <Text style={styles.modalBtnPrimaryText}>Gerar teste</Text>
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </ImageBackground>
     );
   }
