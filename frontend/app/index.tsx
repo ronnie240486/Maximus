@@ -691,6 +691,23 @@ export default function MacLoginScreen() {
             </TVFocusable>
           </View>
 
+          {/* Mesmo botão "Renovar Agora" da tela de bloqueio — quem já sabe
+              que quer assinar não precisa esperar o teste vencer pra pagar;
+              gera o link do Mercado Pago (ou cai pro link fixo/WhatsApp)
+              igualzinho lá. */}
+          <TVFocusable
+            onPress={onRenewNow}
+            disabled={renewLoading}
+            style={[styles.lockBtn, { marginTop: spacing.sm }, renewLoading && { opacity: 0.6 }]}
+            testID="mac-renew-now"
+          >
+            {renewLoading ? (
+              <ActivityIndicator color={colors.black} size="small" />
+            ) : (
+              <Text style={styles.lockBtnText}>{extras.lockButtonText || 'Renovar Agora'}</Text>
+            )}
+          </TVFocusable>
+
           <View style={styles.statusBox} testID="mac-status-box">
             {checking ? (
               <ActivityIndicator color={colors.accentCyan} size="small" />
