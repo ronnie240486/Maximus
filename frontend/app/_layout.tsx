@@ -3,9 +3,10 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
+import * as NavigationBar from "expo-navigation-bar";
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
-import { LogBox, StatusBar, View, Text, StyleSheet } from "react-native";
+import { AppState, LogBox, Platform, StatusBar, View, Text, StyleSheet } from "react-native";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { verifyAppIntegrity } from "@/src/lib/integrity";
@@ -49,6 +50,28 @@ export default function RootLayout() {
     // código). Chamar isso programaticamente garante que funcione mesmo
     // quando a config passiva falha.
     ScreenOrientation.unlockAsync().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Esconde a barra de navegação do Android por completo (igual foi
+    // feito no Fusion) em vez de só colorir ela — o espaço reservado pra
+    // essa barra é o que aparecia como uma faixa cortando a tela. Behavior
+    // "overlay-swipe": some sozinha de novo pouco depois se a pessoa
+    // arrastar da borda pra revelar (mesmo efeito do "immersive sticky"
+    // do Android nativo). iOS não tem essa barra, então isso é Android-only.
+    if (Platform.OS !== 'android') return;
+    const hideNavBar = () => {
+      NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+      NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
+    };
+    hideNavBar();
+    // O Android tende a trazer a barra de volta quando o app volta a
+    // ficar em primeiro plano (voltar de outro app, desbloquear a tela)
+    // — reaplica nesse momento, igual ao onWindowFocusChanged do Fusion.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') hideNavBar();
+    });
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -178,7 +201,7 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0F1A" />
+      <StatusBar hidden barStyle="light-content" backgroundColor="#0B0F1A" />
       <Stack
         screenOptions={{
           headerShown: false,
