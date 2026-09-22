@@ -21,7 +21,7 @@ import { posterImageProps } from '@/src/lib/image-placeholder';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamMovie } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems, filterOutAdultItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -133,6 +133,16 @@ export default function MoviesScreen() {
     () => (kidsMode ? filterToKidsItems(movies, categories) : movies),
     [movies, categories, kidsMode]
   );
+  // "Todos" agrega o catálogo inteiro sem o usuário escolher categoria
+  // nenhuma — filme adulto não pode aparecer logo de cara aí. Perfil
+  // infantil já exclui adulto por completo (visibleMovies acima); pro
+  // perfil normal, escondemos adulto SÓ dessa visão agregada — continua
+  // acessível selecionando a categoria adulta pelo nome, e ainda protegido
+  // por PIN ao abrir (guard em openMovie).
+  const allViewMovies = useMemo(
+    () => (kidsMode ? visibleMovies : filterOutAdultItems(visibleMovies, categories)),
+    [visibleMovies, categories, kidsMode]
+  );
 
   const catNames = useMemo<string[]>(
     () => [FAVORITES, ALL, ...visibleCategories.map((c) => c.category_name)],
@@ -161,14 +171,16 @@ export default function MoviesScreen() {
   // está favoritado.
   const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
-    const matches = visibleMovies.filter((m) => {
+    const isAllSelected = selectedCat === ALL;
+    const catId = isAllSelected ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+    const baseMovies = isAllSelected ? allViewMovies : visibleMovies;
+    const matches = baseMovies.filter((m) => {
       const catOk = !catId || m.category_id === catId;
       const qOk = !q || m.name.toLowerCase().includes(q);
       return catOk && qOk;
     });
     return sortItems(dedupeByName(matches));
-  }, [visibleMovies, visibleCategories, selectedCat, query, sortItems]);
+  }, [visibleMovies, allViewMovies, visibleCategories, selectedCat, query, sortItems]);
 
   const filtered = useMemo(() => {
     if (selectedCat === FAVORITES) {
