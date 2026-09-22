@@ -20,7 +20,8 @@ import { colors, spacing } from '@/src/theme';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamLive, getLastXtreamError, liveStreamUrl } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems, filterOutAdultItems } from '@/src/lib/adult-content';
+import { isUnreliableIconHost } from '@/src/lib/image-placeholder';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -57,6 +58,12 @@ const ChannelRow = React.memo(function ChannelRow({
   onFocus: (item: XtreamLive) => void;
   onPress: (item: XtreamLive) => void;
 }) {
+  // Ícone hospedado no Imgur nasce já sabido como quebrado (ver comentário
+  // em isUnreliableIconHost) — nem tenta carregar. Fora isso, se a URL
+  // falhar de verdade (404, timeout, host fora do ar), onError troca pro
+  // ícone de TV genérico em vez de deixar a área do ícone em branco.
+  const [imgFailed, setImgFailed] = useState(false);
+  const iconUsable = !!item.stream_icon && !isUnreliableIconHost(item.stream_icon) && !imgFailed;
   return (
     <TVFocusable
       onFocus={() => onFocus(item)}
@@ -66,8 +73,14 @@ const ChannelRow = React.memo(function ChannelRow({
       testID={`tv-channel-${item.stream_id}`}
     >
       <Text style={styles.tvRowNum}>{item.num ?? index + 1}</Text>
-      {item.stream_icon ? (
-        <Image source={{ uri: item.stream_icon }} style={styles.tvRowIcon} contentFit="contain" cachePolicy="memory-disk" />
+      {iconUsable ? (
+        <Image
+          source={{ uri: item.stream_icon }}
+          style={styles.tvRowIcon}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          onError={() => setImgFailed(true)}
+        />
       ) : (
         <MaterialCommunityIcons name="television-classic" size={22} color={colors.textMuted} />
       )}
@@ -76,6 +89,65 @@ const ChannelRow = React.memo(function ChannelRow({
       </Text>
       {isFavorite && <Ionicons name="heart" size={14} color={colors.accentMagenta} />}
     </TVFocusable>
+  );
+});
+
+// Card do grid (celular). Mesmo motivo do ChannelRow: extraído e
+// memoizado, e com seu próprio estado de "ícone falhou" pra não deixar a
+// caixa branca em branco quando o link do logo está morto.
+const ChannelCard = React.memo(function ChannelCard({
+  item,
+  width,
+  isFavorite,
+  categoryName,
+  onPress,
+  onToggleFavorite,
+}: {
+  item: XtreamLive;
+  width: number;
+  isFavorite: boolean;
+  categoryName: string;
+  onPress: (item: XtreamLive) => void;
+  onToggleFavorite: (item: XtreamLive) => void;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const iconUsable = !!item.stream_icon && !isUnreliableIconHost(item.stream_icon) && !imgFailed;
+  return (
+    <Pressable onPress={() => onPress(item)} style={[styles.card, { width }]} testID={`channel-${item.stream_id}`}>
+      <View style={styles.logoBox}>
+        {iconUsable ? (
+          <Image
+            source={{ uri: item.stream_icon }}
+            style={styles.logoImg}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <MaterialCommunityIcons name="television-classic" size={28} color={colors.textMuted} />
+        )}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+        {!!categoryName && (
+          <Text style={styles.cardCat} numberOfLines={1}>
+            {categoryName}
+          </Text>
+        )}
+      </View>
+      <Pressable
+        onPress={() => onToggleFavorite(item)}
+        hitSlop={10}
+        style={styles.cardHeart}
+        testID={`channel-favorite-${item.stream_id}`}
+      >
+        <Ionicons
+          name={isFavorite ? 'heart' : 'heart-outline'}
+          size={16}
+          color={isFavorite ? colors.accentMagenta : colors.textMuted}
+        />
+      </Pressable>
+    </Pressable>
   );
 });
 
@@ -218,6 +290,16 @@ export default function ChannelsScreen() {
     () => (kidsMode ? filterToKidsItems(streams, categories) : streams),
     [streams, categories, kidsMode]
   );
+  // "Todos" agrega o catálogo inteiro sem o usuário escolher categoria
+  // nenhuma — canal adulto não pode aparecer logo de cara aí. Perfil
+  // infantil já exclui adulto por completo (visibleStreams acima); pro
+  // perfil normal, escondemos adulto SÓ dessa visão agregada — continua
+  // acessível selecionando a categoria adulta pelo nome, e ainda protegido
+  // por PIN ao abrir (guard em openChannel).
+  const allViewStreams = useMemo(
+    () => (kidsMode ? visibleStreams : filterOutAdultItems(visibleStreams, categories)),
+    [visibleStreams, categories, kidsMode]
+  );
 
   const catNames = useMemo<string[]>(() => {
     return [FAVORITES, ALL, ...visibleCategories.map((c) => c.category_name)];
@@ -233,7 +315,7 @@ export default function ChannelsScreen() {
     const map: Record<string, number> = {};
     for (const cat of catNames) {
       if (cat === ALL) {
-        map[cat] = visibleStreams.length;
+        map[cat] = allViewStreams.length;
       } else if (cat === FAVORITES) {
         map[cat] = favoriteIds.size;
       } else {
@@ -242,18 +324,20 @@ export default function ChannelsScreen() {
       }
     }
     return map;
-  }, [catNames, visibleStreams, categoryIdByName, favoriteIds]);
+  }, [catNames, visibleStreams, allViewStreams, categoryIdByName, favoriteIds]);
 
   const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const selectedCatId = selectedCat === ALL ? null : categoryIdByName.get(selectedCat);
-    const matches = visibleStreams.filter((s) => {
+    const isAllSelected = selectedCat === ALL;
+    const selectedCatId = isAllSelected ? null : categoryIdByName.get(selectedCat);
+    const baseStreams = isAllSelected ? allViewStreams : visibleStreams;
+    const matches = baseStreams.filter((s) => {
       const catOk = !selectedCatId || s.category_id === selectedCatId;
       const qOk = !q || s.name.toLowerCase().includes(q);
       return catOk && qOk;
     });
     return dedupeByName(matches);
-  }, [visibleStreams, categoryIdByName, selectedCat, query]);
+  }, [visibleStreams, allViewStreams, categoryIdByName, selectedCat, query]);
 
   const filtered = useMemo(() => {
     if (selectedCat === FAVORITES) {
@@ -557,39 +641,14 @@ export default function ChannelsScreen() {
           onViewableItemsChanged={onGridViewableItemsChanged}
           viewabilityConfig={gridViewabilityConfig}
           renderItem={({ item }) => (
-            <Pressable
-              onPress={() => openPlayer(item)}
-              style={[styles.card, { width: itemWidth }]}
-              testID={`channel-${item.stream_id}`}
-            >
-              <View style={styles.logoBox}>
-                {item.stream_icon ? (
-                  <Image source={{ uri: item.stream_icon }} style={styles.logoImg} contentFit="contain" cachePolicy="memory-disk" />
-                ) : (
-                  <MaterialCommunityIcons name="television-classic" size={28} color={colors.textMuted} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-                {!!item.category_id && (
-                  <Text style={styles.cardCat} numberOfLines={1}>
-                    {categoryNameById.get(item.category_id) || ''}
-                  </Text>
-                )}
-              </View>
-              <Pressable
-                onPress={() => onToggleFavorite(item)}
-                hitSlop={10}
-                style={styles.cardHeart}
-                testID={`channel-favorite-${item.stream_id}`}
-              >
-                <Ionicons
-                  name={favoriteIds.has(`channel-${item.stream_id}`) ? 'heart' : 'heart-outline'}
-                  size={16}
-                  color={favoriteIds.has(`channel-${item.stream_id}`) ? colors.accentMagenta : colors.textMuted}
-                />
-              </Pressable>
-            </Pressable>
+            <ChannelCard
+              item={item}
+              width={itemWidth}
+              isFavorite={favoriteIds.has(`channel-${item.stream_id}`)}
+              categoryName={item.category_id ? categoryNameById.get(item.category_id) || '' : ''}
+              onPress={openPlayer}
+              onToggleFavorite={onToggleFavorite}
+            />
           )}
         />
           )}
