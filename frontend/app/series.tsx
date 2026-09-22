@@ -21,7 +21,7 @@ import { posterImageProps } from '@/src/lib/image-placeholder';
 import { getXtream } from '@/src/state/session';
 import { loadListCache, saveListCache } from '@/src/state/list-cache';
 import { xtream, XtreamCategory, XtreamSeries } from '@/src/lib/xtream';
-import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsCategories, filterToKidsItems, filterOutAdultItems } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -123,6 +123,16 @@ export default function SeriesScreen() {
     () => (kidsMode ? filterToKidsItems(series, categories) : series),
     [series, categories, kidsMode]
   );
+  // "Todos" agrega o catálogo inteiro sem o usuário escolher categoria
+  // nenhuma — série adulta não pode aparecer logo de cara aí. Perfil
+  // infantil já exclui adulto por completo (visibleSeries acima); pro
+  // perfil normal, escondemos adulto SÓ dessa visão agregada — continua
+  // acessível selecionando a categoria adulta pelo nome, e ainda protegido
+  // por PIN ao abrir (guard em openSeries).
+  const allViewSeries = useMemo(
+    () => (kidsMode ? visibleSeries : filterOutAdultItems(visibleSeries, categories)),
+    [visibleSeries, categories, kidsMode]
+  );
 
   const catNames = useMemo<string[]>(
     () => [FAVORITES, ALL, ...visibleCategories.map((c) => c.category_name)],
@@ -148,14 +158,16 @@ export default function SeriesScreen() {
   // dependências — favoritar não recalcula mais a lista inteira.
   const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const catId = selectedCat === ALL ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
-    const matches = visibleSeries.filter((s) => {
+    const isAllSelected = selectedCat === ALL;
+    const catId = isAllSelected ? null : visibleCategories.find((c) => c.category_name === selectedCat)?.category_id;
+    const baseSeries = isAllSelected ? allViewSeries : visibleSeries;
+    const matches = baseSeries.filter((s) => {
       const catOk = !catId || s.category_id === catId;
       const qOk = !q || s.name.toLowerCase().includes(q);
       return catOk && qOk;
     });
     return sortItems(dedupeByName(matches));
-  }, [visibleSeries, visibleCategories, selectedCat, query, sortItems]);
+  }, [visibleSeries, allViewSeries, visibleCategories, selectedCat, query, sortItems]);
 
   const filtered = useMemo(() => {
     if (selectedCat === FAVORITES) {
